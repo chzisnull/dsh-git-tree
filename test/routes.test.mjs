@@ -58,6 +58,11 @@ const REFS_FIXTURE = [
   '',
 ].join('\n')
 
+const SHOW_FIXTURE =
+  ['c3c3c3c', 'Ann', 'ann@example.com', '2026-10-20T10:00:00+08:00', 'fix: parser', 'body line', 'c2c2c2c', 'HEAD -> refs/heads/main, tag: refs/tags/v1']
+    .join('\u0000') + '\u001e'
+const NAME_STATUS_FIXTURE = ['M\tsrc/app.js', 'A\tdocs/new.md', 'R100\told.md\tnew.md', ''].join('\n')
+
 function defaultResult(argv) {
   const command = argv[1]
   if (command === 'status') return { exitCode: 0, stdout: STATUS_FIXTURE, stderr: '' }
@@ -68,6 +73,13 @@ function defaultResult(argv) {
   if (command === 'diff') return { exitCode: 0, stdout: DIFF_FIXTURE, stderr: '' }
   if (command === 'for-each-ref') return { exitCode: 0, stdout: REFS_FIXTURE, stderr: '' }
   if (command === 'log') return { exitCode: 0, stdout: LOG_FIXTURE, stderr: '' }
+  if (command === 'show') {
+    return {
+      exitCode: 0,
+      stdout: argv.includes('--name-status') ? NAME_STATUS_FIXTURE : SHOW_FIXTURE,
+      stderr: '',
+    }
+  }
   if (command === 'symbolic-ref') return { exitCode: 0, stdout: 'main\n', stderr: '' }
   if (command === 'ls-files') return { exitCode: 0, stdout: '', stderr: '' }
   if (command === 'commit') return { exitCode: 0, stdout: '[main abc1234] message\n', stderr: '' }
@@ -151,6 +163,7 @@ test('apply registers the nine authenticated exact Fetch routes', () => {
     ctx.routes.map((route) => route.path).sort(),
     [
       '/api/git-tree/commit',
+      '/api/git-tree/commit-info',
       '/api/git-tree/diff',
       '/api/git-tree/history',
       '/api/git-tree/open',
@@ -401,6 +414,55 @@ test('history route scopes to a validated local branch', async () => {
   const bad = await call(ctx, '/api/git-tree/history?scope=branch:' + encodeURIComponent('../escape'))
   assert.equal(bad.body.ok, false)
   assert.equal(bad.body.code, 'invalid-branch-name')
+})
+
+test('commit-info route returns metadata, refs and the changed files', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/commit-info?sha=c3c3c3c')
+  assert.equal(body.ok, true)
+  assert.equal(body.sha, 'c3c3c3c')
+  assert.equal(body.subject, 'fix: parser')
+  assert.equal(body.body, 'body line')
+  assert.deepEqual(body.parents, ['c2c2c2c'])
+  assert.deepEqual(body.refs, [
+    { name: 'main', kind: 'branch' },
+    { name: 'v1', kind: 'tag' },
+  ])
+  assert.deepEqual(body.files, [
+    { status: 'modified', path: 'src/app.js' },
+    { status: 'added', path: 'docs/new.md' },
+    { status: 'renamed', path: 'new.md', origPath: 'old.md' },
+  ])
+  const showCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'show' && spawn.argv.includes('--no-patch'))
+  assert.ok(showCall, 'metadata must come from git show --no-patch')
+})
+
+test('commit-info route refuses non-hex shas before spawning git', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  for (const bad of ['--output=x', 'HEAD~1', 'main', '']) {
+    const { body } = await call(ctx, '/api/git-tree/commit-info?sha=' + encodeURIComponent(bad))
+    assert.equal(body.ok, false, 'must refuse ' + bad)
+    assert.equal(body.code, 'invalid-sha')
+  }
+  assert.equal(ctx.spawns.length, 0)
+})
+
+test('diff route reads one file out of a commit when commit is given', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/diff?commit=c3c3c3c&path=src/app.js')
+  assert.equal(body.ok, true)
+  const callRecord = ctx.spawns.find((spawn) => spawn.argv[1] === 'show')
+  assert.ok(callRecord, 'a commit diff must come from git show')
+  assert.ok(callRecord.argv.includes('c3c3c3c'))
+  assert.ok(callRecord.argv.includes('--format='))
+  assert.equal(callRecord.argv[callRecord.argv.length - 1], 'src/app.js')
+
+  const bad = await call(ctx, '/api/git-tree/diff?commit=' + encodeURIComponent('../x') + '&path=src/app.js')
+  assert.equal(bad.body.ok, false)
+  assert.equal(bad.body.code, 'invalid-sha')
 })
 
 test('refs route parses branches, remotes and tags and marks the current branch', async () => {

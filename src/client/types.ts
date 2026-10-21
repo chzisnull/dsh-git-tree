@@ -44,6 +44,27 @@ export interface HistoryPayload {
 
 export type HistoryScope = 'all' | 'current'
 
+export interface CommitFile {
+  path: string
+  origPath?: string
+  status: 'modified' | 'added' | 'deleted' | 'renamed' | 'copied' | string
+}
+
+export interface CommitDetailPayload {
+  ok: boolean
+  sha?: string
+  author?: string
+  authorEmail?: string
+  date?: string
+  subject?: string
+  body?: string
+  parents?: string[]
+  refs?: HistoryRef[]
+  files?: CommitFile[]
+  error?: string
+  code?: string
+}
+
 /** The workspace view currently shown in the main column. */
 export type ViewKind = 'status' | 'history' | 'search'
 

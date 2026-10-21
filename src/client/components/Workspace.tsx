@@ -8,6 +8,7 @@ import type {
   GitFileEntry,
   GitStatusPayload,
   DiffPayload,
+  CommitDetailPayload,
   HistoryCommit,
   HistoryScope,
   OpenTarget,
@@ -63,6 +64,12 @@ export function Workspace(props: { t?: Translate }): any {
   const [historyError, setHistoryError] = React.useState('')
   const [historyScope, setHistoryScope] = React.useState<HistoryScope>('all')
   const [historySha, setHistorySha] = React.useState('')
+  const [commitDetail, setCommitDetail] = React.useState<CommitDetailPayload | null>(null)
+  const [commitDetailLoading, setCommitDetailLoading] = React.useState(false)
+  const [commitDetailError, setCommitDetailError] = React.useState('')
+  const [commitFile, setCommitFile] = React.useState('')
+  const [commitFileDiff, setCommitFileDiff] = React.useState<DiffPayload | null>(null)
+  const [commitFileDiffLoading, setCommitFileDiffLoading] = React.useState(false)
   const [statusError, setStatusError] = React.useState('')
   const [selected, setSelected] = React.useState<{ path: string; side: EntrySide } | null>(null)
   const [diff, setDiff] = React.useState<DiffPayload | null>(null)
@@ -162,6 +169,53 @@ export function Workspace(props: { t?: Translate }): any {
       }
     },
     [historyCommits, historyScope, repoPath, t],
+  )
+
+  const loadCommitDetail = React.useCallback(
+    async (sha: string) => {
+      setCommitDetailLoading(true)
+      setCommitDetailError('')
+      setCommitDetail(null)
+      try {
+        const next = await fetchCommitInfo({ cwd: repoPath || undefined, sha })
+        if (!next.ok) {
+          setCommitDetailError(next.error || t('historyFailed'))
+        } else {
+          setCommitDetail(next)
+        }
+      } catch (error) {
+        setCommitDetailError(error instanceof Error ? error.message : String(error))
+      } finally {
+        setCommitDetailLoading(false)
+      }
+    },
+    [repoPath, t],
+  )
+
+  React.useEffect(() => {
+    if (view !== 'history' || historySha === '') return
+    setCommitFile('')
+    setCommitFileDiff(null)
+    void loadCommitDetail(historySha)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historySha, view, repoPath])
+
+  const openCommitFile = React.useCallback(
+    async (path: string) => {
+      if (historySha === '') return
+      setCommitFile(path)
+      setCommitFileDiff(null)
+      setCommitFileDiffLoading(true)
+      try {
+        const next = await fetchDiff({ cwd: repoPath || undefined, path, commit: historySha })
+        setCommitFileDiff(next)
+      } catch (error) {
+        setCommitFileDiff({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      } finally {
+        setCommitFileDiffLoading(false)
+      }
+    },
+    [historySha, repoPath],
   )
 
   // Reload whenever the view, repository or branch scope changes.
@@ -341,12 +395,20 @@ export function Workspace(props: { t?: Translate }): any {
           error: historyError,
           scope: historyScope,
           selectedSha: historySha,
+          detail: commitDetail,
+          detailLoading: commitDetailLoading,
+          detailError: commitDetailError,
+          selectedFile: commitFile,
+          fileDiff: commitFileDiff,
+          fileDiffLoading: commitFileDiffLoading,
           t,
           onScope: (scope: HistoryScope) => {
             setHistoryScope(scope)
             setHistorySha('')
           },
           onSelect: (commit: HistoryCommit) => setHistorySha(commit.sha),
+          onSelectFile: (path: string) => void openCommitFile(path),
+          onParent: (sha: string) => setHistorySha(sha),
           onLoadMore: () => void loadHistory(false),
         })
       case 'status':
