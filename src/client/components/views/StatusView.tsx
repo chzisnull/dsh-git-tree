@@ -54,27 +54,31 @@ export function StatusView(props: {
         onCopyPath: props.onCopyPath,
         onContextMenu: props.onContextMenu,
       }),
-      h(DiffView, {
-        selected: props.diffSelection,
-        diff: props.diff,
-        loading: props.diffLoading,
-        hasChanges: props.entries.length > 0,
-        t,
-        onToggleFile: () => {
-          if (props.diffSelection) props.onToggle(props.diffSelection.entry, props.diffSelection.side)
-        },
-      }),
+      h(
+        'div',
+        { className: 'dgt-right' },
+        h(DiffView, {
+          selected: props.diffSelection,
+          diff: props.diff,
+          loading: props.diffLoading,
+          hasChanges: props.entries.length > 0,
+          t,
+          onToggleFile: () => {
+            if (props.diffSelection) props.onToggle(props.diffSelection.entry, props.diffSelection.side)
+          },
+        }),
+        h(CommitBox, {
+          status: props.status,
+          message: props.message,
+          busy: props.busy,
+          hint: props.actionError,
+          hintTone: props.actionError ? 'error' : 'muted',
+          t,
+          inputRef: props.commitInputRef,
+          onMessage: props.onMessage,
+          onCommit: props.onCommit,
+        }),
+      ),
     ),
-    h(CommitBox, {
-      status: props.status,
-      message: props.message,
-      busy: props.busy,
-      hint: props.actionError,
-      hintTone: props.actionError ? 'error' : 'muted',
-      t,
-      inputRef: props.commitInputRef,
-      onMessage: props.onMessage,
-      onCommit: props.onCommit,
-    }),
   )
 }
