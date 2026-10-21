@@ -8,7 +8,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.3.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel. Remotes are out of scope on purpose.
+Version 0.4.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel. Remotes are out of scope on purpose.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Repository switcher** in the toolbar: pick any workspace registered in DSH; every route then runs against that repository.
@@ -20,13 +20,14 @@ Version 0.3.0 is the **local workbench slice**: file status, history, search and
 - **Commit detail**: select a commit to see its message, author, date, parents, refs and changed files; pick a file for its in-commit diff; follow a parent link to jump.
 - **Search view**: find commits by message, author or file path; results reuse the history list and detail.
 - **Branches**: click a branch to browse its history, double-click to check out; create, rename and delete local branches from the rail. Checkout refuses a dirty working copy instead of stashing your changes.
+- **Right-click actions**: file rows offer commit (stage + focus the message), stage/unstage, discard changes, delete file / delete untracked file and copy path; branch rows offer checkout, rename, delete and copy name; commit rows offer copy SHA, new branch from this commit and copy message. Destructive items confirm first and only live items are red.
 - **Local actions**: reveal the repository in Finder or open it in Terminal (macOS).
 - **Live**: the panel polls status every 2s while visible and refetches immediately after a write.
 - **Small write surface by construction**: file-level stage, unstage and commit only. No `reset --hard`, no push, no amend, no discard route exists.
 
 ## Status
 
-| Area | 0.3.0 |
+| Area | 0.4.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | repository switcher (DSH workspaces) | done |
@@ -39,6 +40,7 @@ Version 0.3.0 is the **local workbench slice**: file status, history, search and
 | search (message / author / path) | done |
 | branch navigation + checkout | done |
 | branch create / rename / delete | done |
+| right-click actions + discard / delete | done |
 | Finder / Terminal | done |
 | auto refresh | done |
 | right-sidebar tab (compact mode) | not yet |
@@ -78,6 +80,8 @@ POST /api/git-tree/commit                  → { message } → { sha, shortSha, 
 POST /api/git-tree/checkout                → { branch } → refuses a dirty work tree
 POST /api/git-tree/branch/create|rename|delete
 POST /api/git-tree/open                    → { target: 'finder' | 'terminal' }
+POST /api/git-tree/discard                 → { paths[], side } → git restore
+POST /api/git-tree/remove                  → { paths[], untracked } → git rm / git clean
 ```
 
 Git runs without a shell, with `GIT_TERMINAL_PROMPT=0` (never blocks on credentials), `GIT_OPTIONAL_LOCKS=0` (never takes optional locks in your repo), `GIT_CONFIG_COUNT=0` and bounded output and time. A path that is absolute, contains `..`, or starts with `-` is refused before it reaches `argv`, and a `cwd` outside the workspace is refused with 403.
@@ -111,7 +115,7 @@ Restart DSH after installing: the host half is mounted at app startup. Nothing i
 ```sh
 node build.mjs     # src/client/index.tsx → client.js (committed artifact)
 npm run check      # node --check on both halves
-npm test           # 66 assertions: manifest, host routes, parsers, client boot, import guard
+npm test           # 70 assertions: manifest, host routes, parsers, client boot, import guard
 ```
 
 `build.mjs` resolves esbuild from this package's `node_modules`, then from an installed `dsh-workbench`; if neither is present it stops with the exact command to fix that (`npm i -D esbuild`).

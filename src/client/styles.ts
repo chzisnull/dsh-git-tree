@@ -9,7 +9,7 @@ export const CSS = `
 .dgt-root{position:relative;box-sizing:border-box;height:100%;min-height:0;display:flex;flex-direction:column;
   background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);
   font-family:var(--dsw-font-family);font-size:12.5px;line-height:18px;
-  padding:calc(var(--dsh-frame-top-clearance,0px) + 6px) 10px 10px;
+  padding:0 10px 10px;
   /* readable semantic text: mix the state colour toward the label colour */
   --dgt-ok:color-mix(in srgb, var(--dsw-alias-state-success-primary) 55%, var(--dsw-alias-label-primary));
   --dgt-warn:color-mix(in srgb, var(--dsw-alias-state-warn-primary) 58%, var(--dsw-alias-label-primary));

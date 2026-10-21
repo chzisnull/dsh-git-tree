@@ -34,7 +34,13 @@ export function usePopover(): {
     const onKey = (event: any) => {
       if (event.key === 'Escape') close()
     }
-    const onScroll = () => close()
+    const onScroll = (event: any) => {
+      // Scrolling inside the popover itself (wheel over the list, dragging its
+      // scrollbar) must not dismiss it; only the page behind closes a menu.
+      const target = event && event.target
+      if (target && menuRef.current && menuRef.current.contains && menuRef.current.contains(target)) return
+      close()
+    }
 
     document.addEventListener('mousedown', onDown, true)
     document.addEventListener('keydown', onKey)
