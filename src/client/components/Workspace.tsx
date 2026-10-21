@@ -1,5 +1,6 @@
-// The workspace panel: state, host calls, polling and the Sourcetree-style
-// layout (toolbar / reference rail / change list / diff / commit box).
+// The workspace shell: repository, view, status state and host calls. Each view
+// renders its own surface; the shell owns the toolbar, the reference rail and
+// the shared banners.
 
 import { h, React } from '../react'
 import type { EntrySide, GitFileEntry, GitStatusPayload, DiffPayload, RefsPayload, Translate, WorkspaceRecord } from '../types'
@@ -7,9 +8,8 @@ import { commitChanges, fetchDiff, fetchRefs, fetchStatus, fetchWorkspaces, stag
 import { rowKey, sideFor, splitEntries } from '../model'
 import { TopBar } from './TopBar'
 import { RefRail } from './RefRail'
-import { ChangeList } from './ChangeList'
-import { DiffView } from './DiffView'
-import { CommitBox } from './CommitBox'
+import { StatusView } from './views/StatusView'
+import type { ViewKind } from '../types'
 
 const POLL_MS = 2000
 const REPO_KEY = 'dsh-git-tree/repository'
@@ -32,6 +32,7 @@ export function Workspace(props: { t?: Translate }): any {
   const [refs, setRefs] = React.useState<RefsPayload | null>(null)
   const [workspaces, setWorkspaces] = React.useState<WorkspaceRecord[]>([])
   const [repoPath, setRepoPath] = React.useState('')
+  const [view] = React.useState<ViewKind>('status')
   const [statusError, setStatusError] = React.useState('')
   const [selected, setSelected] = React.useState<{ path: string; side: EntrySide } | null>(null)
   const [diff, setDiff] = React.useState<DiffPayload | null>(null)
@@ -242,6 +243,33 @@ export function Workspace(props: { t?: Translate }): any {
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null
   const truncated = status?.truncated === true
 
+  const renderView = () => {
+    switch (view) {
+      case 'status':
+      default:
+        return h(StatusView, {
+          status,
+          statusError,
+          rows,
+          entries,
+          selectedKey,
+          diffSelection,
+          diff,
+          diffLoading,
+          message,
+          busy,
+          actionError,
+          t,
+          commitInputRef: commitInput,
+          onSelect: (entry: GitFileEntry, side: EntrySide) => void openDiff(entry, side),
+          onToggle: (entry: GitFileEntry, side: EntrySide) => void toggle(entry, side),
+          onCopyPath: copyPath,
+          onMessage: setMessage,
+          onCommit: () => void commit(),
+        })
+    }
+  }
+
   return h(
     'div',
     { className: 'dgt-root', 'data-plugin': 'dsh-git-tree' },
@@ -267,50 +295,7 @@ export function Workspace(props: { t?: Translate }): any {
       : null,
     truncated ? h('div', { className: 'dgt-banner' }, h('span', { className: 'dgt-banner-text' }, t('truncated'))) : null,
 
-    h(
-      'div',
-      { className: 'dgt-body' },
-      h(RefRail, { status, refs, t }),
-      h(
-        'div',
-        { className: 'dgt-main' },
-        h(
-          'div',
-          { className: 'dgt-panes' },
-          h(ChangeList, {
-            status,
-            statusError,
-            rows,
-            selectedKey,
-            t,
-            onSelect: (entry: GitFileEntry, side: EntrySide) => void openDiff(entry, side),
-            onToggle: (entry: GitFileEntry, side: EntrySide) => void toggle(entry, side),
-            onCopyPath: copyPath,
-          }),
-          h(DiffView, {
-            selected: diffSelection,
-            diff,
-            loading: diffLoading,
-            hasChanges: entries.length > 0,
-            t,
-            onToggleFile: () => {
-              if (diffSelection) void toggle(diffSelection.entry, diffSelection.side)
-            },
-          }),
-        ),
-        h(CommitBox, {
-          status,
-          message,
-          busy,
-          hint: actionError,
-          hintTone: actionError ? 'error' : 'muted',
-          t,
-          inputRef: commitInput,
-          onMessage: setMessage,
-          onCommit: () => void commit(),
-        }),
-      ),
-    ),
+    h('div', { className: 'dgt-body' }, h(RefRail, { status, refs, t }), renderView()),
 
     toast ? h('div', { className: 'dgt-toast', role: 'status' }, toast) : null,
     notice ? h('div', { className: 'dgt-toast', role: 'status' }, notice) : null,
