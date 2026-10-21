@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Git Tree",
+    "description": "Sourcetree-style Git workspace panel: local branches, working-tree changes, and diff preview in a full-height main panel."
+  }
+}

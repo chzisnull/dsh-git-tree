@@ -1,0 +1,21 @@
+# dsh-git-tree bundle patch layer.
+#
+# Installed as a profile layer (Lead/installation decision; NOT installed by
+# this skeleton):
+#   plugin_manager action=install_bundle target=<this directory>
+#   or: dsh plugin --profile <name> add /path/to/plugin
+#
+# One dual-face row: the HOST half is package-root `index.js` (plain ESM) and
+# registers the /api/git-tree/* Fetch routes; the CLIENT half is declared in
+# the manifest (`dsh.client` + exports["./client"]) and bundled to
+# lib/client.js by `node build.mjs`. Enabling this row is what makes
+# dsh-client-modules scan the package and serve its browser bundle.
+#
+# A later patch layer can tune or disable the row without removing the bundle:
+#   - id: dsh-git-tree
+#     disabled: true
+# 
+# (No `config` here: this skeleton exports no schemastery Config. See README.)
+- insert:
+    - id: dsh-git-tree
+      name: dsh-git-tree

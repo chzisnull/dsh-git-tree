@@ -1,0 +1,8 @@
+.DS_Store
+node_modules/
+
+# Build scratch: the intermediate esbuild bundle, removed by build.mjs
+.client.bundle.cjs
+
+# Dev-only screenshots/renders
+preview/shots/

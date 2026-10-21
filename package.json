@@ -1,0 +1,58 @@
+{
+  "name": "dsh-git-tree",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness plugin: a Sourcetree-style Git workspace — local branches, working-tree changes and diff preview in a full-height panel.",
+  "license": "MIT",
+  "type": "module",
+  "icon": "./icon.svg",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chzisnull/dsh-git-tree.git"
+  },
+  "homepage": "https://github.com/chzisnull/dsh-git-tree#readme",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "dsh",
+    "git",
+    "source-control",
+    "diff"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "icon.svg",
+    "cordis.patch.yml",
+    "locale",
+    "src/client",
+    "build.mjs",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node --check index.js && node --check client.js",
+    "test": "node --test test/manifest.test.mjs test/routes.test.mjs test/ui-contract.test.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  }
+}
