@@ -115,6 +115,20 @@ export interface RefsPayload {
   code?: string
 }
 
+export interface WorkspaceRecord {
+  id: string
+  path: string
+  title: string
+}
+
+export interface WorkspacesPayload {
+  ok: boolean
+  current?: string
+  workspaces?: WorkspaceRecord[]
+  error?: string
+  code?: string
+}
+
 export interface MutationPayload {
   ok: boolean
   error?: string

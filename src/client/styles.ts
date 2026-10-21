@@ -16,7 +16,25 @@ export const CSS = `
   border:1px solid var(--dsw-alias-border-l2);border-bottom:0;
   border-radius:var(--dsw-radius-md) var(--dsw-radius-md) 0 0;
   background:var(--dsw-alias-bg-layer-1);}
-.dgt-repo{display:flex;align-items:baseline;gap:8px;min-width:0;}
+.dgt-repo{position:relative;display:flex;align-items:baseline;gap:8px;min-width:0;}
+.dgt-repo-switch{display:inline-flex;align-items:center;gap:4px;margin-left:-4px;padding:2px 4px;border:0;
+  border-radius:var(--dsw-radius-xs);background:transparent;color:var(--dsw-alias-label-primary);
+  font:inherit;font-size:13px;font-weight:600;cursor:pointer;max-width:24vw;}
+.dgt-repo-switch:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-repo-caret{color:var(--dsw-alias-label-tertiary);font-size:10px;line-height:1;}
+.dgt-repo-menu{position:absolute;left:0;top:calc(100% + 8px);z-index:20;min-width:300px;max-width:440px;
+  max-height:320px;overflow:auto;padding:4px;border:1px solid var(--dsw-alias-border-l2);
+  border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-layer-3);
+  box-shadow:0 8px 24px var(--dsw-alias-bg-mask-1);}
+.dgt-repo-menu-item{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;
+  padding:5px 8px;border:0;border-radius:var(--dsw-radius-xs);background:transparent;
+  color:var(--dsw-alias-label-primary);font:inherit;text-align:left;cursor:pointer;}
+.dgt-repo-menu-item:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-repo-menu-item[data-current]{background:var(--dsw-alias-interactive-bg-active);}
+.dgt-repo-menu-title{font-size:12px;font-weight:500;}
+.dgt-repo-menu-path{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--dsw-alias-label-tertiary);font-size:10.5px;direction:rtl;text-align:left;}
+.dgt-repo-menu-empty{padding:6px 8px;color:var(--dsw-alias-label-tertiary);font-size:11.5px;}
 .dgt-repo-name{font-size:13px;font-weight:600;white-space:nowrap;}
 .dgt-repo-path{font-size:11px;color:var(--dsw-alias-label-tertiary);max-width:26vw;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;}

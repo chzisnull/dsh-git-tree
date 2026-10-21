@@ -13,7 +13,7 @@ import { MAX_DIFF_BYTES, MAX_REFS_BYTES, MAX_STATUS_BYTES, git, subprocessOf } f
 import { parseUnifiedDiff } from './diff.js'
 import { parsePorcelainV2, summariseEntries } from './porcelain.js'
 import { REF_ARGS, parseRefs } from './refs.js'
-import { resolveCwd, safeRepoPath } from './paths.js'
+import { resolveCwd, safeRepoPath, workspaceRootOf } from './paths.js'
 import { RequestError } from './errors.js'
 import { json } from './http.js'
 
@@ -44,6 +44,36 @@ async function readIdentity(subprocess, cwd) {
 }
 
 // ── read routes ────────────────────────────────────────────────────────────
+
+/**
+ * Registered workspaces for the top-bar repository switcher. The current
+ * session workspace is always included, even before the registry has any row.
+ */
+export async function handleWorkspaces(ctx) {
+  const workspaces = []
+  try {
+    const registry = ctx.get('workspaceRegistry')
+    if (registry && typeof registry.list === 'function') {
+      for (const workspace of registry.list()) {
+        if (!workspace || typeof workspace.path !== 'string' || !workspace.path) continue
+        const segments = workspace.path.split(/[\\/]+/).filter(Boolean)
+        workspaces.push({
+          id: String(workspace.id ?? workspace.path),
+          path: workspace.path,
+          title: workspace.title || segments[segments.length - 1] || workspace.path,
+        })
+      }
+    }
+  } catch {
+    /* registry not present in this composition */
+  }
+  const current = workspaceRootOf(ctx)
+  if (!workspaces.some((workspace) => workspace.path === current)) {
+    const segments = current.split(/[\\/]+/).filter(Boolean)
+    workspaces.unshift({ id: current, path: current, title: segments[segments.length - 1] || current })
+  }
+  return json({ ok: true, current, workspaces })
+}
 
 export async function handleStatus(ctx, request) {
   const { cwd } = handleCwd(ctx, request)

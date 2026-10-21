@@ -7,6 +7,7 @@
  * relative path with no traversal, no leading dash and no NUL.
  */
 
+import { realpathSync } from 'node:fs'
 import { isAbsolute, relative, resolve as resolvePath } from 'node:path'
 import { RequestError } from './errors.js'
 
@@ -31,28 +32,57 @@ export function workspaceRootOf(ctx) {
 }
 
 /**
- * Resolve the requested `cwd` (optional) and confine it to the workspace root.
- * A panel may only read repositories inside the workspace it was opened in.
+ * Every directory a git command may run in: the session workspace plus every
+ * workspace DSH has registered. This is the trust boundary the repo switcher
+ * relies on — a client can name any registered workspace, never an arbitrary
+ * path.
  */
-export function resolveCwd(ctx, requested) {
-  const root = workspaceRootOf(ctx)
-  if (!requested) return root
-  if (typeof requested !== 'string' || requested.includes('\0')) throw new RequestError('无效的 cwd 参数')
-  let absolute
+export function allowedRoots(ctx) {
+  // Roots are compared as real paths so /tmp and /private/tmp agree.
+  const roots = []
+  const add = (value) => {
+    if (typeof value === 'string' && value && !roots.includes(value)) roots.push(value)
+  }
+  add(workspaceRootOf(ctx))
   try {
-    const fs = ctx.get('fs')
-    if (fs && typeof fs.resolve === 'function') {
-      const target = fs.resolve(requested)
-      absolute = target ? (typeof fs.processPath === 'function' ? fs.processPath(target) : target) : requested
-    } else {
-      absolute = resolvePath(root, requested)
+    const registry = ctx.get('workspaceRegistry')
+    if (registry && typeof registry.list === 'function') {
+      for (const workspace of registry.list()) add(workspace && workspace.path)
     }
   } catch {
-    throw new RequestError('无法解析 cwd 参数')
+    /* service not present in this composition */
   }
+  return roots.map(realpathOr)
+}
+
+/** Real path when the target exists; the original value otherwise. */
+function realpathOr(value) {
+  try {
+    return realpathSync.native(value)
+  } catch {
+    return value
+  }
+}
+
+function isInside(root, absolute) {
   const rel = relative(root, absolute)
-  if (rel !== '' && (rel.startsWith('..') || isAbsolute(rel))) {
-    throw new RequestError('cwd 位于工作区之外', 403, 'outside-workspace')
+  return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
+}
+
+/**
+ * Resolve the requested `cwd` (optional) and confine it to a registered
+ * workspace. Without a requested cwd the session workspace is used.
+ */
+export function resolveCwd(ctx, requested) {
+  const roots = allowedRoots(ctx)
+  const root = roots[0] ?? workspaceRootOf(ctx)
+  if (!requested) return root
+  if (typeof requested !== 'string' || requested.includes('\0')) throw new RequestError('无效的 cwd 参数')
+  // Resolve with node:path only. `ctx.fs.resolve()` returns an opaque FsTarget
+  // for the model's filesystem view, not an OS path a child process can chdir to.
+  const absolute = realpathOr(isAbsolute(requested) ? requested : resolvePath(root, requested))
+  if (!roots.some((candidate) => isInside(candidate, absolute))) {
+    throw new RequestError('cwd 不在任何已注册工作区内', 403, 'outside-workspace')
   }
   return absolute
 }

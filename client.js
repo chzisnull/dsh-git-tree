@@ -37,6 +37,8 @@ var NS = "dsh-git-tree";
 var EN = {
   panel: "Git",
   refresh: "Refresh",
+  switchRepository: "Switch repository",
+  noRepositories: "No registered repositories",
   refs: "References",
   readOnly: "Read-only for now",
   workspace: "Workspace",
@@ -87,6 +89,8 @@ var EN = {
 var ZH = {
   panel: "Git",
   refresh: "\u5237\u65B0",
+  switchRepository: "\u5207\u6362\u4ED3\u5E93",
+  noRepositories: "\u6CA1\u6709\u5DF2\u6CE8\u518C\u7684\u4ED3\u5E93",
   refs: "\u5F15\u7528",
   readOnly: "\u6682\u4E3A\u53EA\u8BFB",
   workspace: "\u5DE5\u4F5C\u533A",
@@ -147,7 +151,25 @@ var CSS = `
   border:1px solid var(--dsw-alias-border-l2);border-bottom:0;
   border-radius:var(--dsw-radius-md) var(--dsw-radius-md) 0 0;
   background:var(--dsw-alias-bg-layer-1);}
-.dgt-repo{display:flex;align-items:baseline;gap:8px;min-width:0;}
+.dgt-repo{position:relative;display:flex;align-items:baseline;gap:8px;min-width:0;}
+.dgt-repo-switch{display:inline-flex;align-items:center;gap:4px;margin-left:-4px;padding:2px 4px;border:0;
+  border-radius:var(--dsw-radius-xs);background:transparent;color:var(--dsw-alias-label-primary);
+  font:inherit;font-size:13px;font-weight:600;cursor:pointer;max-width:24vw;}
+.dgt-repo-switch:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-repo-caret{color:var(--dsw-alias-label-tertiary);font-size:10px;line-height:1;}
+.dgt-repo-menu{position:absolute;left:0;top:calc(100% + 8px);z-index:20;min-width:300px;max-width:440px;
+  max-height:320px;overflow:auto;padding:4px;border:1px solid var(--dsw-alias-border-l2);
+  border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-layer-3);
+  box-shadow:0 8px 24px var(--dsw-alias-bg-mask-1);}
+.dgt-repo-menu-item{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;
+  padding:5px 8px;border:0;border-radius:var(--dsw-radius-xs);background:transparent;
+  color:var(--dsw-alias-label-primary);font:inherit;text-align:left;cursor:pointer;}
+.dgt-repo-menu-item:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-repo-menu-item[data-current]{background:var(--dsw-alias-interactive-bg-active);}
+.dgt-repo-menu-title{font-size:12px;font-weight:500;}
+.dgt-repo-menu-path{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--dsw-alias-label-tertiary);font-size:10.5px;direction:rtl;text-align:left;}
+.dgt-repo-menu-empty{padding:6px 8px;color:var(--dsw-alias-label-tertiary);font-size:11.5px;}
 .dgt-repo-name{font-size:13px;font-weight:600;white-space:nowrap;}
 .dgt-repo-path{font-size:11px;color:var(--dsw-alias-label-tertiary);max-width:26vw;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;}
@@ -323,6 +345,7 @@ var CSS = `
 
 // src/client/routes.ts
 var STATUS_ROUTE = "api/git-tree/status";
+var WORKSPACES_ROUTE = "api/git-tree/workspaces";
 var DIFF_ROUTE = "api/git-tree/diff";
 var REFS_ROUTE = "api/git-tree/refs";
 var STAGE_ROUTE = "api/git-tree/stage";
@@ -351,23 +374,26 @@ async function postJson(route, body, signal) {
   });
   return await response.json();
 }
-function fetchStatus(signal) {
-  return getJson(STATUS_ROUTE, {}, signal);
+function fetchWorkspaces(signal) {
+  return getJson(WORKSPACES_ROUTE, {}, signal);
+}
+function fetchStatus(cwd, signal) {
+  return getJson(STATUS_ROUTE, { cwd }, signal);
 }
 function fetchDiff(params, signal) {
   return getJson(DIFF_ROUTE, params, signal);
 }
-function fetchRefs(signal) {
-  return getJson(REFS_ROUTE, {}, signal);
+function fetchRefs(cwd, signal) {
+  return getJson(REFS_ROUTE, { cwd }, signal);
 }
-function stagePaths(paths) {
-  return postJson(STAGE_ROUTE, { paths });
+function stagePaths(paths, cwd) {
+  return postJson(STAGE_ROUTE + query({ cwd }), { paths });
 }
-function unstagePaths(paths) {
-  return postJson(UNSTAGE_ROUTE, { paths });
+function unstagePaths(paths, cwd) {
+  return postJson(UNSTAGE_ROUTE + query({ cwd }), { paths });
 }
-function commitChanges(message) {
-  return postJson(COMMIT_ROUTE, { message });
+function commitChanges(message, cwd) {
+  return postJson(COMMIT_ROUTE + query({ cwd }), { message });
 }
 
 // src/client/model.ts
@@ -478,22 +504,57 @@ function MoreIcon() {
 // src/client/components/TopBar.tsx
 function TopBar(props) {
   const { status, t } = props;
+  const [open, setOpen] = React.useState(false);
   const branch = status?.branch && status.branch !== "(detached)" ? status.branch : status?.branch || "\u2014";
   const ahead = status?.ahead ?? 0;
   const behind = status?.behind ?? 0;
   const staged = status?.counts?.staged ?? 0;
+  const repoPath = props.currentPath || status?.repoRoot || status?.cwd || "";
+  const current = props.workspaces.find((workspace) => workspace.path === repoPath);
+  const title = current?.title || (status?.repoRoot ? lastSegment(status.repoRoot) : t("panel"));
   return h(
     "header",
     { className: "dgt-topbar" },
     h(
       "div",
       { className: "dgt-repo" },
-      h("span", { className: "dgt-repo-name" }, status?.repoRoot ? lastSegment(status.repoRoot) : t("panel")),
       h(
-        "span",
-        { className: "dgt-repo-path", title: status?.repoRoot || status?.cwd || "" },
-        status?.repoRoot || status?.cwd || "\u2014"
-      )
+        "button",
+        {
+          type: "button",
+          className: "dgt-repo-switch",
+          title: t("switchRepository"),
+          "aria-haspopup": "listbox",
+          "aria-expanded": open,
+          onClick: () => setOpen(!open)
+        },
+        h("span", { className: "dgt-repo-name" }, title),
+        h("span", { className: "dgt-repo-caret", "aria-hidden": "true" }, "\u25BE")
+      ),
+      h("span", { className: "dgt-repo-path", title: repoPath }, repoPath || "\u2014"),
+      open ? h(
+        "div",
+        { className: "dgt-repo-menu", role: "listbox", "aria-label": t("switchRepository") },
+        props.workspaces.length === 0 ? h("div", { className: "dgt-repo-menu-empty" }, t("noRepositories")) : props.workspaces.map(
+          (workspace) => h(
+            "button",
+            {
+              key: workspace.id,
+              type: "button",
+              className: "dgt-repo-menu-item",
+              role: "option",
+              "aria-selected": workspace.path === repoPath,
+              "data-current": workspace.path === repoPath || void 0,
+              onClick: () => {
+                setOpen(false);
+                props.onSelectWorkspace(workspace.path);
+              }
+            },
+            h("span", { className: "dgt-repo-menu-title" }, workspace.title),
+            h("span", { className: "dgt-repo-menu-path" }, workspace.path)
+          )
+        )
+      ) : null
     ),
     h(
       "div",
@@ -913,6 +974,7 @@ function CommitBox(props) {
 
 // src/client/components/Workspace.tsx
 var POLL_MS = 2e3;
+var REPO_KEY = "dsh-git-tree/repository";
 function findEntry(status, path) {
   return (status?.entries ?? []).find((entry) => entry.path === path) ?? null;
 }
@@ -925,6 +987,8 @@ function Workspace(props) {
   const t = typeof props.t === "function" ? props.t : (key) => key;
   const [status, setStatus] = React.useState(null);
   const [refs, setRefs] = React.useState(null);
+  const [workspaces, setWorkspaces] = React.useState([]);
+  const [repoPath, setRepoPath] = React.useState("");
   const [statusError, setStatusError] = React.useState("");
   const [selected, setSelected] = React.useState(null);
   const [diff, setDiff] = React.useState(null);
@@ -950,7 +1014,7 @@ function Workspace(props) {
     async (options) => {
       if (!options?.silent) setRefreshing(true);
       try {
-        const next = await fetchStatus();
+        const next = await fetchStatus(repoPath || void 0);
         if (next.ok) {
           setStatus(next);
           setStatusError("");
@@ -965,28 +1029,44 @@ function Workspace(props) {
         if (!options?.silent) setRefreshing(false);
       }
     },
-    [t]
+    [repoPath, t]
   );
   const loadRefs = React.useCallback(async () => {
     try {
-      const next = await fetchRefs();
+      const next = await fetchRefs(repoPath || void 0);
       if (next.ok) setRefs(next);
     } catch {
     }
-  }, []);
+  }, [repoPath]);
   const openDiff = React.useCallback(async (entry, side) => {
     setSelected({ path: entry.path, side });
     setDiff(null);
     if (entry.kind === "ignored") return;
     setDiffLoading(true);
     try {
-      const next = await fetchDiff({ path: entry.path, side: sideFor(entry, side) });
+      const next = await fetchDiff({ path: entry.path, side: sideFor(entry, side), cwd: repoPath || void 0 });
       setDiff(next);
     } catch (error) {
       setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
     } finally {
       setDiffLoading(false);
     }
+  }, [repoPath]);
+  React.useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const list = await fetchWorkspaces();
+        if (cancelled || !list.ok) return;
+        setWorkspaces(list.workspaces ?? []);
+        const saved = typeof localStorage !== "undefined" ? localStorage.getItem(REPO_KEY) : null;
+        if (saved && (list.workspaces ?? []).some((workspace) => workspace.path === saved)) setRepoPath(saved);
+      } catch {
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
   React.useEffect(() => {
     void loadStatus();
@@ -1030,9 +1110,9 @@ function Workspace(props) {
       setBusy(true);
       setActionError("");
       try {
-        const result = side === "staged" ? await unstagePaths([entry.path]) : await stagePaths([entry.path]);
+        const result = side === "staged" ? await unstagePaths([entry.path], repoPath || void 0) : await stagePaths([entry.path], repoPath || void 0);
         if (!result.ok) throw new Error(result.error || (side === "staged" ? t("unstageFailed") : t("stageFailed")));
-        const next = await fetchStatus();
+        const next = await fetchStatus(repoPath || void 0);
         if (next.ok) setStatus(next);
         if (selected?.path === entry.path && next.ok) {
           const updated = findEntry(next, entry.path);
@@ -1044,7 +1124,7 @@ function Workspace(props) {
         setBusy(false);
       }
     },
-    [openDiff, selected, t]
+    [openDiff, repoPath, selected, t]
   );
   const copyPath = React.useCallback(
     (entry) => {
@@ -1064,7 +1144,7 @@ function Workspace(props) {
     setBusy(true);
     setActionError("");
     try {
-      const result = await commitChanges(message);
+      const result = await commitChanges(message, repoPath || void 0);
       if (!result.ok) throw new Error(result.error || t("commitFailed"));
       showToast([t("commitDone"), result.shortSha, result.subject].filter(Boolean).join(" \xB7 "));
       setMessage("");
@@ -1077,7 +1157,18 @@ function Workspace(props) {
     } finally {
       setBusy(false);
     }
-  }, [loadRefs, loadStatus, message, showToast, status, t]);
+  }, [loadRefs, loadStatus, message, repoPath, showToast, status, t]);
+  const switchWorkspace = React.useCallback((path) => {
+    setRepoPath(path);
+    try {
+      if (typeof localStorage !== "undefined") localStorage.setItem(REPO_KEY, path);
+    } catch {
+    }
+    setSelected(null);
+    setDiff(null);
+    setActionError("");
+    setMessage("");
+  }, []);
   const entries = status?.entries ?? [];
   const rows = splitEntries(entries);
   const selectedKey = selected ? rowKey(selected.path, selected.side) : "";
@@ -1089,9 +1180,12 @@ function Workspace(props) {
     { className: "dgt-root", "data-plugin": "dsh-git-tree" },
     h(TopBar, {
       status,
+      workspaces,
+      currentPath: repoPath || status?.repoRoot || status?.cwd || "",
       busy: refreshing || busy,
       t,
       onRefresh: () => void loadStatus(),
+      onSelectWorkspace: switchWorkspace,
       onCommitFocus: () => {
         if (commitInput.current && commitInput.current.focus) commitInput.current.focus();
       }

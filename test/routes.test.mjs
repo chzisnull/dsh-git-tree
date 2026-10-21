@@ -66,6 +66,12 @@ function fakeContext({ handler = defaultResult } = {}) {
   const spawns = []
   const services = {
     sandboxPolicy: { workspaceRoot: WORKSPACE },
+    workspaceRegistry: {
+      list: () => [
+        { id: 'w-main', path: WORKSPACE, title: 'fake-workspace' },
+        { id: 'w-other', path: '/tmp/other-repo', title: 'other-repo' },
+      ],
+    },
     subprocess: {
       async resolveExecutable(command) {
         if (command !== 'git') throw new Error('unexpected executable')
@@ -134,6 +140,7 @@ test('apply registers the six authenticated exact Fetch routes', () => {
       '/api/git-tree/stage',
       '/api/git-tree/status',
       '/api/git-tree/unstage',
+      '/api/git-tree/workspaces',
     ],
   )
   for (const route of ctx.routes) {
@@ -144,6 +151,43 @@ test('apply registers the six authenticated exact Fetch routes', () => {
       : ['GET']
     assert.deepEqual(route.methods, expected, 'unexpected methods for ' + route.path)
   }
+})
+
+test('workspaces route lists the registered workspaces and the current one', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/workspaces')
+  assert.equal(body.ok, true)
+  assert.equal(body.current, WORKSPACE)
+  assert.deepEqual(
+    body.workspaces.map((workspace) => workspace.path).sort(),
+    ['/tmp/fake-workspace', '/tmp/other-repo'],
+  )
+  assert.equal(body.workspaces.find((workspace) => workspace.path === '/tmp/other-repo').title, 'other-repo')
+})
+
+test('cwd inside another registered workspace is allowed, an unregistered one is refused', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const allowed = await call(ctx, '/api/git-tree/status?cwd=' + encodeURIComponent('/tmp/other-repo'))
+  assert.equal(allowed.body.ok, true)
+  const statusCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'status')
+  assert.equal(statusCall.cwd, '/tmp/other-repo')
+
+  const refused = await call(ctx, '/api/git-tree/status?cwd=' + encodeURIComponent('/tmp/not-a-workspace'))
+  assert.equal(refused.body.ok, false)
+  assert.equal(refused.body.code, 'outside-workspace')
+})
+
+test('an opaque ctx.fs target never leaks into a child-process cwd', async () => {
+  // ctx.fs.resolve() returns an opaque FsTarget for the model's file view; a
+  // cwd must be resolved with node:path instead (regression: ENOENT on spawn).
+  const ctx = fakeContext({ fs: { resolve: () => ({ opaqueTarget: true }) } })
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/status?cwd=' + encodeURIComponent('/tmp/other-repo'))
+  assert.equal(body.ok, true)
+  const statusCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'status')
+  assert.equal(statusCall.cwd, '/tmp/other-repo')
 })
 
 test('status route reports the real change model: rename, conflict, two-sided, untracked', async () => {

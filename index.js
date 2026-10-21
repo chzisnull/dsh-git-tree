@@ -37,6 +37,7 @@ import {
   handleStage,
   handleStatus,
   handleUnstage,
+  handleWorkspaces,
 } from './src/host/handlers.js'
 import { guard } from './src/host/http.js'
 
@@ -52,6 +53,7 @@ export const inject = ['connection', 'subprocess']
 
 /** Exact Fetch route paths. */
 const ROUTES = [
+  { path: '/api/git-tree/workspaces', methods: ['GET'], handler: handleWorkspaces },
   { path: '/api/git-tree/status', methods: ['GET'], handler: handleStatus },
   { path: '/api/git-tree/diff', methods: ['GET'], handler: handleDiff },
   { path: '/api/git-tree/refs', methods: ['GET'], handler: handleRefs },

@@ -2,8 +2,8 @@
 // layout (toolbar / reference rail / change list / diff / commit box).
 
 import { h, React } from '../react'
-import type { EntrySide, GitFileEntry, GitStatusPayload, DiffPayload, RefsPayload, Translate } from '../types'
-import { commitChanges, fetchDiff, fetchRefs, fetchStatus, stagePaths, unstagePaths } from '../routes'
+import type { EntrySide, GitFileEntry, GitStatusPayload, DiffPayload, RefsPayload, Translate, WorkspaceRecord } from '../types'
+import { commitChanges, fetchDiff, fetchRefs, fetchStatus, fetchWorkspaces, stagePaths, unstagePaths } from '../routes'
 import { rowKey, sideFor, splitEntries } from '../model'
 import { TopBar } from './TopBar'
 import { RefRail } from './RefRail'
@@ -12,6 +12,7 @@ import { DiffView } from './DiffView'
 import { CommitBox } from './CommitBox'
 
 const POLL_MS = 2000
+const REPO_KEY = 'dsh-git-tree/repository'
 
 function findEntry(status: GitStatusPayload | null, path: string): GitFileEntry | null {
   return (status?.entries ?? []).find((entry) => entry.path === path) ?? null
@@ -29,6 +30,8 @@ export function Workspace(props: { t?: Translate }): any {
 
   const [status, setStatus] = React.useState<GitStatusPayload | null>(null)
   const [refs, setRefs] = React.useState<RefsPayload | null>(null)
+  const [workspaces, setWorkspaces] = React.useState<WorkspaceRecord[]>([])
+  const [repoPath, setRepoPath] = React.useState('')
   const [statusError, setStatusError] = React.useState('')
   const [selected, setSelected] = React.useState<{ path: string; side: EntrySide } | null>(null)
   const [diff, setDiff] = React.useState<DiffPayload | null>(null)
@@ -57,7 +60,7 @@ export function Workspace(props: { t?: Translate }): any {
     async (options?: { silent?: boolean }) => {
       if (!options?.silent) setRefreshing(true)
       try {
-        const next = await fetchStatus()
+        const next = await fetchStatus(repoPath || undefined)
         if (next.ok) {
           setStatus(next)
           setStatusError('')
@@ -72,17 +75,17 @@ export function Workspace(props: { t?: Translate }): any {
         if (!options?.silent) setRefreshing(false)
       }
     },
-    [t],
+    [repoPath, t],
   )
 
   const loadRefs = React.useCallback(async () => {
     try {
-      const next = await fetchRefs()
+      const next = await fetchRefs(repoPath || undefined)
       if (next.ok) setRefs(next)
     } catch {
       /* the rail degrades to empty groups */
     }
-  }, [])
+  }, [repoPath])
 
   const openDiff = React.useCallback(async (entry: GitFileEntry, side: EntrySide) => {
     setSelected({ path: entry.path, side })
@@ -90,12 +93,31 @@ export function Workspace(props: { t?: Translate }): any {
     if (entry.kind === 'ignored') return
     setDiffLoading(true)
     try {
-      const next = await fetchDiff({ path: entry.path, side: sideFor(entry, side) })
+      const next = await fetchDiff({ path: entry.path, side: sideFor(entry, side), cwd: repoPath || undefined })
       setDiff(next)
     } catch (error) {
       setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) })
     } finally {
       setDiffLoading(false)
+    }
+  }, [repoPath])
+
+  // Registered workspaces for the toolbar switcher; restore the last choice.
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const list = await fetchWorkspaces()
+        if (cancelled || !list.ok) return
+        setWorkspaces(list.workspaces ?? [])
+        const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(REPO_KEY) : null
+        if (saved && (list.workspaces ?? []).some((workspace) => workspace.path === saved)) setRepoPath(saved)
+      } catch {
+        /* the switcher stays with the session workspace */
+      }
+    })()
+    return () => {
+      cancelled = true
     }
   }, [])
 
@@ -146,9 +168,12 @@ export function Workspace(props: { t?: Translate }): any {
       setBusy(true)
       setActionError('')
       try {
-        const result = side === 'staged' ? await unstagePaths([entry.path]) : await stagePaths([entry.path])
+        const result =
+          side === 'staged'
+            ? await unstagePaths([entry.path], repoPath || undefined)
+            : await stagePaths([entry.path], repoPath || undefined)
         if (!result.ok) throw new Error(result.error || (side === 'staged' ? t('unstageFailed') : t('stageFailed')))
-        const next = await fetchStatus()
+        const next = await fetchStatus(repoPath || undefined)
         if (next.ok) setStatus(next)
         if (selected?.path === entry.path && next.ok) {
           const updated = findEntry(next, entry.path)
@@ -160,7 +185,7 @@ export function Workspace(props: { t?: Translate }): any {
         setBusy(false)
       }
     },
-    [openDiff, selected, t],
+    [openDiff, repoPath, selected, t],
   )
 
   const copyPath = React.useCallback(
@@ -182,7 +207,7 @@ export function Workspace(props: { t?: Translate }): any {
     setBusy(true)
     setActionError('')
     try {
-      const result = await commitChanges(message)
+      const result = await commitChanges(message, repoPath || undefined)
       if (!result.ok) throw new Error(result.error || t('commitFailed'))
       showToast([t('commitDone'), result.shortSha, result.subject].filter(Boolean).join(' · '))
       setMessage('')
@@ -195,7 +220,20 @@ export function Workspace(props: { t?: Translate }): any {
     } finally {
       setBusy(false)
     }
-  }, [loadRefs, loadStatus, message, showToast, status, t])
+  }, [loadRefs, loadStatus, message, repoPath, showToast, status, t])
+
+  const switchWorkspace = React.useCallback((path: string) => {
+    setRepoPath(path)
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(REPO_KEY, path)
+    } catch {
+      /* storage may be unavailable; the selection still holds for this mount */
+    }
+    setSelected(null)
+    setDiff(null)
+    setActionError('')
+    setMessage('')
+  }, [])
 
   const entries = status?.entries ?? []
   const rows = splitEntries(entries)
@@ -209,9 +247,12 @@ export function Workspace(props: { t?: Translate }): any {
     { className: 'dgt-root', 'data-plugin': 'dsh-git-tree' },
     h(TopBar, {
       status,
+      workspaces,
+      currentPath: repoPath || status?.repoRoot || status?.cwd || '',
       busy: refreshing || busy,
       t,
       onRefresh: () => void loadStatus(),
+      onSelectWorkspace: switchWorkspace,
       onCommitFocus: () => {
         if (commitInput.current && commitInput.current.focus) commitInput.current.focus()
       },

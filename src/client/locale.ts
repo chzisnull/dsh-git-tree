@@ -7,6 +7,8 @@ export const NS = 'dsh-git-tree'
 export const EN: Record<string, string> = {
   panel: 'Git',
   refresh: 'Refresh',
+  switchRepository: 'Switch repository',
+  noRepositories: 'No registered repositories',
   refs: 'References',
   readOnly: 'Read-only for now',
   workspace: 'Workspace',
@@ -58,6 +60,8 @@ export const EN: Record<string, string> = {
 export const ZH: Record<string, string> = {
   panel: 'Git',
   refresh: '刷新',
+  switchRepository: '切换仓库',
+  noRepositories: '没有已注册的仓库',
   refs: '引用',
   readOnly: '暂为只读',
   workspace: '工作区',
