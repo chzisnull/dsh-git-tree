@@ -480,6 +480,7 @@ var WORKSPACES_ROUTE = "api/git-tree/workspaces";
 var DIFF_ROUTE = "api/git-tree/diff";
 var REFS_ROUTE = "api/git-tree/refs";
 var HISTORY_ROUTE = "api/git-tree/history";
+var COMMIT_INFO_ROUTE = "api/git-tree/commit-info";
 var STAGE_ROUTE = "api/git-tree/stage";
 var UNSTAGE_ROUTE = "api/git-tree/unstage";
 var COMMIT_ROUTE = "api/git-tree/commit";
@@ -518,6 +519,9 @@ function fetchDiff(params, signal) {
 }
 function fetchRefs(cwd, signal) {
   return getJson(REFS_ROUTE, { cwd }, signal);
+}
+function fetchCommitInfo(params, signal) {
+  return getJson(COMMIT_INFO_ROUTE, params, signal);
 }
 function fetchHistory(params, signal) {
   return getJson(HISTORY_ROUTE, params, signal);
