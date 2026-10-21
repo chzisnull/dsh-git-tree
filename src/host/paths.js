@@ -7,8 +7,8 @@
  * relative path with no traversal, no leading dash and no NUL.
  */
 
-import { realpathSync } from 'node:fs'
-import { isAbsolute, relative, resolve as resolvePath } from 'node:path'
+import { existsSync, realpathSync } from 'node:fs'
+import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { RequestError } from './errors.js'
 
 /** Workspace root from the host services, with the same fallback ladder workbench uses. */
@@ -69,14 +69,36 @@ function isInside(root, absolute) {
   return rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))
 }
 
+function isRepositoryPath(root) {
+  try {
+    return existsSync(join(root, '.git'))
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The directory a request without a cwd runs in.
+ *
+ * The app-level sandbox root is often the process cwd of the desktop app (for
+ * example `/`), which is not a repository. Instead of failing with git's
+ * "not a git repository", pick the session workspace when it is a repository,
+ * otherwise the first registered workspace that is one.
+ */
+export function defaultRoot(ctx) {
+  const roots = allowedRoots(ctx)
+  for (const root of roots) if (isRepositoryPath(root)) return root
+  return roots[0] ?? process.cwd()
+}
+
 /**
  * Resolve the requested `cwd` (optional) and confine it to a registered
- * workspace. Without a requested cwd the session workspace is used.
+ * workspace. Without a requested cwd the default workspace is used.
  */
 export function resolveCwd(ctx, requested) {
   const roots = allowedRoots(ctx)
   const root = roots[0] ?? workspaceRootOf(ctx)
-  if (!requested) return root
+  if (!requested) return defaultRoot(ctx)
   if (typeof requested !== 'string' || requested.includes('\0')) throw new RequestError('无效的 cwd 参数')
   // Resolve with node:path only. `ctx.fs.resolve()` returns an opaque FsTarget
   // for the model's filesystem view, not an OS path a child process can chdir to.

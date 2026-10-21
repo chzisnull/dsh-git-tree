@@ -4,6 +4,9 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { apply, inject, name } from '../index.js'
 
 const WORKSPACE = '/tmp/fake-workspace'
@@ -61,16 +64,18 @@ function defaultResult(argv) {
   return { exitCode: 0, stdout: '', stderr: '' }
 }
 
-function fakeContext({ handler = defaultResult } = {}) {
+function fakeContext({ handler = defaultResult, workspaceRoot = WORKSPACE, registry } = {}) {
   const routes = []
   const spawns = []
   const services = {
-    sandboxPolicy: { workspaceRoot: WORKSPACE },
+    sandboxPolicy: { workspaceRoot },
     workspaceRegistry: {
-      list: () => [
-        { id: 'w-main', path: WORKSPACE, title: 'fake-workspace' },
-        { id: 'w-other', path: '/tmp/other-repo', title: 'other-repo' },
-      ],
+      list:
+        registry ??
+        (() => [
+          { id: 'w-main', path: WORKSPACE, title: 'fake-workspace' },
+          { id: 'w-other', path: '/tmp/other-repo', title: 'other-repo' },
+        ]),
     },
     subprocess: {
       async resolveExecutable(command) {
@@ -177,6 +182,20 @@ test('cwd inside another registered workspace is allowed, an unregistered one is
   const refused = await call(ctx, '/api/git-tree/status?cwd=' + encodeURIComponent('/tmp/not-a-workspace'))
   assert.equal(refused.body.ok, false)
   assert.equal(refused.body.code, 'outside-workspace')
+})
+
+test('without a cwd the default is a registered workspace that is a repository', async () => {
+  const repo = mkdtempSync(join(tmpdir(), 'dgt-default-'))
+  mkdirSync(join(repo, '.git'))
+  const ctx = fakeContext({
+    workspaceRoot: '/tmp/not-a-repository',
+    registry: () => [{ id: 'w-repo', path: repo, title: 'repo' }],
+  })
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/status')
+  assert.equal(body.ok, true)
+  const statusCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'status')
+  assert.equal(statusCall.cwd, realpathSync.native(repo))
 })
 
 test('an opaque ctx.fs target never leaks into a child-process cwd', async () => {
