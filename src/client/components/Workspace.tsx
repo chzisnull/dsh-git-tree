@@ -3,12 +3,13 @@
 // the shared banners.
 
 import { h, React } from '../react'
-import type { EntrySide, GitFileEntry, GitStatusPayload, DiffPayload, RefsPayload, Translate, WorkspaceRecord } from '../types'
-import { commitChanges, fetchDiff, fetchRefs, fetchStatus, fetchWorkspaces, stagePaths, unstagePaths } from '../routes'
+import type { EntrySide, GitFileEntry, GitStatusPayload, DiffPayload, HistoryCommit, HistoryScope, RefsPayload, Translate, WorkspaceRecord } from '../types'
+import { commitChanges, fetchDiff, fetchHistory, fetchRefs, fetchStatus, fetchWorkspaces, stagePaths, unstagePaths } from '../routes'
 import { rowKey, sideFor, splitEntries } from '../model'
 import { TopBar } from './TopBar'
 import { RefRail } from './RefRail'
 import { StatusView } from './views/StatusView'
+import { HistoryView } from './views/HistoryView'
 import type { ViewKind } from '../types'
 
 const POLL_MS = 2000
@@ -32,7 +33,15 @@ export function Workspace(props: { t?: Translate }): any {
   const [refs, setRefs] = React.useState<RefsPayload | null>(null)
   const [workspaces, setWorkspaces] = React.useState<WorkspaceRecord[]>([])
   const [repoPath, setRepoPath] = React.useState('')
-  const [view] = React.useState<ViewKind>('status')
+  const [view, setView] = React.useState<ViewKind>('status')
+
+  const [historyCommits, setHistoryCommits] = React.useState<HistoryCommit[]>([])
+  const [historyLaneCount, setHistoryLaneCount] = React.useState(1)
+  const [historyHasMore, setHistoryHasMore] = React.useState(false)
+  const [historyLoading, setHistoryLoading] = React.useState(false)
+  const [historyError, setHistoryError] = React.useState('')
+  const [historyScope, setHistoryScope] = React.useState<HistoryScope>('all')
+  const [historySha, setHistorySha] = React.useState('')
   const [statusError, setStatusError] = React.useState('')
   const [selected, setSelected] = React.useState<{ path: string; side: EntrySide } | null>(null)
   const [diff, setDiff] = React.useState<DiffPayload | null>(null)
@@ -102,6 +111,44 @@ export function Workspace(props: { t?: Translate }): any {
       setDiffLoading(false)
     }
   }, [repoPath])
+
+  const loadHistory = React.useCallback(
+    async (reset: boolean) => {
+      setHistoryLoading(true)
+      setHistoryError('')
+      const skip = reset ? 0 : historyCommits.length
+      try {
+        const next = await fetchHistory({
+          cwd: repoPath || undefined,
+          scope: historyScope,
+          limit: '200',
+          skip: String(skip),
+        })
+        if (!next.ok) {
+          setHistoryError(next.error || t('historyFailed'))
+          if (reset) setHistoryCommits([])
+        } else {
+          const list = next.commits ?? []
+          setHistoryCommits(reset ? list : [...historyCommits, ...list])
+          setHistoryLaneCount(next.laneCount ?? 1)
+          setHistoryHasMore(next.hasMore === true)
+        }
+      } catch (error) {
+        setHistoryError(error instanceof Error ? error.message : String(error))
+      } finally {
+        setHistoryLoading(false)
+      }
+    },
+    [historyCommits, historyScope, repoPath, t],
+  )
+
+  // Reload whenever the view, repository or branch scope changes.
+  React.useEffect(() => {
+    if (view !== 'history') return
+    setHistorySha('')
+    void loadHistory(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, repoPath, historyScope])
 
   // Registered workspaces for the toolbar switcher; restore the last choice.
   React.useEffect(() => {
@@ -234,6 +281,9 @@ export function Workspace(props: { t?: Translate }): any {
     setDiff(null)
     setActionError('')
     setMessage('')
+    setView('status')
+    setHistoryCommits([])
+    setHistorySha('')
   }, [])
 
   const entries = status?.entries ?? []
@@ -245,6 +295,23 @@ export function Workspace(props: { t?: Translate }): any {
 
   const renderView = () => {
     switch (view) {
+      case 'history':
+        return h(HistoryView, {
+          commits: historyCommits,
+          laneCount: historyLaneCount,
+          hasMore: historyHasMore,
+          loading: historyLoading,
+          error: historyError,
+          scope: historyScope,
+          selectedSha: historySha,
+          t,
+          onScope: (scope: HistoryScope) => {
+            setHistoryScope(scope)
+            setHistorySha('')
+          },
+          onSelect: (commit: HistoryCommit) => setHistorySha(commit.sha),
+          onLoadMore: () => void loadHistory(false),
+        })
       case 'status':
       default:
         return h(StatusView, {
@@ -295,7 +362,7 @@ export function Workspace(props: { t?: Translate }): any {
       : null,
     truncated ? h('div', { className: 'dgt-banner' }, h('span', { className: 'dgt-banner-text' }, t('truncated'))) : null,
 
-    h('div', { className: 'dgt-body' }, h(RefRail, { status, refs, t }), renderView()),
+    h('div', { className: 'dgt-body' }, h(RefRail, { status, refs, view, t, onView: setView }), renderView()),
 
     toast ? h('div', { className: 'dgt-toast', role: 'status' }, toast) : null,
     notice ? h('div', { className: 'dgt-toast', role: 'status' }, notice) : null,
