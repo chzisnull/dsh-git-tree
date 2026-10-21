@@ -41,6 +41,15 @@ const DIFF_FIXTURE = [
   '',
 ].join('\n')
 
+const LOG_FIELDS = '\u0000'
+const LOG_RECORD = '\u001e'
+const LOG_FIXTURE = [
+  ['c4', 'c3 c2', 'Ann', 'ann@example.com', '2026-10-20T10:00:00+08:00', "Merge branch 'topic'", 'HEAD -> refs/heads/main, refs/remotes/origin/main, tag: refs/tags/v1'],
+  ['c3', 'c1', 'Bob', 'bob@example.com', '2026-10-19T10:00:00+08:00', 'fix: parser', 'refs/heads/topic'],
+  ['c2', 'c1', 'Ann', 'ann@example.com', '2026-10-18T10:00:00+08:00', 'docs: readme', ''],
+  ['c1', '', 'Ann', 'ann@example.com', '2026-10-17T10:00:00+08:00', 'initial commit', ''],
+].map((fields) => fields.join(LOG_FIELDS)).join(LOG_RECORD) + LOG_RECORD
+
 const REFS_FIXTURE = [
   'refs/heads/main\u0000abc1234\u0000origin/main\u00001790000000\u0000Initial commit',
   'refs/heads/topic\u0000def5678\u0000\u00001780000000\u0000Topic work',
@@ -58,6 +67,7 @@ function defaultResult(argv) {
   }
   if (command === 'diff') return { exitCode: 0, stdout: DIFF_FIXTURE, stderr: '' }
   if (command === 'for-each-ref') return { exitCode: 0, stdout: REFS_FIXTURE, stderr: '' }
+  if (command === 'log') return { exitCode: 0, stdout: LOG_FIXTURE, stderr: '' }
   if (command === 'symbolic-ref') return { exitCode: 0, stdout: 'main\n', stderr: '' }
   if (command === 'ls-files') return { exitCode: 0, stdout: '', stderr: '' }
   if (command === 'commit') return { exitCode: 0, stdout: '[main abc1234] message\n', stderr: '' }
@@ -133,7 +143,7 @@ test('host plugin declares its name and hard service dependencies', () => {
   assert.deepEqual(inject, ['connection', 'subprocess'])
 })
 
-test('apply registers the eight authenticated exact Fetch routes', () => {
+test('apply registers the nine authenticated exact Fetch routes', () => {
   const ctx = fakeContext()
   apply(ctx)
 
@@ -142,6 +152,7 @@ test('apply registers the eight authenticated exact Fetch routes', () => {
     [
       '/api/git-tree/commit',
       '/api/git-tree/diff',
+      '/api/git-tree/history',
       '/api/git-tree/open',
       '/api/git-tree/refs',
       '/api/git-tree/stage',
@@ -324,6 +335,72 @@ test('missing subprocess degrades instead of throwing', async () => {
   const { body } = await call(ctx, '/api/git-tree/status')
   assert.equal(body.ok, false)
   assert.equal(body.code, 'subprocess-unavailable')
+})
+
+test('history route parses commits, drops remote refs and assigns lanes', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/history')
+  assert.equal(body.ok, true)
+  assert.equal(body.scope, 'all')
+  assert.equal(body.commits.length, 4)
+  assert.equal(body.hasMore, false)
+  assert.ok(body.laneCount >= 1)
+
+  const [merge] = body.commits
+  assert.equal(merge.sha, 'c4')
+  assert.deepEqual(merge.parents, ['c3', 'c2'])
+  assert.deepEqual(merge.refs, [
+    { name: 'main', kind: 'branch' },
+    { name: 'v1', kind: 'tag' },
+  ], 'remote refs and HEAD are dropped')
+  assert.equal(typeof merge.lane, 'number')
+  assert.equal(merge.parentLanes.length, 2)
+
+  const logCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'log')
+  assert.ok(logCall, 'history must come from git log')
+  assert.ok(logCall.argv.includes('--branches'))
+  assert.ok(logCall.argv.includes('--decorate=full'))
+})
+
+test('history route paginates and reports hasMore', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/history?limit=2&skip=1')
+  assert.equal(body.commits.length, 2)
+  assert.equal(body.hasMore, true)
+  const logCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'log')
+  assert.ok(logCall.argv.includes('--max-count=3'), 'one extra record detects hasMore')
+  assert.ok(logCall.argv.includes('--skip=1'))
+})
+
+test('history route maps search filters to fixed-string args and guards paths', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(
+    ctx,
+    '/api/git-tree/history?query=fix&author=Ann&path=' + encodeURIComponent('src/app.js'),
+  )
+  assert.equal(body.ok, true)
+  const logCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'log')
+  assert.ok(logCall.argv.includes('--grep=fix'))
+  assert.ok(logCall.argv.includes('--author=Ann'))
+  assert.ok(logCall.argv.includes('--fixed-strings'))
+  assert.ok(logCall.argv.includes('--regexp-ignore-case'))
+  assert.equal(logCall.argv[logCall.argv.indexOf('--') + 1], 'src/app.js')
+})
+
+test('history route scopes to a validated local branch', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/history?scope=branch:topic')
+  assert.equal(body.ok, true)
+  const logCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'log')
+  assert.ok(logCall.argv.includes('refs/heads/topic'))
+
+  const bad = await call(ctx, '/api/git-tree/history?scope=branch:' + encodeURIComponent('../escape'))
+  assert.equal(bad.body.ok, false)
+  assert.equal(bad.body.code, 'invalid-branch-name')
 })
 
 test('refs route parses branches, remotes and tags and marks the current branch', async () => {

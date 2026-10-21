@@ -12,6 +12,14 @@
 import { MAX_DIFF_BYTES, MAX_REFS_BYTES, MAX_STATUS_BYTES, git, runProcess, subprocessOf } from './git.js'
 import { parseUnifiedDiff } from './diff.js'
 import { parsePorcelainV2, summariseEntries } from './porcelain.js'
+import {
+  DEFAULT_LIMIT,
+  HISTORY_FORMAT,
+  MAX_LIMIT,
+  assignLanes,
+  isSafeBranchName,
+  parseHistoryLog,
+} from './history.js'
 import { REF_ARGS, parseRefs } from './refs.js'
 import { openArgv } from './open.js'
 import { resolveCwd, safeRepoPath, workspaceRootOf } from './paths.js'
@@ -139,6 +147,51 @@ export async function handleDiff(ctx, request) {
     // Kept while the old renderer still ships; the panel uses `files`.
     text,
   })
+}
+
+export async function handleHistory(ctx, request) {
+  const { url, cwd } = handleCwd(ctx, request)
+  const subprocess = subprocessOf(ctx)
+
+  const limit = Math.min(MAX_LIMIT, Math.max(1, Number(url.searchParams.get('limit')) || DEFAULT_LIMIT))
+  const skip = Math.max(0, Number(url.searchParams.get('skip')) || 0)
+  const scope = url.searchParams.get('scope') || 'all'
+  const query = (url.searchParams.get('query') || '').trim()
+  const author = (url.searchParams.get('author') || '').trim()
+  const path = url.searchParams.get('path') || ''
+
+  const argv = ['log', '--date-order', '--decorate=full', '--format=' + HISTORY_FORMAT]
+  if (scope === 'current') {
+    argv.push('HEAD')
+  } else if (scope.startsWith('branch:')) {
+    const branch = scope.slice('branch:'.length)
+    if (!isSafeBranchName(branch)) throw new RequestError('无效的分支名', 400, 'invalid-branch-name')
+    argv.push('refs/heads/' + branch)
+  } else {
+    argv.push('--branches', '--tags', 'HEAD')
+  }
+  if (query) argv.push('--grep=' + query, '--fixed-strings', '--regexp-ignore-case')
+  if (author) argv.push('--author=' + author, '--fixed-strings', '--regexp-ignore-case')
+  argv.push('--max-count=' + String(limit + 1), '--skip=' + String(skip))
+  if (path) argv.push('--', safeRepoPath(path))
+
+  let text = ''
+  try {
+    text = await git(subprocess, argv, cwd, { maxBytes: MAX_DIFF_BYTES, signal: request.signal })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    // An unborn branch has no history yet; that is an empty list, not a failure.
+    if (/does not have any commits|unknown revision|bad default revision/i.test(message)) {
+      return json({ ok: true, commits: [], laneCount: 1, hasMore: false, scope })
+    }
+    throw error
+  }
+
+  const parsed = parseHistoryLog(text)
+  const hasMore = parsed.length > limit
+  const commits = hasMore ? parsed.slice(0, limit) : parsed
+  const laneCount = assignLanes(commits)
+  return json({ ok: true, commits, laneCount, hasMore, scope })
 }
 
 export async function handleRefs(ctx, request) {
