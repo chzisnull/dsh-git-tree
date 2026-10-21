@@ -6,28 +6,34 @@
 
 ![Git 工作区面板](docs/design/frame2-workspace.png)
 
-## 0.1.0 能做什么
+## 0.2.0 能做什么
 
-这一版是**只读的第一刀**，不藏着：面板读取工作区并渲染，还不能暂存、提交或推送。
+这一版是**能用的一刀**：读工作区、暂存 / 取消暂存、提交，全在面板里完成。
 
 - **一个 `main` 面板**，入口是左侧图标栏里的 `Git` 一行——和「插件」页面用的是同一类座位，所以它自动拿到整个中栏、窗口顶部安全区和 DSH 的深浅色。
+- **顶部仓库切换**：列出 DSH 已注册的 workspace，选中哪个，所有路由就作用在哪个仓库。
 - **分支与同步状态**：当前分支、upstream、ahead/behind、仓库根目录。
-- **已暂存 / 未暂存双列表**，按 Sourcetree 的方式分组，数据来自 `git status --porcelain=v2 --branch -z`——重命名、未跟踪、冲突都保留真实的 XY 状态，不会被压平成「已修改」。
-- **选中文件的 diff**，用的是和 DSH 自己的 workspace-changes 相同的 `--` 保护、无颜色的 `git diff`。
-- **构造上只读**：宿主半边只会执行 `status`、`rev-parse`、`diff`。这一版根本不存在写操作路由。
+- **Sourcetree 的改动模型**：冲突 / 已暂存 / 未暂存三组带计数；重命名保留原路径；同一文件两侧都有改动时两栏各出现一次（数据来自 `git status --porcelain=v2 --branch -z`）。
+- **结构化 diff**：宿主解析成 files → hunks → lines，渲染双行号、hunk 头、整行底色与 `+N −M`。
+- **暂存 / 取消暂存 / 提交**：行内复选框、悬停菜单、diff 头部文件级动作，底部提交区（作者、分支、暂存数、⌘↵）。
+- **实时**：面板可见时每 2 秒刷新，写操作后立即刷新。
+- **写操作面很小**：只有文件级 stage / unstage / commit。没有 `reset --hard`、没有 push、没有 amend、没有 discard 路由。
 
 ## 状态
 
-| 能力 | 0.1.0 |
+| 能力 | 0.2.0 |
 | --- | --- |
 | `main` 面板 + 侧栏入口 | 已完成 |
-| 分支 / ahead / behind | 已完成 |
-| 已暂存 + 未暂存列表 | 已完成 |
-| 单文件 diff | 已完成 |
-| 暂存 / 取消暂存 / 提交 | 计划中（P2） |
-| 历史泳道 | 计划中（P3） |
-| 右侧栏窄面板形态 | 计划中 |
-| 与 Agent 共用操作 | 计划中 |
+| 仓库切换（DSH workspaces） | 已完成 |
+| 分支 / ahead / behind / 引用树 | 已完成 |
+| 冲突 / 已暂存 / 未暂存分组 | 已完成 |
+| 结构化单文件 diff | 已完成 |
+| 暂存 / 取消暂存 / 提交 | 已完成 |
+| 自动刷新 | 已完成 |
+| 历史泳道 | 未做 |
+| 右侧栏窄面板形态 | 未做 |
+| 大仓库虚拟滚动 | 不做（按决定取消） |
+| 与 Agent 共用操作 | 未做 |
 
 完整计划（包括布局依据的实测 UI 规格）在 [`docs/PLAN.md`](docs/PLAN.md)。
 
@@ -44,12 +50,17 @@
 
 | 半边 | 文件 | 作用 |
 | --- | --- | --- |
-| Host | `index.js`（纯 ESM，无构建） | 用 `ctx.connection.fetch.register` 注册两条带鉴权的 exact Fetch 路由，用 `ctx.subprocess` 跑 git |
+| Host | `index.js`（纯 ESM，无构建） | 用 `ctx.connection.fetch.register` 注册七条带鉴权的 exact Fetch 路由，用 `ctx.subprocess` 跑 git |
 | Client | `client.js`（由 `src/client/index.tsx` 构建） | 把侧栏图标注册进 `sidebar.panellist`、把面板注册进 `main`，两者共用 id `git-tree` |
 
 ```
-GET /api/git-tree/status          → { branch, upstream, ahead, behind, entries[] }
-GET /api/git-tree/diff?path=…     → { path, staged, text }
+GET  /api/git-tree/workspaces          → DSH 已注册 workspace
+GET  /api/git-tree/status?cwd=…        → 分支、upstream、ahead/behind、entries、counts
+GET  /api/git-tree/diff?path=…&side=…  → files → hunks → lines、统计
+GET  /api/git-tree/refs?cwd=…          → 分支、远程、标签
+POST /api/git-tree/stage               → { paths[] }
+POST /api/git-tree/unstage             → { paths[] }
+POST /api/git-tree/commit              → { message } → { sha, shortSha, subject }
 ```
 
 git 不走 shell；子进程环境带 `GIT_TERMINAL_PROMPT=0`（永不卡在认证）、`GIT_OPTIONAL_LOCKS=0`（不在你的仓库里拿可选锁）、`GIT_CONFIG_COUNT=0`，输出与耗时都有上限。绝对路径、含 `..`、以 `-` 开头的路径在进入 `argv` 之前就被拒绝；工作区之外的 `cwd` 一律 403。
@@ -58,26 +69,32 @@ git 不走 shell；子进程环境带 `GIT_TERMINAL_PROMPT=0`（永不卡在认�
 
 ## 安装
 
+从 npm 按名称安装（包里同时带宿主半、客户端半和 bundle patch）：
+
+```sh
+dsh plugin --profile <profile> add dsh-git-tree
+```
+
+或者在带 plugin manager 的会话里：
+
+```
+plugin_manager action=install_bundle target=dsh-git-tree
+```
+
 从本地检出安装：
 
 ```sh
-dsh plugin add /Library/aiProject/dsh-git-tree
+dsh plugin --profile <profile> add /Library/aiProject/dsh-git-tree
 ```
 
-或者在有 plugin manager 的会话里安装 bundle，路径指向包目录：
-
-```
-plugin_manager action=install_bundle target=/Library/aiProject/dsh-git-tree
-```
-
-如果客户端模块没有立刻出现，刷新或重启 DSH 页面。插件只读，不会写你的仓库。
+装完要**重启 DSH**（宿主半在 App 启动时装配）。在你的按下暂存或提交之前，插件不会写你的仓库。
 
 ## 开发
 
 ```sh
 node build.mjs     # src/client/index.tsx → client.js（产物入库）
 npm run check      # 两个半边 node --check
-npm test           # 18 条断言：清单、宿主路由、bundle 契约
+npm test           # 40 条断言：清单、宿主路由、解析器、客户端启动
 ```
 
 `build.mjs` 先找本包的 `node_modules` 里的 esbuild，再找已安装的 `dsh-workbench`；都没有就停下并打印修复命令（`npm i -D esbuild`）。
@@ -85,8 +102,10 @@ npm test           # 18 条断言：清单、宿主路由、bundle 契约
 测试不需要 DSH、不需要 git、不需要浏览器：
 
 - `test/manifest.test.mjs` —— 加载器会校验的东西（platform、exports、patch 行、图标、语言包）。
-- `test/routes.test.mjs` —— 用假 context 跑 `apply()`：两条路由注册、porcelain v2 解析、路径前有 `--`、穿越/绝对/选项形路径被拒、subprocess 缺失时降级而不是抛错。
-- `test/ui-contract.test.mjs` —— 构建产物：loader 包装、恰好两次 slot 注册且共用 id、调用两条路由、只用主题 token、不碰 `document.body`。
+- `test/routes.test.mjs` —— 用假 context 跑 `apply()`：七条路由、真实改动模型、仓库切换、路径前有 `--`、穿越/绝对/选项形路径被拒、提交前检查。
+- `test/host-modules.test.mjs` —— 解析器作为纯函数：porcelain v2（rename / 冲突 / 双侧）、unified diff、refs。
+- `test/ui-contract.test.mjs` —— 构建产物：loader 包装、恰好两次 slot 注册且共用 id、调用路由、只用主题 token、不碰 `document.body`。
+- `test/client-boot.test.mjs` —— 在 Node 里执行构建产物、物化插件，用「未声明服务即抛错」的 Cortis 式 ctx 调 `apply()`。
 
 ## 效果图
 
