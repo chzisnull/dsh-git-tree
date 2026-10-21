@@ -108,9 +108,9 @@ function Detail(props: {
           : null,
         detail.body ? h('pre', { className: 'dgt-detail-body' }, detail.body) : null,
       ),
-      h('div', { className: 'dgt-detail-head' }, t('changedFiles')),
+      h('div', { className: 'dgt-detail-head' }, t('changedFiles') + ' · ' + String(files.length)),
       files.length === 0
-        ? h('div', { className: 'dgt-placeholder' }, t('noFiles'))
+        ? null
         : h(
             'div',
             { className: 'dgt-detail-list' },
@@ -135,20 +135,20 @@ function Detail(props: {
       'div',
       { className: 'dgt-detail-diff' },
       files.length === 0
-        ? h('div', { className: 'dgt-placeholder' }, t('noFiles'))
+        ? h('div', { className: 'dgt-empty' }, t('noFiles'))
         : props.selectedFile === ''
-        ? h('div', { className: 'dgt-placeholder' }, t('selectCommitFile'))
-        : props.fileDiffLoading
-          ? h('div', { className: 'dgt-placeholder' }, t('loading'))
-          : props.fileDiff && props.fileDiff.ok === false
-            ? h('div', { className: 'dgt-placeholder dgt-error' }, props.fileDiff.error || t('diffFailed'))
-            : props.fileDiff && props.fileDiff.binary
-              ? h('div', { className: 'dgt-placeholder' }, t('binaryFile'))
-              : props.fileDiff && props.fileDiff.files && props.fileDiff.files.length > 0
-                ? props.fileDiff.files.map((file, index) =>
-                    h(DiffFileBlock, { key: 'detail-file:' + String(index), file, t }),
-                  )
-                : h('div', { className: 'dgt-placeholder' }, t('noDiff')),
+          ? h('div', { className: 'dgt-empty' }, t('selectCommitFile'))
+          : props.fileDiffLoading
+            ? h('div', { className: 'dgt-empty' }, t('loading'))
+            : props.fileDiff && props.fileDiff.ok === false
+              ? h('div', { className: 'dgt-empty' }, props.fileDiff.error || t('diffFailed'))
+              : props.fileDiff && props.fileDiff.binary
+                ? h('div', { className: 'dgt-empty' }, t('binaryFile'))
+                : props.fileDiff && props.fileDiff.files && props.fileDiff.files.length > 0
+                  ? props.fileDiff.files.map((file, index) =>
+                      h(DiffFileBlock, { key: 'detail-file:' + String(index), file, t }),
+                    )
+                  : h('div', { className: 'dgt-empty' }, t('noDiff')),
     ),
   )
 }
@@ -249,6 +249,9 @@ export function HistoryView(props: {
             t('currentBranchOnly'),
           ),
         ),
+        props.mode === 'search' && commits.length > 0
+          ? h('span', { className: 'dgt-resultcount' }, String(commits.length) + ' ' + t('commitsUnit'))
+          : null,
         scoped
           ? h(
               'span',

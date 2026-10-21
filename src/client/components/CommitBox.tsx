@@ -53,6 +53,12 @@ export function CommitBox(props: {
       h('span', { className: 'dgt-commit-branch' }, '⎇ ' + branch),
       h('span', { className: 'dgt-commit-branch' }, String(staged) + ' ' + t('filesChanged')),
     ),
+    h(
+      'div',
+      { className: 'dgt-commit-label' },
+      h('span', null, t('commitMessageLabel')),
+      h('span', null, t('commitShortcut')),
+    ),
     h('textarea', {
       className: 'dgt-commit-input',
       ref: props.inputRef,
@@ -77,8 +83,8 @@ export function CommitBox(props: {
       ),
       h(
         'button',
-        { type: 'button', className: 'dgt-button', onClick: () => props.onMessage('') },
-        t('cancel'),
+        { type: 'button', className: 'dgt-clear', onClick: () => props.onMessage('') },
+        t('clear'),
       ),
       h(
         'button',

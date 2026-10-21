@@ -214,6 +214,25 @@ export function Workspace(props: { t?: Translate }): any {
           setCommitDetailError(next.error || t('historyFailed'))
         } else {
           setCommitDetail(next)
+          // Open the first changed file so selecting a commit lands on a diff,
+          // not on an empty instruction pane.
+          const first = (next.files ?? [])[0]
+          if (first) {
+            setCommitFile(first.path)
+            setCommitFileDiff(null)
+            setCommitFileDiffLoading(true)
+            try {
+              const detail = await fetchDiff({ cwd: repoPath || undefined, path: first.path, commit: sha })
+              setCommitFileDiff(detail)
+            } catch (error) {
+              setCommitFileDiff({ ok: false, error: error instanceof Error ? error.message : String(error) })
+            } finally {
+              setCommitFileDiffLoading(false)
+            }
+          } else {
+            setCommitFile('')
+            setCommitFileDiff(null)
+          }
         }
       } catch (error) {
         setCommitDetailError(error instanceof Error ? error.message : String(error))
@@ -225,7 +244,7 @@ export function Workspace(props: { t?: Translate }): any {
   )
 
   React.useEffect(() => {
-    if (view !== 'history' || historySha === '') return
+    if ((view !== 'history' && view !== 'search') || historySha === '') return
     setCommitFile('')
     setCommitFileDiff(null)
     void loadCommitDetail(historySha)
@@ -249,6 +268,13 @@ export function Workspace(props: { t?: Translate }): any {
     },
     [historySha, repoPath],
   )
+
+  React.useEffect(() => {
+    if (view !== 'search' || historyLoading || historySha !== '') return
+    const first = historyCommits[0]
+    if (first) setHistorySha(first.sha)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, historyLoading, historyCommits, historySha])
 
   const openRef = React.useCallback((record: RefRecord, kind: 'branch' | 'tag') => {
     setHistoryScope((kind === 'branch' ? 'branch:' : 'tag:') + record.name)
@@ -576,16 +602,18 @@ export function Workspace(props: { t?: Translate }): any {
         onSelect: () => void toggle(entry, side),
       })
     }
-    items.push({
-      label: t('discardChanges'),
-      danger: true,
-      disabled: conflict,
-      hint: conflict ? t('conflictsBlockCommit') : undefined,
-      onSelect: () => {
-        setDialogError('')
-        setDialog({ kind: 'discard', path: entry.path, side })
-      },
-    })
+    if (!untracked) {
+      items.push({
+        label: t('discardChanges'),
+        danger: true,
+        disabled: conflict,
+        hint: conflict ? t('conflictsBlockCommit') : undefined,
+        onSelect: () => {
+          setDialogError('')
+          setDialog({ kind: 'discard', path: entry.path, side })
+        },
+      })
+    }
     items.push({
       label: untracked ? t('removeUntracked') : t('removeFile'),
       danger: true,
@@ -714,7 +742,15 @@ export function Workspace(props: { t?: Translate }): any {
     autoSelectRef.current = key
     if (selected !== null) return
     const split = splitEntries(status.entries ?? [])
-    const first = split.conflicted[0] ?? split.staged[0] ?? split.unstaged[0]
+    // Prefer an entry that actually has a diff: untracked files open onto an
+    // empty pane, which made the primary screen look blank.
+    const tracked = (list: GitFileEntry[]) => list.find((entry) => entry.kind !== 'untracked')
+    const first =
+      split.conflicted[0] ??
+      tracked(split.staged) ??
+      tracked(split.unstaged) ??
+      split.staged[0] ??
+      split.unstaged[0]
     if (!first) return
     const side: EntrySide = split.conflicted.includes(first)
       ? 'conflicted'
