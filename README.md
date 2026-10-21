@@ -8,7 +8,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.6.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel. Remotes are out of scope on purpose.
+Version 0.6.1 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, and push the current branch. Fetch/pull, remote branches and remote management are not implemented yet.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Repository switcher** in the toolbar: pick any workspace registered in DSH; every route then runs against that repository.
@@ -25,11 +25,11 @@ Version 0.6.0 is the **local workbench slice**: file status, history, search and
 - **Commit and push**: a checkbox in the commit card pushes right after a successful commit. A failed push never rolls the commit back.
 - **Local actions**: reveal the repository in Finder or open it in Terminal (macOS).
 - **Live**: the panel polls status every 2s while visible and refetches immediately after a write.
-- **Small write surface by construction**: file-level stage, unstage and commit only. No `reset --hard`, no push, no amend, no discard route exists.
+- **Small write surface by construction**: stage/unstage/commit, discard, delete, branch create-rename-delete, checkout, merge into the current branch, and a push of the current branch that never forces. No `reset --hard`, no force-push, no amend, no rebase, no stash route exists.
 
 ## Status
 
-| Area | 0.6.0 |
+| Area | 0.6.1 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | repository switcher (DSH workspaces) | done |
@@ -47,8 +47,10 @@ Version 0.6.0 is the **local workbench slice**: file status, history, search and
 | Finder / Terminal | done |
 | auto refresh | done |
 | right-sidebar tab (compact mode) | not yet |
-| remotes (fetch / pull / push, remote branches) | out of scope |
-| merge / rebase / stash / conflict UI | out of scope |
+| push current branch | done |
+| fetch / pull / remote branches / remote management | not yet |
+| merge into current branch | done |
+| rebase / stash / conflict-resolution UI | not yet |
 | large-repo virtualisation | not planned |
 | agent-shared operations | not yet |
 

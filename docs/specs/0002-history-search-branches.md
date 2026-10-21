@@ -1,6 +1,7 @@
 # 本地 Git 工作台：历史视图 / 搜索视图 / 分支检出与分支操作
 
 > 目标版本：0.3.0（本地优先，不做远端）。
+> 2026-10-21 注：本 spec 里“不做远端 / 不为 push 预留按钮”的条款已被 [`docs/adr/0001-push-and-merge-semantics.md`](../adr/0001-push-and-merge-semantics.md) 取代；其余（历史 / 搜索 / 分支）仍然有效。
 > 承接 0.2.0 的「可写工作区」；本 spec 补齐 Sourcetree 的三个工作区视图与分支交互。
 > 已发布：GitHub issue [#13](https://github.com/chzisnull/dsh-git-tree/issues/13)，标签 `ready-for-agent`。本文件是可编辑副本，改动后请同步到 issue。
 

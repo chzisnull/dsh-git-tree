@@ -106,6 +106,7 @@ export interface GitStatusPayload {
   ahead?: number
   behind?: number
   identity?: GitIdentity | null
+  remotes?: string[]
   entries?: GitFileEntry[]
   counts?: GitCounts
   truncated?: boolean
@@ -204,6 +205,8 @@ export interface MutationPayload {
   subject?: string
   staged?: string[]
   unstaged?: string[]
+  branch?: string
+  upstream?: string
 }
 
 export type Translate = (key: string) => string

@@ -288,6 +288,7 @@ test('status route reports the real change model: rename, conflict, two-sided, u
   assert.equal(byPath['docs/new-note.md'].kind, 'untracked')
   assert.equal(byPath['docs/new-note.md'].unstaged, true)
 
+  assert.deepEqual(body.remotes, ['origin'])
   assert.deepEqual(body.counts, { staged: 3, unstaged: 3, conflicted: 1 })
   assert.equal(body.truncated, false)
 
@@ -731,6 +732,21 @@ test('merge lets git decide about local changes, refuses self and unknown', asyn
   assert.equal(missing.body.code, 'unknown-branch')
 })
 
+test('merge reports unmerged entries separately from local changes', async () => {
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'merge') {
+        return { exitCode: 2, stdout: '', stderr: 'error: Merging is not possible because you have unmerged files.' }
+      }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const { response, body } = await call(ctx, '/api/git-tree/merge', { method: 'POST', body: { branch: 'topic' } })
+  assert.equal(response.status, 409)
+  assert.equal(body.code, 'unmerged')
+})
+
 test('merge maps conflicts to a 409 instead of throwing', async () => {
   const clean = '# branch.oid abc\u0000# branch.head main\u0000'
   const ctx = fakeContext({
@@ -766,8 +782,22 @@ test('push uses the upstream when one exists and never forces', async () => {
   assert.equal(body.ok, true)
   assert.equal(body.branch, 'main')
   const push = ctx.spawns.find((spawn) => spawn.argv[1] === 'push')
-  assert.deepEqual(push.argv.slice(1), ['push'])
+  assert.deepEqual(push.argv.slice(1), ['push', 'origin', 'main:main'])
   assert.ok(!push.argv.includes('--force'))
+})
+
+test('push follows the upstream remote and branch, not push.default', async () => {
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'rev-parse' && argv.includes('@{u}')) return { exitCode: 0, stdout: 'upstream/dev\n', stderr: '' }
+      if (argv[1] === 'push') return { exitCode: 0, stdout: '', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  await call(ctx, '/api/git-tree/push', { method: 'POST', body: {} })
+  const push = ctx.spawns.find((spawn) => spawn.argv[1] === 'push')
+  assert.deepEqual(push.argv.slice(1), ['push', 'upstream', 'main:dev'])
 })
 
 test('push sets the upstream when the branch has none', async () => {
@@ -782,6 +812,19 @@ test('push sets the upstream when the branch has none', async () => {
   assert.equal(body.ok, true)
   const push = ctx.spawns.find((spawn) => spawn.argv[1] === 'push')
   assert.deepEqual(push.argv.slice(1), ['push', '-u', 'origin', 'main'])
+})
+
+test('push refuses when there is no origin and the branch has no upstream', async () => {
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'remote') return { exitCode: 0, stdout: 'backup\n', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/push', { method: 'POST', body: {} })
+  assert.equal(body.code, 'no-remote')
+  assert.equal(ctx.spawns.filter((spawn) => spawn.argv[1] === 'push').length, 0)
 })
 
 test('push refuses without a remote or on a detached head', async () => {

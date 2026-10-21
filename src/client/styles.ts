@@ -297,6 +297,8 @@ export const CSS = `
 .dgt-commit-input::placeholder{color:var(--dsw-alias-label-tertiary);}
 .dgt-commit-check{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dsw-alias-label-secondary);cursor:pointer;}
 .dgt-commit-check input{accent-color:var(--dgt-accent-strong);margin:0;width:13px;height:13px;}
+.dgt-commit-check[data-disabled]{opacity:.75;cursor:default;}
+.dgt-commit-check em{font-style:normal;color:var(--dsw-alias-label-tertiary);font-size:10.5px;}
 .dgt-commit-foot{display:flex;align-items:center;gap:10px;}
 .dgt-hint{flex:1 1 auto;min-width:0;color:var(--dsw-alias-label-tertiary);font-size:10.5px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

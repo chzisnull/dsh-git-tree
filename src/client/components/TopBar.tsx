@@ -118,8 +118,10 @@ export function TopBar(props: {
         {
           type: 'button',
           className: 'dgt-iconbtn',
-          title: props.canPush ? t('push') : t('pushNoRemote'),
-          'aria-label': t('push'),
+          title: props.canPush
+            ? t('push') + ' ' + branch + (ahead > 0 ? ' · ↑' + String(ahead) : '')
+            : t('pushNoRemote'),
+          'aria-label': t('push') + ' ' + branch,
           disabled: !props.canPush || props.busy,
           onClick: props.onPush,
         },

@@ -76,6 +76,7 @@ var EN = {
   push: "Push",
   pushTitle: "Push branch",
   pushBody: "will be pushed to its upstream. Nothing is forced.",
+  pushFirst: "first push \u2014 the upstream will be created",
   pushAfterCommit: "Push after commit",
   pushed: "Pushed",
   pushFailed: "Push failed",
@@ -214,6 +215,7 @@ var ZH = {
   push: "\u63A8\u9001",
   pushTitle: "\u63A8\u9001\u5206\u652F",
   pushBody: "\u5C06\u63A8\u9001\u5230\u5B83\u7684 upstream\uFF0C\u4E0D\u4F1A force\u3002",
+  pushFirst: "\u9996\u6B21\u63A8\u9001\uFF0C\u5C06\u5EFA\u7ACB upstream",
   pushAfterCommit: "\u63D0\u4EA4\u540E\u7ACB\u5373\u63A8\u9001",
   pushed: "\u5DF2\u63A8\u9001",
   pushFailed: "\u63A8\u9001\u5931\u8D25",
@@ -606,6 +608,8 @@ var CSS = `
 .dgt-commit-input::placeholder{color:var(--dsw-alias-label-tertiary);}
 .dgt-commit-check{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dsw-alias-label-secondary);cursor:pointer;}
 .dgt-commit-check input{accent-color:var(--dgt-accent-strong);margin:0;width:13px;height:13px;}
+.dgt-commit-check[data-disabled]{opacity:.75;cursor:default;}
+.dgt-commit-check em{font-style:normal;color:var(--dsw-alias-label-tertiary);font-size:10.5px;}
 .dgt-commit-foot{display:flex;align-items:center;gap:10px;}
 .dgt-hint{flex:1 1 auto;min-width:0;color:var(--dsw-alias-label-tertiary);font-size:10.5px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -1016,8 +1020,8 @@ function TopBar(props) {
         {
           type: "button",
           className: "dgt-iconbtn",
-          title: props.canPush ? t("push") : t("pushNoRemote"),
-          "aria-label": t("push"),
+          title: props.canPush ? t("push") + " " + branch + (ahead > 0 ? " \xB7 \u2191" + String(ahead) : "") : t("pushNoRemote"),
+          "aria-label": t("push") + " " + branch,
           disabled: !props.canPush || props.busy,
           onClick: props.onPush
         },
@@ -1600,16 +1604,22 @@ function CommitBox(props) {
         }
       }
     }),
-    props.canPush ? h(
+    h(
       "label",
-      { className: "dgt-commit-check" },
+      {
+        className: "dgt-commit-check",
+        "data-disabled": props.canPush ? void 0 : true,
+        title: props.canPush ? void 0 : t("pushNoRemote")
+      },
       h("input", {
         type: "checkbox",
         checked: props.pushAfter,
+        disabled: !props.canPush,
         onChange: (event) => props.onPushAfter(event.target.checked)
       }),
-      h("span", null, t("pushAfterCommit"))
-    ) : null,
+      h("span", null, t("pushAfterCommit")),
+      props.canPush ? null : h("em", null, t("pushNoRemote"))
+    ),
     h(
       "div",
       { className: "dgt-commit-foot" },
@@ -2272,6 +2282,11 @@ function Workspace(props) {
     },
     [appliedAuthor, appliedPath, appliedQuery, historyCommits, historyScope, repoPath, t, view]
   );
+  const afterPush = React.useCallback(async () => {
+    await loadStatus();
+    await loadRefs();
+    if (view !== "status") await loadHistory(true);
+  }, [loadHistory, loadRefs, loadStatus, view]);
   const loadCommitDetail = React.useCallback(
     async (sha) => {
       setCommitDetailLoading(true);
@@ -2623,15 +2638,13 @@ function Workspace(props) {
       if (!result.ok) throw new Error(result.error || t("pushFailed"));
       closeDialog();
       showToast(t("pushed") + " \xB7 " + (result.upstream || status?.branch || ""));
-      await loadStatus();
-      await loadRefs();
-      if (view !== "status") await loadHistory(true);
+      await afterPush();
     } catch (error) {
       setDialogError(error instanceof Error ? error.message : String(error));
     } finally {
       setDialogBusy(false);
     }
-  }, [closeDialog, loadHistory, loadRefs, loadStatus, repoPath, showToast, status?.branch, t, view]);
+  }, [afterPush, closeDialog, repoPath, showToast, status?.branch, t]);
   const submitMerge = React.useCallback(async () => {
     const branch = dialog?.branch ?? "";
     setDialogBusy(true);
@@ -2782,21 +2795,25 @@ function Workspace(props) {
       setSelected(null);
       setDiff(null);
       if (pushAfter) {
-        const pushed = await pushBranch(repoPath || void 0);
-        showToast(
-          pushed.ok ? receipt + " \xB7 " + t("pushed") : receipt + " \xB7 " + t("pushFailed") + "\uFF1A" + (pushed.error || "")
-        );
+        let note = "";
+        try {
+          const pushed = await pushBranch(repoPath || void 0);
+          note = pushed.ok ? " \xB7 " + t("pushed") : " \xB7 " + t("pushFailed") + "\uFF1A" + (pushed.error || "");
+        } catch (error) {
+          note = " \xB7 " + t("pushFailed") + "\uFF1A" + (error instanceof Error ? error.message : String(error));
+        }
+        showToast(receipt + note);
       } else {
         showToast(receipt);
       }
-      await loadStatus();
-      await loadRefs();
+      setPushAfter(false);
+      await afterPush();
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }
-  }, [loadRefs, loadStatus, message, pushAfter, repoPath, showToast, status, t]);
+  }, [afterPush, message, pushAfter, repoPath, showToast, status, t]);
   const switchWorkspace = React.useCallback((path) => {
     setRepoPath(path);
     try {
@@ -2810,6 +2827,7 @@ function Workspace(props) {
     setView("status");
     setHistoryCommits([]);
     setHistorySha("");
+    setPushAfter(false);
   }, []);
   const entries = status?.entries ?? [];
   const rows = splitEntries(entries);
@@ -2817,7 +2835,7 @@ function Workspace(props) {
   const selectedEntry = selected ? findEntry(status, selected.path) : null;
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null;
   const truncated = status?.truncated === true;
-  const canPush = (refs?.remotes?.length ?? 0) > 0;
+  const canPush = (status?.remotes?.length ?? 0) > 0;
   const autoSelectRef = React.useRef("");
   React.useEffect(() => {
     if (view !== "status" || status === null) return;
@@ -2990,7 +3008,7 @@ function Workspace(props) {
     contextMenu ? h(ContextMenu, { state: contextMenu, onClose: () => setContextMenu(null) }) : null,
     dialog?.kind === "push" ? h(ConfirmDialog, {
       title: t("pushTitle"),
-      body: (status?.branch || "\u2014") + " \u2192 " + (status?.upstream || "origin/" + (status?.branch || "")) + " \xB7 " + String(status?.ahead ?? 0) + " " + t("ahead") + " \xB7 " + t("pushBody"),
+      body: status?.upstream ? (status?.branch || "\u2014") + " \u2192 " + status.upstream + " \xB7 " + String(status?.ahead ?? 0) + " " + t("ahead") + " \xB7 " + t("pushBody") : (status?.branch || "\u2014") + " \xB7 " + t("pushFirst") + " \xB7 " + t("pushBody"),
       submitLabel: t("push"),
       busy: dialogBusy,
       error: dialogError,

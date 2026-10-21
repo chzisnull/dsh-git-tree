@@ -75,18 +75,22 @@ export function CommitBox(props: {
         }
       },
     }),
-    props.canPush
-      ? h(
-          'label',
-          { className: 'dgt-commit-check' },
-          h('input', {
-            type: 'checkbox',
-            checked: props.pushAfter,
-            onChange: (event: any) => props.onPushAfter(event.target.checked),
-          }),
-          h('span', null, t('pushAfterCommit')),
-        )
-      : null,
+    h(
+      'label',
+      {
+        className: 'dgt-commit-check',
+        'data-disabled': props.canPush ? undefined : true,
+        title: props.canPush ? undefined : t('pushNoRemote'),
+      },
+      h('input', {
+        type: 'checkbox',
+        checked: props.pushAfter,
+        disabled: !props.canPush,
+        onChange: (event: any) => props.onPushAfter(event.target.checked),
+      }),
+      h('span', null, t('pushAfterCommit')),
+      props.canPush ? null : h('em', null, t('pushNoRemote')),
+    ),
     h(
       'div',
       { className: 'dgt-commit-foot' },

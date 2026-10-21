@@ -5,11 +5,21 @@
  * themselves. `index.js` owns the route table, so this module stays a plain
  * importable unit that a Node test can call directly.
  *
- * Read routes: status, diff, refs. Write routes: stage, unstage, commit.
- * The write surface is deliberately small: no reset --hard, no push, no amend.
+ * Read routes: status, diff, refs, history, commit-info, workspaces.
+ * Write routes: stage, unstage, commit, checkout, merge, branch create/rename/
+ * delete, discard, remove, open and a non-forcing push of the current branch.
  */
 
-import { MAX_DIFF_BYTES, MAX_REFS_BYTES, MAX_STATUS_BYTES, git, runProcess, subprocessOf } from './git.js'
+import {
+  GIT_PUSH_TIMEOUT_MS,
+  MAX_DIFF_BYTES,
+  MAX_PUSH_BYTES,
+  MAX_REFS_BYTES,
+  MAX_STATUS_BYTES,
+  git,
+  runProcess,
+  subprocessOf,
+} from './git.js'
 import { parseUnifiedDiff } from './diff.js'
 import { parsePorcelainV2, summariseEntries } from './porcelain.js'
 import {
@@ -118,6 +128,7 @@ export async function handleStatus(ctx, request) {
     ahead: parsed.ahead,
     behind: parsed.behind,
     identity: await readIdentity(subprocess, cwd),
+    remotes: await readRemotes(subprocess, cwd),
     entries: parsed.entries,
     counts: summariseEntries(parsed.entries),
     truncated: parsed.truncated,
@@ -393,7 +404,10 @@ export async function handleMerge(ctx, request) {
     if (/CONFLICT|Automatic merge failed|fix conflicts/i.test(detail)) {
       throw new RequestError('合并产生冲突，冲突文件已列在改动里', 409, 'merge-conflict')
     }
-    if (/commit your changes or stash|would be overwritten|not possible because you have unmerged/i.test(detail)) {
+    if (/not possible because you have unmerged|unresolved conflicts/i.test(detail)) {
+      throw new RequestError('有未解决的冲突，先解决再合并', 409, 'unmerged')
+    }
+    if (/commit your changes or stash|would be overwritten/i.test(detail)) {
       throw new RequestError('本地改动会被这次合并覆盖，先提交或贮藏再合并', 409, 'dirty-worktree')
     }
     throw error
@@ -432,6 +446,7 @@ async function readRemotes(subprocess, cwd) {
  */
 export async function handlePush(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
+  await readJsonBody(request)
   const subprocess = subprocessOf(ctx)
 
   const current = await currentBranchOf(subprocess, cwd)
@@ -441,11 +456,25 @@ export async function handlePush(ctx, request) {
   if (remotes.length === 0) throw new RequestError('当前仓库没有配置远端', 409, 'no-remote')
 
   const upstream = await readUpstream(subprocess, cwd)
-  const remote = upstream ? upstream.split('/')[0] : remotes.includes('origin') ? 'origin' : remotes[0]
-  const argv = upstream ? ['push'] : ['push', '-u', remote, current]
+  let argv
+  let remote = ''
+  if (upstream) {
+    const separator = upstream.indexOf('/')
+    remote = separator === -1 ? upstream : upstream.slice(0, separator)
+    const remoteBranch = separator === -1 ? current : upstream.slice(separator + 1)
+    // Explicit remote and refspec: never let push.default or a remote-level
+    // push refspec decide what gets pushed.
+    argv = ['push', remote, current + ':' + remoteBranch]
+  } else {
+    if (!remotes.includes('origin')) {
+      throw new RequestError('当前分支没有 upstream，且仓库没有 origin 远端', 409, 'no-remote')
+    }
+    remote = 'origin'
+    argv = ['push', '-u', 'origin', current]
+  }
 
   try {
-    await git(subprocess, argv, cwd, { maxBytes: MAX_DIFF_BYTES, timeoutMs: 60_000 })
+    await git(subprocess, argv, cwd, { maxBytes: MAX_PUSH_BYTES, timeoutMs: GIT_PUSH_TIMEOUT_MS })
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     if (/Authentication failed|could not read Username|terminal prompts disabled|Permission denied|HTTP 40[13]/i.test(detail)) {
@@ -453,9 +482,6 @@ export async function handlePush(ctx, request) {
     }
     if (/Updates were rejected|non-fast-forward|fetch first/i.test(detail)) {
       throw new RequestError('远端有新提交，先拉取或合并后再推送', 409, 'non-fast-forward')
-    }
-    if (/no upstream branch|set-upstream/i.test(detail)) {
-      throw new RequestError('当前分支没有 upstream，推送一次后会自动建立', 409, 'no-upstream')
     }
     throw error
   }

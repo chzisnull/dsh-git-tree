@@ -14,6 +14,8 @@ export const MAX_STATUS_BYTES = 4 * 1024 * 1024
 export const MAX_DIFF_BYTES = 2 * 1024 * 1024
 export const MAX_REFS_BYTES = 2 * 1024 * 1024
 export const GIT_TIMEOUT_MS = 10_000
+export const GIT_PUSH_TIMEOUT_MS = 60_000
+export const MAX_PUSH_BYTES = 2 * 1024 * 1024
 
 /** Environment every git child starts from (merged over the subprocess scrub). */
 export const GIT_ENV = Object.freeze({

@@ -80,6 +80,18 @@ _Avoid_: Find, filter
 One column of the commit graph; a commit sits on a lane and lanes merge or split at merge commits.
 _Avoid_: Branch line, swim lane, column
 
+**Upstream** (上游):
+The remote branch a local branch tracks by default; pushing without arguments uses it.
+_Avoid_: Tracking branch target, origin ref
+
+**Push** (推送):
+Sending the current branch's commits to its upstream; it never rewrites or forces.
+_Avoid_: Upload, sync
+
+**Fast-forward** (快进):
+A merge that only moves the current branch pointer forward because the merged branch already contains it.
+_Avoid_: FF, linear merge
+
 **Checkout** (检出):
 Switching the repository to a branch, moving `HEAD` and the working copy to it.
 _Avoid_: Switch, activate

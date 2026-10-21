@@ -206,6 +206,12 @@ export function Workspace(props: { t?: Translate }): any {
     [appliedAuthor, appliedPath, appliedQuery, historyCommits, historyScope, repoPath, t, view],
   )
 
+  const afterPush = React.useCallback(async () => {
+    await loadStatus()
+    await loadRefs()
+    if (view !== 'status') await loadHistory(true)
+  }, [loadHistory, loadRefs, loadStatus, view])
+
   const loadCommitDetail = React.useCallback(
     async (sha: string) => {
       setCommitDetailLoading(true)
@@ -595,15 +601,13 @@ export function Workspace(props: { t?: Translate }): any {
       if (!result.ok) throw new Error(result.error || t('pushFailed'))
       closeDialog()
       showToast(t('pushed') + ' · ' + (result.upstream || status?.branch || ''))
-      await loadStatus()
-      await loadRefs()
-      if (view !== 'status') await loadHistory(true)
+      await afterPush()
     } catch (error) {
       setDialogError(error instanceof Error ? error.message : String(error))
     } finally {
       setDialogBusy(false)
     }
-  }, [closeDialog, loadHistory, loadRefs, loadStatus, repoPath, showToast, status?.branch, t, view])
+  }, [afterPush, closeDialog, repoPath, showToast, status?.branch, t])
 
   const submitMerge = React.useCallback(async () => {
     const branch = dialog?.branch ?? ''
@@ -754,21 +758,27 @@ export function Workspace(props: { t?: Translate }): any {
       setSelected(null)
       setDiff(null)
       if (pushAfter) {
-        const pushed = await pushBranch(repoPath || undefined)
-        showToast(
-          pushed.ok ? receipt + ' · ' + t('pushed') : receipt + ' · ' + t('pushFailed') + '：' + (pushed.error || ''),
-        )
+        let note = ''
+        try {
+          const pushed = await pushBranch(repoPath || undefined)
+          note = pushed.ok
+            ? ' · ' + t('pushed')
+            : ' · ' + t('pushFailed') + '：' + (pushed.error || '')
+        } catch (error) {
+          note = ' · ' + t('pushFailed') + '：' + (error instanceof Error ? error.message : String(error))
+        }
+        showToast(receipt + note)
       } else {
         showToast(receipt)
       }
-      await loadStatus()
-      await loadRefs()
+      setPushAfter(false)
+      await afterPush()
     } catch (error) {
       setActionError(error instanceof Error ? error.message : String(error))
     } finally {
       setBusy(false)
     }
-  }, [loadRefs, loadStatus, message, pushAfter, repoPath, showToast, status, t])
+  }, [afterPush, message, pushAfter, repoPath, showToast, status, t])
 
   const switchWorkspace = React.useCallback((path: string) => {
     setRepoPath(path)
@@ -784,6 +794,7 @@ export function Workspace(props: { t?: Translate }): any {
     setView('status')
     setHistoryCommits([])
     setHistorySha('')
+    setPushAfter(false)
   }, [])
 
   const entries = status?.entries ?? []
@@ -792,7 +803,7 @@ export function Workspace(props: { t?: Translate }): any {
   const selectedEntry = selected ? findEntry(status, selected.path) : null
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null
   const truncated = status?.truncated === true
-  const canPush = (refs?.remotes?.length ?? 0) > 0
+  const canPush = (status?.remotes?.length ?? 0) > 0
 
   const autoSelectRef = React.useRef('')
   React.useEffect(() => {
@@ -991,16 +1002,17 @@ export function Workspace(props: { t?: Translate }): any {
     dialog?.kind === 'push'
       ? h(ConfirmDialog, {
           title: t('pushTitle'),
-          body:
-            (status?.branch || '—') +
-            ' → ' +
-            (status?.upstream || 'origin/' + (status?.branch || '')) +
-            ' · ' +
-            String(status?.ahead ?? 0) +
-            ' ' +
-            t('ahead') +
-            ' · ' +
-            t('pushBody'),
+          body: status?.upstream
+            ? (status?.branch || '—') +
+              ' → ' +
+              status.upstream +
+              ' · ' +
+              String(status?.ahead ?? 0) +
+              ' ' +
+              t('ahead') +
+              ' · ' +
+              t('pushBody')
+            : (status?.branch || '—') + ' · ' + t('pushFirst') + ' · ' + t('pushBody'),
           submitLabel: t('push'),
           busy: dialogBusy,
           error: dialogError,
