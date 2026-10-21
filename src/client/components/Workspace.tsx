@@ -18,6 +18,7 @@ import type {
 } from '../types'
 import {
   commitChanges,
+  fetchCommitInfo,
   fetchDiff,
   fetchHistory,
   fetchRefs,
