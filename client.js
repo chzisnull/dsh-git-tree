@@ -38,125 +38,292 @@ var EN = {
   panel: "Git",
   refresh: "Refresh",
   refs: "References",
-  branches: "Local branches",
-  branchesPlaceholder: "Branch list (skeleton)",
+  readOnly: "Read-only for now",
+  workspace: "Workspace",
+  fileStatus: "File status",
+  history: "History",
+  search: "Search",
+  branches: "Branches",
   remotes: "Remotes",
-  remotesPlaceholder: "Remote list (skeleton)",
   tags: "Tags",
-  tagsPlaceholder: "Tag list (skeleton)",
-  changes: "Changes",
-  staged: "Staged",
-  working: "Working tree",
-  diff: "Diff",
+  stagedFiles: "Staged files",
+  unstagedFiles: "Unstaged files",
+  conflicts: "Conflicts",
+  nothingToCommit: "Nothing to commit",
+  nothingHint: "Your working tree is clean.",
+  noFileSelected: "Select a changed file to preview its diff.",
   diffPlaceholder: "Select a changed file to preview its diff.",
-  untrackedNoDiff: "Untracked file: no diff until it is added.",
+  untrackedNoDiff: "Untracked file: no diff until it is staged.",
   noDiff: "No diff for this file.",
-  clean: "Working tree clean.",
+  binaryFile: "Binary file \u2014 no text diff.",
+  renameFrom: "from",
+  stageFile: "Stage file",
+  unstageFile: "Unstage file",
+  copyPath: "Copy path",
+  copiedPath: "Path copied",
+  fileActions: "File actions",
+  author: "Author",
+  commit: "Commit",
+  commitPlaceholder: "Commit message (\u2318\u21B5 to commit)",
+  commitHint: "Stage files and write a message to commit.",
+  conflictsBlockCommit: "Resolve unmerged files before committing.",
+  commitDone: "Committed",
+  commitFailed: "Commit failed",
+  stageFailed: "Stage failed",
+  unstageFailed: "Unstage failed",
   loading: "Loading\u2026",
-  statusFailed: "git status failed.",
-  diffFailed: "git diff failed.",
-  hostUnavailable: "Host half not available"
+  statusFailed: "Could not read the working copy.",
+  diffFailed: "Could not read the diff.",
+  hostUnavailable: "Host half not available",
+  notARepo: "This folder is not a Git repository.",
+  truncated: "Too many changes \u2014 showing the first 5000.",
+  ahead: "ahead",
+  behind: "behind",
+  noChanges: "No changes",
+  filesChanged: "files",
+  code: "Code"
 };
 var ZH = {
   panel: "Git",
   refresh: "\u5237\u65B0",
   refs: "\u5F15\u7528",
-  branches: "\u672C\u5730\u5206\u652F",
-  branchesPlaceholder: "\u5206\u652F\u5217\u8868\uFF08\u9AA8\u67B6\uFF09",
+  readOnly: "\u6682\u4E3A\u53EA\u8BFB",
+  workspace: "\u5DE5\u4F5C\u533A",
+  fileStatus: "\u6587\u4EF6\u72B6\u6001",
+  history: "\u5386\u53F2",
+  search: "\u641C\u7D22",
+  branches: "\u5206\u652F",
   remotes: "\u8FDC\u7A0B",
-  remotesPlaceholder: "\u8FDC\u7A0B\u5217\u8868\uFF08\u9AA8\u67B6\uFF09",
   tags: "\u6807\u7B7E",
-  tagsPlaceholder: "\u6807\u7B7E\u5217\u8868\uFF08\u9AA8\u67B6\uFF09",
-  changes: "\u6539\u52A8",
-  staged: "\u5DF2\u6682\u5B58",
-  working: "\u5DE5\u4F5C\u533A",
-  diff: "\u5DEE\u5F02",
+  stagedFiles: "\u5DF2\u6682\u5B58\u6587\u4EF6",
+  unstagedFiles: "\u672A\u6682\u5B58\u6587\u4EF6",
+  conflicts: "\u51B2\u7A81",
+  nothingToCommit: "\u6CA1\u4EC0\u4E48\u53EF\u63D0\u4EA4\u7684",
+  nothingHint: "\u5DE5\u4F5C\u533A\u662F\u5E72\u51C0\u7684\u3002",
+  noFileSelected: "\u9009\u62E9\u5DE6\u4FA7\u6539\u52A8\u4EE5\u9884\u89C8\u5DEE\u5F02\u3002",
   diffPlaceholder: "\u9009\u62E9\u5DE6\u4FA7\u6539\u52A8\u4EE5\u9884\u89C8\u5DEE\u5F02\u3002",
-  untrackedNoDiff: "\u672A\u8DDF\u8E2A\u6587\u4EF6\uFF1A\u52A0\u5165\u6682\u5B58\u524D\u6CA1\u6709\u5DEE\u5F02\u3002",
+  untrackedNoDiff: "\u672A\u8DDF\u8E2A\u6587\u4EF6\uFF1A\u6682\u5B58\u4E4B\u540E\u624D\u6709\u5DEE\u5F02\u3002",
   noDiff: "\u8BE5\u6587\u4EF6\u6CA1\u6709\u5DEE\u5F02\u3002",
-  clean: "\u5DE5\u4F5C\u533A\u5E72\u51C0\u3002",
+  binaryFile: "\u4E8C\u8FDB\u5236\u6587\u4EF6\uFF0C\u65E0\u6CD5\u9884\u89C8\u5DEE\u5F02\u3002",
+  renameFrom: "\u539F\u8DEF\u5F84",
+  stageFile: "\u6682\u5B58\u6587\u4EF6",
+  unstageFile: "\u53D6\u6D88\u6682\u5B58\u6587\u4EF6",
+  copyPath: "\u590D\u5236\u8DEF\u5F84",
+  copiedPath: "\u8DEF\u5F84\u5DF2\u590D\u5236",
+  fileActions: "\u6587\u4EF6\u64CD\u4F5C",
+  author: "\u4F5C\u8005",
+  commit: "\u63D0\u4EA4",
+  commitPlaceholder: "\u63D0\u4EA4\u4FE1\u606F\uFF08\u2318\u21B5 \u63D0\u4EA4\uFF09",
+  commitHint: "\u6682\u5B58\u6587\u4EF6\u5E76\u586B\u5199\u63D0\u4EA4\u4FE1\u606F\u540E\u624D\u80FD\u63D0\u4EA4\u3002",
+  conflictsBlockCommit: "\u5B58\u5728\u672A\u5408\u5E76\u6587\u4EF6\uFF0C\u8BF7\u5148\u89E3\u51B3\u51B2\u7A81\u3002",
+  commitDone: "\u5DF2\u63D0\u4EA4",
+  commitFailed: "\u63D0\u4EA4\u5931\u8D25",
+  stageFailed: "\u6682\u5B58\u5931\u8D25",
+  unstageFailed: "\u53D6\u6D88\u6682\u5B58\u5931\u8D25",
   loading: "\u52A0\u8F7D\u4E2D\u2026",
-  statusFailed: "git status \u6267\u884C\u5931\u8D25\u3002",
-  diffFailed: "git diff \u6267\u884C\u5931\u8D25\u3002",
-  hostUnavailable: "\u5BBF\u4E3B\u534A\u672A\u5C31\u7EEA"
+  statusFailed: "\u8BFB\u53D6\u5DE5\u4F5C\u533A\u5931\u8D25\u3002",
+  diffFailed: "\u8BFB\u53D6\u5DEE\u5F02\u5931\u8D25\u3002",
+  hostUnavailable: "\u5BBF\u4E3B\u534A\u672A\u5C31\u7EEA",
+  notARepo: "\u5F53\u524D\u76EE\u5F55\u4E0D\u662F Git \u4ED3\u5E93\u3002",
+  truncated: "\u6539\u52A8\u8FC7\u591A\uFF0C\u4EC5\u663E\u793A\u524D 5000 \u6761\u3002",
+  ahead: "\u9886\u5148",
+  behind: "\u843D\u540E",
+  noChanges: "\u6CA1\u6709\u6539\u52A8",
+  filesChanged: "\u4E2A\u6587\u4EF6",
+  code: "\u4EE3\u7801"
 };
 
 // src/client/styles.ts
 var CSS = `
-.dgt-root{box-sizing:border-box;height:100%;min-height:0;display:flex;flex-direction:column;
+.dgt-root{position:relative;box-sizing:border-box;height:100%;min-height:0;display:flex;flex-direction:column;
   background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);
-  font-family:var(--dsw-font-family);font-size:13px;line-height:20px;
-  padding:calc(var(--dsh-frame-top-clearance,0px) + 8px) 12px 12px;}
-.dgt-topbar{display:flex;align-items:center;gap:12px;padding:8px 10px;border:1px solid var(--dsw-alias-border-l2);
-  border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-1);flex:0 0 auto;}
-.dgt-repo{display:flex;flex-direction:column;min-width:0;gap:1px;}
-.dgt-repo-name{font-size:14px;font-weight:500;}
-.dgt-repo-path{font-size:11px;color:var(--dsw-alias-label-tertiary);max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  font-family:var(--dsw-font-family);font-size:12.5px;line-height:18px;
+  padding:calc(var(--dsh-frame-top-clearance,0px) + 6px) 10px 10px;}
+
+/* toolbar */
+.dgt-topbar{display:flex;align-items:center;gap:10px;flex:0 0 auto;height:44px;padding:0 10px;
+  border:1px solid var(--dsw-alias-border-l2);border-bottom:0;
+  border-radius:var(--dsw-radius-md) var(--dsw-radius-md) 0 0;
+  background:var(--dsw-alias-bg-layer-1);}
+.dgt-repo{display:flex;align-items:baseline;gap:8px;min-width:0;}
+.dgt-repo-name{font-size:13px;font-weight:600;white-space:nowrap;}
+.dgt-repo-path{font-size:11px;color:var(--dsw-alias-label-tertiary);max-width:26vw;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;}
 .dgt-refs{display:flex;align-items:center;gap:6px;margin-left:auto;min-width:0;}
-.dgt-upstream{font-size:11px;color:var(--dsw-alias-label-caption);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:20vw;}
-.dgt-branch-glyph{opacity:.75;}
-.dgt-chip{display:inline-flex;align-items:center;gap:2px;padding:1px 8px;border-radius:999px;
-  background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary);
+.dgt-chip{display:inline-flex;align-items:center;gap:4px;padding:1px 8px;border-radius:999px;
+  background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);
   font-size:11px;line-height:18px;white-space:nowrap;}
 .dgt-chip[data-tone='ok']{color:var(--dsw-alias-state-success-primary);}
 .dgt-chip[data-tone='warn']{color:var(--dsw-alias-state-warn-primary);}
-.dgt-actions{display:flex;align-items:center;gap:8px;}
-.dgt-button{appearance:none;border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);
-  color:var(--dsw-alias-label-primary);border-radius:var(--dsw-radius-sm);padding:3px 10px;
-  font:inherit;font-size:12px;cursor:pointer;}
-.dgt-button:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);}
-.dgt-button:disabled{color:var(--dsw-alias-label-caption);cursor:default;}
-.dgt-banner{display:flex;flex-direction:column;gap:2px;margin-top:8px;padding:8px 12px;flex:0 0 auto;
-  border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);
-  background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-secondary);font-size:12px;}
-.dgt-banner strong{color:var(--dsw-alias-state-warn-primary);font-weight:500;}
-.dgt-body{display:flex;gap:8px;min-height:0;flex:1 1 auto;margin-top:8px;}
-.dgt-rail{flex:0 0 200px;min-width:0;display:flex;flex-direction:column;gap:2px;overflow:auto;
-  border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);
-  background:var(--dsw-alias-bg-layer-1);padding:8px;}
-.dgt-list{flex:1 1 300px;min-width:0;display:flex;flex-direction:column;
-  border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);
-  background:var(--dsw-alias-bg-layer-1);overflow:hidden;}
-.dgt-diff{flex:1.4 1 380px;min-width:0;display:flex;flex-direction:column;
-  border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);
-  background:var(--dsw-alias-bg-layer-1);overflow:hidden;}
-.dgt-list-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto;
-  padding:7px 10px;border-bottom:1px solid var(--dsw-alias-border-l2);
-  color:var(--dsw-alias-label-secondary);font-size:12px;}
-.dgt-count{color:var(--dsw-alias-label-caption);font-variant-numeric:tabular-nums;}
-.dgt-section-title{margin-top:6px;padding:2px 4px;color:var(--dsw-alias-label-tertiary);
-  font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
-.dgt-placeholder{padding:10px;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px;}
-.dgt-error{color:var(--dsw-alias-state-error-primary);}
-.dgt-scroll{overflow:auto;min-height:0;flex:1 1 auto;padding:4px;}
-.dgt-group{padding:6px 6px 2px;color:var(--dsw-alias-label-caption);font-size:11px;text-transform:uppercase;letter-spacing:.04em;}
-.dgt-file{display:flex;align-items:center;gap:8px;width:100%;text-align:left;appearance:none;border:0;
-  background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;
-  padding:3px 6px;border-radius:var(--dsw-radius-xs);cursor:pointer;}
-.dgt-file:hover{background:var(--dsw-alias-interactive-bg-hover);}
-.dgt-file[data-active]{background:var(--dsw-alias-interactive-bg-active);}
-.dgt-file-code{flex:0 0 auto;width:18px;text-align:center;font-family:var(--ds-font-family-code);
-  font-size:11px;color:var(--dsw-alias-label-tertiary);}
-.dgt-file-code[data-status='A']{color:var(--dsw-alias-state-success-primary);}
-.dgt-file-code[data-status='D']{color:var(--dsw-alias-state-error-primary);}
-.dgt-file-code[data-status='M']{color:var(--dsw-alias-state-warn-primary);}
-.dgt-file-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;}
-.dgt-diff-body{min-height:0;flex:1 1 auto;overflow:auto;}
-.dgt-premain{margin:0;padding:10px;font-family:var(--ds-font-family-code);
-  font-size:var(--dsh-code-font-size,11px);line-height:17px;color:var(--dsw-alias-label-secondary);
-  white-space:pre;tab-size:2;}
-.dgt-mono{font-family:var(--ds-font-family-code);font-size:11px;color:var(--dsw-alias-label-caption);
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:55%;}
-.dgt-spinner{width:12px;height:12px;border-radius:50%;flex:0 0 auto;
-  border:1.5px solid var(--dsw-alias-border-l3);border-top-color:var(--dsw-alias-brand-primary);
-  animation:dgt-spin .8s linear infinite;}
+.dgt-chip[data-tone='brand']{color:var(--dsw-alias-brand-text);}
+.dgt-upstream{font-size:11px;color:var(--dsw-alias-label-caption);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;max-width:18vw;}
+.dgt-actions{display:flex;align-items:center;gap:4px;}
+.dgt-iconbtn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:4px;
+  width:26px;height:26px;padding:0;border:0;border-radius:var(--dsw-radius-xs);
+  background:transparent;color:var(--dsw-alias-label-secondary);cursor:pointer;font:inherit;font-size:11px;}
+.dgt-iconbtn:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);
+  color:var(--dsw-alias-label-primary);}
+.dgt-iconbtn:disabled{color:var(--dsw-alias-label-caption);cursor:default;}
+.dgt-iconbtn[data-busy='true'] svg{animation:dgt-spin .9s linear infinite;}
 @keyframes dgt-spin{to{transform:rotate(360deg)}}
-@media (prefers-reduced-motion:reduce){.dgt-spinner{animation:none}}
+@media (prefers-reduced-motion:reduce){.dgt-iconbtn[data-busy='true'] svg{animation:none}}
+
+/* body: rail | (panes + commit box) */
+.dgt-body{display:flex;flex:1 1 auto;min-height:0;border:1px solid var(--dsw-alias-border-l2);
+  border-radius:0 0 var(--dsw-radius-md) var(--dsw-radius-md);overflow:hidden;
+  background:var(--dsw-alias-bg-layer-1);}
+
+/* reference rail */
+.dgt-rail{flex:0 0 224px;min-width:0;display:flex;flex-direction:column;overflow:auto;
+  padding:4px 0 8px;border-right:1px solid var(--dsw-alias-border-l2);
+  background:var(--dsw-alias-bg-layer-1);}
+.dgt-rail-title{display:flex;align-items:center;justify-content:space-between;height:26px;padding:0 12px;
+  margin-top:6px;color:var(--dsw-alias-label-tertiary);font-size:10px;font-weight:600;
+  letter-spacing:.06em;text-transform:uppercase;}
+.dgt-rail-title:first-child{margin-top:0;}
+.dgt-rail-row{display:flex;align-items:center;gap:6px;height:26px;padding:0 12px 0 20px;
+  color:var(--dsw-alias-label-secondary);white-space:nowrap;}
+.dgt-rail-row[data-active='true']{background:var(--dsw-alias-interactive-bg-active);
+  color:var(--dsw-alias-label-primary);}
+.dgt-rail-row[data-current='true']{color:var(--dsw-alias-label-primary);font-weight:500;}
+.dgt-rail-row[data-muted='true']{color:var(--dsw-alias-label-caption);}
+.dgt-rail-dot{width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-brand-primary);flex:0 0 auto;}
+.dgt-rail-name{overflow:hidden;text-overflow:ellipsis;}
+.dgt-rail-empty{padding:4px 12px 6px 20px;color:var(--dsw-alias-label-caption);font-size:11px;}
+.dgt-rail-scroll{overflow:hidden;}
+
+/* panes */
+.dgt-main{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0;}
+.dgt-panes{display:flex;flex:1 1 auto;min-height:0;min-width:0;}
+.dgt-list{display:flex;flex-direction:column;flex:0 0 360px;min-width:0;min-height:0;
+  border-right:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);}
+.dgt-diff{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0;
+  background:var(--dsw-alias-bg-base);}
+
+/* list */
+.dgt-list-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto;
+  height:27px;padding:0 10px;border-bottom:1px solid var(--dsw-alias-border-l2);
+  background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);
+  font-size:11px;font-weight:500;}
+.dgt-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding:0;}
+.dgt-group{display:flex;align-items:center;justify-content:space-between;height:27px;padding:0 10px;
+  background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l2);
+  color:var(--dsw-alias-label-secondary);font-size:11px;font-weight:500;}
+.dgt-group[data-tone='error']{color:var(--dsw-alias-state-error-primary);}
+.dgt-group-count{color:var(--dsw-alias-label-caption);font-variant-numeric:tabular-nums;font-weight:400;}
+.dgt-row{position:relative;display:flex;align-items:center;gap:6px;width:100%;height:27px;
+  padding:0 8px;border:0;background:transparent;color:var(--dsw-alias-label-primary);
+  font:inherit;font-size:12px;text-align:left;cursor:default;}
+.dgt-row:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-row[data-active='true']{background:var(--dsw-alias-interactive-bg-active);}
+.dgt-row:focus-visible{outline:1px solid var(--dsw-alias-brand-primary);outline-offset:-1px;}
+.dgt-check{flex:0 0 auto;width:13px;height:13px;margin:0;accent-color:var(--dsw-alias-brand-primary);cursor:pointer;}
+.dgt-letter{flex:0 0 auto;width:12px;text-align:center;font-family:var(--ds-font-family-code);
+  font-size:11px;font-weight:600;color:var(--dsw-alias-label-tertiary);}
+.dgt-letter[data-tone='ok']{color:var(--dsw-alias-state-success-primary);}
+.dgt-letter[data-tone='warn']{color:var(--dsw-alias-state-warn-primary);}
+.dgt-letter[data-tone='error']{color:var(--dsw-alias-state-error-primary);}
+.dgt-letter[data-tone='accent']{color:var(--dsw-alias-brand-text);}
+.dgt-path{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;}
+.dgt-path-dir{color:var(--dsw-alias-label-tertiary);}
+.dgt-path-name{color:var(--dsw-alias-label-primary);}
+.dgt-more{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;
+  padding:0;border:0;border-radius:var(--dsw-radius-xs);background:transparent;opacity:0;
+  color:var(--dsw-alias-label-tertiary);cursor:pointer;}
+.dgt-row:hover .dgt-more,.dgt-row:focus-within .dgt-more,.dgt-more[data-open='true']{opacity:1;}
+.dgt-more:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary);}
+.dgt-menu{position:absolute;right:6px;top:24px;z-index:5;min-width:132px;padding:4px;
+  border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);
+  background:var(--dsw-alias-bg-layer-3);box-shadow:0 6px 18px var(--dsw-alias-bg-mask-1);}
+.dgt-menu button{display:block;width:100%;padding:4px 8px;border:0;border-radius:var(--dsw-radius-xs);
+  background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;
+  text-align:left;cursor:pointer;}
+.dgt-menu button:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-placeholder{padding:14px 12px;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px;}
+.dgt-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  height:100%;min-height:120px;color:var(--dsw-alias-label-secondary);font-size:12.5px;}
+.dgt-empty-hint{color:var(--dsw-alias-label-tertiary);font-size:11.5px;}
+.dgt-banner{display:flex;align-items:center;gap:8px;margin:8px 10px;padding:6px 10px;flex:0 0 auto;
+  border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);
+  background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);font-size:12px;}
+.dgt-banner[data-tone='error']{color:var(--dsw-alias-state-error-primary);}
+.dgt-banner-text{flex:1 1 auto;min-width:0;}
+.dgt-banner button{appearance:none;border:0;background:transparent;color:inherit;cursor:pointer;
+  font:inherit;font-size:11px;opacity:.8;}
+
+/* diff */
+.dgt-diff-head{display:flex;align-items:center;gap:8px;flex:0 0 auto;height:30px;padding:0 10px;
+  border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);
+  font-size:12px;color:var(--dsw-alias-label-secondary);}
+.dgt-diff-path{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--dsw-alias-label-primary);}
+.dgt-diff-orig{color:var(--dsw-alias-label-caption);font-size:11px;}
+.dgt-stats{display:flex;gap:6px;font-size:11px;font-variant-numeric:tabular-nums;}
+.dgt-stat-add{color:var(--dsw-alias-state-success-primary);}
+.dgt-stat-del{color:var(--dsw-alias-state-error-primary);}
+.dgt-diff-action{appearance:none;height:22px;padding:0 8px;border:1px solid var(--dsw-alias-border-l2);
+  border-radius:var(--dsw-radius-xs);background:var(--dsw-alias-bg-layer-1);
+  color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;cursor:pointer;}
+.dgt-diff-action:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary);}
+.dgt-diff-body{flex:1 1 auto;min-height:0;overflow:auto;background:var(--dsw-alias-bg-base);}
+.dgt-hunk-head{display:flex;align-items:center;justify-content:space-between;gap:8px;height:28px;
+  padding:0 10px;border-top:1px solid var(--dsw-alias-border-l1);border-bottom:1px solid var(--dsw-alias-border-l1);
+  background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);
+  font-family:var(--ds-font-family-code);font-size:11px;white-space:nowrap;overflow:hidden;}
+.dgt-hunk-head span{overflow:hidden;text-overflow:ellipsis;}
+.dgt-line{display:flex;min-width:max-content;height:18px;line-height:18px;
+  font-family:var(--ds-font-family-code);font-size:11px;white-space:pre;color:var(--dsw-alias-label-secondary);}
+.dgt-line[data-kind='add']{background:var(--dsw-alias-file-diff-added-bg);}
+.dgt-line[data-kind='del']{background:var(--dsw-alias-file-diff-deleted-bg);}
+.dgt-line[data-kind='meta']{color:var(--dsw-alias-label-caption);font-style:italic;}
+.dgt-gutter{flex:0 0 38px;text-align:right;padding-right:6px;user-select:none;
+  color:var(--dsw-alias-label-caption);font-variant-numeric:tabular-nums;
+  border-right:1px solid var(--dsw-alias-border-l1);}
+.dgt-line[data-kind='add'] .dgt-gutter{background:var(--dsw-alias-file-diff-added-gutter);}
+.dgt-line[data-kind='del'] .dgt-gutter{background:var(--dsw-alias-file-diff-deleted-gutter);}
+.dgt-marker{flex:0 0 14px;text-align:center;user-select:none;color:var(--dsw-alias-label-caption);}
+.dgt-line[data-kind='add'] .dgt-marker{color:var(--dsw-alias-file-diff-added-marker);}
+.dgt-line[data-kind='del'] .dgt-marker{color:var(--dsw-alias-file-diff-deleted-marker);}
+.dgt-text{flex:1 1 auto;padding:0 12px 0 6px;}
+
+/* commit box */
+.dgt-commit{flex:0 0 auto;display:flex;flex-direction:column;gap:6px;padding:8px 12px 10px;
+  border-top:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);}
+.dgt-commit-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dsw-alias-label-tertiary);}
+.dgt-avatar{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;
+  border-radius:50%;background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-secondary);
+  font-size:10px;font-weight:600;flex:0 0 auto;}
+.dgt-commit-author{color:var(--dsw-alias-label-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-commit-branch{color:var(--dsw-alias-label-caption);}
+.dgt-commit-input{box-sizing:border-box;width:100%;min-height:66px;max-height:140px;resize:vertical;
+  padding:7px 9px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);
+  background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);
+  font:inherit;font-size:12.5px;line-height:18px;}
+.dgt-commit-input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);}
+.dgt-commit-input::placeholder{color:var(--dsw-alias-label-quaternary);}
+.dgt-commit-foot{display:flex;align-items:center;gap:10px;}
+.dgt-hint{flex:1 1 auto;min-width:0;color:var(--dsw-alias-label-tertiary);font-size:11px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-hint[data-tone='error']{color:var(--dsw-alias-state-error-primary);}
+.dgt-primary{appearance:none;height:26px;padding:0 14px;border:1px solid transparent;
+  border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-brand-primary);
+  color:var(--dsw-alias-label-primary-inverted);font:inherit;font-size:12px;font-weight:500;cursor:pointer;}
+.dgt-primary:hover:not(:disabled){opacity:.92;}
+.dgt-primary:disabled{background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-caption);cursor:default;}
+.dgt-toast{position:absolute;right:14px;bottom:118px;z-index:6;max-width:60%;
+  padding:6px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);
+  background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);font-size:12px;
+  box-shadow:0 6px 18px var(--dsw-alias-bg-mask-1);}
 `;
 
 // src/client/routes.ts
 var STATUS_ROUTE = "api/git-tree/status";
 var DIFF_ROUTE = "api/git-tree/diff";
+var REFS_ROUTE = "api/git-tree/refs";
+var STAGE_ROUTE = "api/git-tree/stage";
+var UNSTAGE_ROUTE = "api/git-tree/unstage";
+var COMMIT_ROUTE = "api/git-tree/commit";
 function query(params) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) if (value !== void 0 && value !== "") search.set(key, value);
@@ -168,14 +335,35 @@ async function getJson(route, params, signal) {
     signal,
     headers: { accept: "application/json" }
   });
-  if (!response.ok) throw new Error("HTTP " + String(response.status));
+  const payload = await response.json();
+  return payload;
+}
+async function postJson(route, body, signal) {
+  const response = await fetch(route, {
+    method: "POST",
+    signal,
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
   return await response.json();
 }
-async function fetchStatus(signal) {
+function fetchStatus(signal) {
   return getJson(STATUS_ROUTE, {}, signal);
 }
-async function fetchDiff(params, signal) {
+function fetchDiff(params, signal) {
   return getJson(DIFF_ROUTE, params, signal);
+}
+function fetchRefs(signal) {
+  return getJson(REFS_ROUTE, {}, signal);
+}
+function stagePaths(paths) {
+  return postJson(STAGE_ROUTE, { paths });
+}
+function unstagePaths(paths) {
+  return postJson(UNSTAGE_ROUTE, { paths });
+}
+function commitChanges(message) {
+  return postJson(COMMIT_ROUTE, { message });
 }
 
 // src/client/model.ts
@@ -183,135 +371,556 @@ function lastSegment(path) {
   const parts = String(path).split(/[\\/]+/).filter(Boolean);
   return parts.length > 0 ? parts[parts.length - 1] : path;
 }
-function isStaged(entry) {
-  return entry.kind === "changed" && entry.x !== "." && entry.x !== "?" && entry.y === ".";
+function splitPath(path) {
+  const parts = String(path).split("/");
+  const name = parts.pop() ?? path;
+  return { dir: parts.length > 0 ? parts.join("/") + "/" : "", name };
+}
+function rowKey(path, side) {
+  return side + "\0" + path;
+}
+function splitEntries(entries) {
+  const staged = [];
+  const unstaged = [];
+  const conflicted = [];
+  for (const entry of entries) {
+    if (entry.conflicted) {
+      conflicted.push(entry);
+      continue;
+    }
+    if (entry.staged) staged.push(entry);
+    if (entry.unstaged) unstaged.push(entry);
+  }
+  return { staged, unstaged, conflicted };
+}
+function statusLetter(entry, side) {
+  if (side === "conflicted" || entry.conflicted) return "U";
+  if (entry.kind === "untracked") return "?";
+  if (entry.kind === "renamed") return "R";
+  if (entry.kind === "copied") return "C";
+  const letter = side === "staged" ? entry.x : entry.y;
+  return letter && letter !== "." ? letter : "M";
+}
+function statusTone(letter) {
+  if (letter === "A") return "ok";
+  if (letter === "D" || letter === "U") return "error";
+  if (letter === "M") return "warn";
+  if (letter === "R" || letter === "C") return "accent";
+  return "muted";
+}
+function sideFor(entry, side) {
+  return side === "staged" ? "staged" : "unstaged";
 }
 
 // src/client/components/atoms.tsx
 function Chip(props) {
-  return h("span", { className: "dgt-chip", "data-tone": props.tone ?? "muted" }, props.children);
-}
-function Spinner() {
-  return h("span", { className: "dgt-spinner", "aria-hidden": "true" });
+  return h("span", { className: "dgt-chip", "data-tone": props.tone ?? "muted", title: props.title }, props.children);
 }
 
-// src/client/components/RefRail.tsx
-function RefRail(props) {
-  const t = props.t;
+// src/client/icons.tsx
+function svg(children, extra) {
   return h(
-    "aside",
-    { className: "dgt-rail", "aria-label": t("refs") },
-    h("div", { className: "dgt-section-title" }, t("branches")),
-    h("div", { className: "dgt-placeholder" }, t("branchesPlaceholder")),
-    h("div", { className: "dgt-section-title" }, t("remotes")),
-    h("div", { className: "dgt-placeholder" }, t("remotesPlaceholder")),
-    h("div", { className: "dgt-section-title" }, t("tags")),
-    h("div", { className: "dgt-placeholder" }, t("tagsPlaceholder"))
+    "svg",
+    { width: 14, height: 14, viewBox: "0 0 16 16", "aria-hidden": "true", focusable: "false", ...extra },
+    children
+  );
+}
+function RefreshIcon() {
+  return svg([
+    h("path", { d: "M13 8a5 5 0 1 1-1.6-3.7", fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round" }),
+    h("path", { d: "M13 2.4V5h-2.6", fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round", strokeLinejoin: "round" })
+  ]);
+}
+function CommitIcon() {
+  return svg([
+    h("circle", { cx: 8, cy: 8, r: 4.2, fill: "none", stroke: "currentColor", strokeWidth: 1.3 }),
+    h("path", { d: "M8 1.4v2.4M8 12.2v2.4", fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round" })
+  ]);
+}
+function MoreIcon() {
+  return h(
+    "svg",
+    { width: 13, height: 13, viewBox: "0 0 16 16", "aria-hidden": "true", focusable: "false" },
+    h("circle", { cx: 3.4, cy: 8, r: 1.15, fill: "currentColor" }),
+    h("circle", { cx: 8, cy: 8, r: 1.15, fill: "currentColor" }),
+    h("circle", { cx: 12.6, cy: 8, r: 1.15, fill: "currentColor" })
   );
 }
 
-// src/client/components/FileRow.tsx
-function FileRow(props) {
-  const entry = props.entry;
-  const code = (entry.x + entry.y).trim() || "??";
+// src/client/components/TopBar.tsx
+function TopBar(props) {
+  const { status, t } = props;
+  const branch = status?.branch && status.branch !== "(detached)" ? status.branch : status?.branch || "\u2014";
+  const ahead = status?.ahead ?? 0;
+  const behind = status?.behind ?? 0;
+  const staged = status?.counts?.staged ?? 0;
   return h(
-    "button",
-    {
-      type: "button",
-      className: "dgt-file",
-      "data-active": props.active || void 0,
-      "data-kind": entry.kind,
-      title: entry.path,
-      onClick: () => props.onSelect(entry)
-    },
-    h(
-      "span",
-      {
-        className: "dgt-file-code",
-        "data-status": entry.x === "?" ? "?" : entry.x === "A" ? "A" : entry.y === "M" || entry.x === "M" ? "M" : "D"
-      },
-      code
-    ),
-    h("span", { className: "dgt-file-path" }, entry.path)
-  );
-}
-
-// src/client/components/ChangeList.tsx
-function ChangeList(props) {
-  const { status, statusError, entries, staged, working, selected, t, onSelect } = props;
-  return h(
-    "section",
-    { className: "dgt-list", "aria-label": t("changes") },
+    "header",
+    { className: "dgt-topbar" },
     h(
       "div",
-      { className: "dgt-list-head" },
-      h("span", null, t("changes")),
-      h("span", { className: "dgt-count" }, String(entries.length))
+      { className: "dgt-repo" },
+      h("span", { className: "dgt-repo-name" }, status?.repoRoot ? lastSegment(status.repoRoot) : t("panel")),
+      h(
+        "span",
+        { className: "dgt-repo-path", title: status?.repoRoot || status?.cwd || "" },
+        status?.repoRoot || status?.cwd || "\u2014"
+      )
     ),
-    status === null && statusError === "" ? h("div", { className: "dgt-placeholder" }, t("loading")) : entries.length === 0 ? h("div", { className: "dgt-placeholder" }, t("clean")) : h(
+    h(
       "div",
-      { className: "dgt-scroll" },
-      staged.length > 0 ? h("div", { className: "dgt-group" }, t("staged"), " \xB7 ", String(staged.length)) : null,
-      staged.map(
-        (entry) => h(FileRow, {
-          key: "s:" + entry.path,
-          entry,
-          active: selected?.path === entry.path,
-          onSelect
-        })
+      { className: "dgt-refs" },
+      h(Chip, { tone: "brand", title: t("branches") }, h("span", { "aria-hidden": "true" }, "\u2387"), " ", branch),
+      ahead > 0 ? h(Chip, { tone: "ok", title: t("ahead") }, "\u2191" + String(ahead)) : null,
+      behind > 0 ? h(Chip, { tone: "warn", title: t("behind") }, "\u2193" + String(behind)) : null,
+      status?.upstream ? h("span", { className: "dgt-upstream" }, status.upstream) : null
+    ),
+    h(
+      "div",
+      { className: "dgt-actions" },
+      h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-iconbtn",
+          title: t("refresh"),
+          "aria-label": t("refresh"),
+          "data-busy": props.busy || void 0,
+          disabled: props.busy,
+          onClick: props.onRefresh
+        },
+        h(RefreshIcon)
       ),
-      working.length > 0 ? h("div", { className: "dgt-group" }, t("working"), " \xB7 ", String(working.length)) : null,
-      working.map(
-        (entry) => h(FileRow, {
-          key: "w:" + entry.path,
-          entry,
-          active: selected?.path === entry.path,
-          onSelect
-        })
+      h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-iconbtn",
+          title: t("commit"),
+          "aria-label": t("commit"),
+          disabled: staged === 0,
+          onClick: props.onCommitFocus
+        },
+        h(CommitIcon)
       )
     )
   );
 }
 
-// src/client/components/DiffView.tsx
-function DiffView(props) {
-  const { selected, loading, diff, t } = props;
+// src/client/components/RefRail.tsx
+function Section(props) {
+  return h(
+    "div",
+    { className: "dgt-rail-section" },
+    h(
+      "div",
+      { className: "dgt-rail-title" },
+      h("span", null, props.title),
+      typeof props.count === "number" && props.count > 0 ? h("span", null, String(props.count)) : null
+    ),
+    props.children
+  );
+}
+function RefRow(props) {
+  const ref = props.record;
+  return h(
+    "div",
+    {
+      className: "dgt-rail-row",
+      "data-current": ref.current || void 0,
+      title: ref.subject ? ref.name + " \u2014 " + ref.subject : ref.name
+    },
+    ref.current ? h("span", { className: "dgt-rail-dot" }) : null,
+    h("span", { className: "dgt-rail-name" }, ref.name)
+  );
+}
+function RefRail(props) {
+  const { refs, t } = props;
+  const branches = refs?.branches ?? [];
+  const remotes = refs?.remotes ?? [];
+  const tags = refs?.tags ?? [];
+  return h(
+    "aside",
+    { className: "dgt-rail", "aria-label": t("refs") },
+    h(
+      Section,
+      { title: t("workspace") },
+      h(
+        "div",
+        { className: "dgt-rail-row", "data-active": true },
+        h("span", { className: "dgt-rail-name" }, t("fileStatus"))
+      ),
+      h("div", { className: "dgt-rail-row", "data-muted": true, title: t("readOnly") }, h("span", { className: "dgt-rail-name" }, t("history"))),
+      h("div", { className: "dgt-rail-row", "data-muted": true, title: t("readOnly") }, h("span", { className: "dgt-rail-name" }, t("search")))
+    ),
+    h(
+      Section,
+      { title: t("branches"), count: branches.length },
+      branches.length > 0 ? branches.map((ref) => h(RefRow, { key: "b:" + ref.name, record: ref })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
+    ),
+    h(
+      Section,
+      { title: t("remotes"), count: remotes.length },
+      remotes.length > 0 ? remotes.map((ref) => h(RefRow, { key: "r:" + ref.name, record: ref })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
+    ),
+    h(
+      Section,
+      { title: t("tags"), count: tags.length },
+      tags.length > 0 ? tags.map((ref) => h(RefRow, { key: "t:" + ref.name, record: ref })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
+    )
+  );
+}
+
+// src/client/components/FileRow.tsx
+function FileRow(props) {
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const entry = props.entry;
+  const side = props.side;
+  const t = props.t;
+  const letter = statusLetter(entry, side);
+  const tone = statusTone(letter);
+  const { dir, name } = splitPath(entry.path);
+  const conflict = side === "conflicted" || entry.conflicted;
+  const actionLabel = side === "staged" ? t("unstageFile") : t("stageFile");
+  const title = entry.origPath ? entry.path + " \u2014 " + t("renameFrom") + " " + entry.origPath : entry.path;
+  return h(
+    "div",
+    {
+      className: "dgt-row",
+      "data-active": props.active || void 0,
+      "data-side": side,
+      role: "button",
+      tabIndex: 0,
+      title,
+      onClick: () => props.onSelect(entry, side),
+      onKeyDown: (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          props.onSelect(entry, side);
+        }
+      }
+    },
+    h("input", {
+      type: "checkbox",
+      className: "dgt-check",
+      checked: side === "staged",
+      disabled: conflict,
+      "aria-label": actionLabel,
+      title: conflict ? t("conflictsBlockCommit") : actionLabel,
+      onClick: (event) => event.stopPropagation(),
+      onChange: () => props.onToggle(entry, side)
+    }),
+    h("span", { className: "dgt-letter", "data-tone": tone }, letter),
+    h(
+      "span",
+      { className: "dgt-path" },
+      dir ? h("span", { className: "dgt-path-dir" }, dir) : null,
+      h("span", { className: "dgt-path-name" }, name)
+    ),
+    h(
+      "button",
+      {
+        type: "button",
+        className: "dgt-more",
+        "data-open": menuOpen || void 0,
+        title: t("fileActions"),
+        "aria-label": t("fileActions"),
+        onClick: (event) => {
+          event.stopPropagation();
+          setMenuOpen(!menuOpen);
+        }
+      },
+      h(MoreIcon)
+    ),
+    menuOpen ? h(
+      "div",
+      { className: "dgt-menu", onClick: (event) => event.stopPropagation() },
+      conflict ? null : h(
+        "button",
+        {
+          type: "button",
+          onClick: () => {
+            setMenuOpen(false);
+            props.onToggle(entry, side);
+          }
+        },
+        actionLabel
+      ),
+      h(
+        "button",
+        {
+          type: "button",
+          onClick: () => {
+            setMenuOpen(false);
+            props.onCopyPath(entry);
+          }
+        },
+        t("copyPath")
+      )
+    ) : null
+  );
+}
+
+// src/client/components/ChangeList.tsx
+function Group(props) {
+  if (props.rows.length === 0) return null;
+  return h(
+    "div",
+    { className: "dgt-group-wrap" },
+    h(
+      "div",
+      { className: "dgt-group", "data-tone": props.tone },
+      h("span", null, props.label),
+      h("span", { className: "dgt-group-count" }, String(props.rows.length))
+    ),
+    props.rows.map(
+      (entry) => h(FileRow, {
+        key: props.side + ":" + entry.path,
+        entry,
+        side: props.side,
+        active: props.activeKey === props.side + "\0" + entry.path,
+        t: props.t,
+        onSelect: props.onSelect,
+        onToggle: props.onToggle,
+        onCopyPath: props.onCopyPath
+      })
+    )
+  );
+}
+function ChangeList(props) {
+  const { status, statusError, rows, t } = props;
+  const total = (status?.entries ?? []).length;
+  const empty = rows.staged.length === 0 && rows.unstaged.length === 0 && rows.conflicted.length === 0;
   return h(
     "section",
-    { className: "dgt-diff", "aria-label": t("diff") },
+    { className: "dgt-list", "aria-label": t("fileStatus") },
     h(
       "div",
       { className: "dgt-list-head" },
-      h("span", null, t("diff")),
-      h("span", { className: "dgt-mono" }, selected?.path ?? "")
+      h("span", null, t("fileStatus")),
+      h("span", { className: "dgt-group-count" }, String(total))
+    ),
+    status === null && statusError === "" ? h("div", { className: "dgt-placeholder" }, t("loading")) : empty ? h(
+      "div",
+      { className: "dgt-empty" },
+      h("span", null, t("nothingToCommit")),
+      h("span", { className: "dgt-empty-hint" }, t("nothingHint"))
+    ) : h(
+      "div",
+      { className: "dgt-scroll" },
+      h(Group, {
+        label: t("conflicts"),
+        tone: "error",
+        rows: rows.conflicted,
+        side: "conflicted",
+        activeKey: props.selectedKey,
+        t,
+        onSelect: props.onSelect,
+        onToggle: props.onToggle,
+        onCopyPath: props.onCopyPath
+      }),
+      h(Group, {
+        label: t("stagedFiles"),
+        rows: rows.staged,
+        side: "staged",
+        activeKey: props.selectedKey,
+        t,
+        onSelect: props.onSelect,
+        onToggle: props.onToggle,
+        onCopyPath: props.onCopyPath
+      }),
+      h(Group, {
+        label: t("unstagedFiles"),
+        rows: rows.unstaged,
+        side: "unstaged",
+        activeKey: props.selectedKey,
+        t,
+        onSelect: props.onSelect,
+        onToggle: props.onToggle,
+        onCopyPath: props.onCopyPath
+      })
+    )
+  );
+}
+
+// src/client/components/DiffView.tsx
+function Line(props) {
+  const line = props.line;
+  const marker = line.kind === "add" ? "+" : line.kind === "del" ? "-" : line.kind === "meta" ? "" : " ";
+  return h(
+    "div",
+    { className: "dgt-line", "data-kind": line.kind },
+    h("span", { className: "dgt-gutter" }, line.oldNo === null ? "" : String(line.oldNo)),
+    h("span", { className: "dgt-gutter" }, line.newNo === null ? "" : String(line.newNo)),
+    h("span", { className: "dgt-marker" }, marker),
+    h("span", { className: "dgt-text" }, line.text)
+  );
+}
+function FileBlock(props) {
+  const file = props.file;
+  if (file.binary) {
+    return h("div", { className: "dgt-placeholder" }, props.t("binaryFile"));
+  }
+  return h(
+    "div",
+    { className: "dgt-file-block" },
+    file.status !== "modified" ? h(
+      "div",
+      { className: "dgt-hunk-head" },
+      h("span", null, file.status),
+      h("span", null, (file.oldPath ?? "") + " \u2192 " + (file.newPath ?? ""))
+    ) : null,
+    file.hunks.map(
+      (hunk, hunkIndex) => h(
+        "div",
+        { className: "dgt-hunk", key: "hunk:" + String(hunkIndex) },
+        h("div", { className: "dgt-hunk-head" }, h("span", null, hunk.header)),
+        hunk.lines.map((line, lineIndex) => h(Line, { key: "l:" + String(lineIndex), line }))
+      )
+    )
+  );
+}
+function DiffView(props) {
+  const { selected, diff, loading, t } = props;
+  const entry = selected?.entry ?? null;
+  const side = selected?.side ?? "unstaged";
+  const stats = diff?.stats;
+  const canAct = entry !== null && !entry.conflicted;
+  const actionLabel = side === "staged" ? t("unstageFile") : t("stageFile");
+  return h(
+    "section",
+    { className: "dgt-diff", "aria-label": t("code") },
+    h(
+      "div",
+      { className: "dgt-diff-head" },
+      h("span", { className: "dgt-diff-path" }, entry?.path ?? t("fileStatus")),
+      entry?.origPath ? h("span", { className: "dgt-diff-orig" }, t("renameFrom") + " " + entry.origPath) : null,
+      stats && (stats.additions > 0 || stats.deletions > 0) ? h(
+        "span",
+        { className: "dgt-stats" },
+        h("span", { className: "dgt-stat-add" }, "+" + String(stats.additions)),
+        h("span", { className: "dgt-stat-del" }, "\u2212" + String(stats.deletions))
+      ) : null,
+      canAct ? h("button", { type: "button", className: "dgt-diff-action", onClick: props.onToggleFile }, actionLabel) : null
     ),
     h(
       "div",
       { className: "dgt-diff-body" },
-      selected === null ? h("div", { className: "dgt-placeholder" }, t("diffPlaceholder")) : loading ? h("div", { className: "dgt-placeholder" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-placeholder dgt-error" }, diff.error || t("diffFailed")) : diff && diff.text ? h("pre", { className: "dgt-premain" }, diff.text) : h(
+      entry === null ? h("div", { className: "dgt-placeholder" }, t("noFileSelected")) : loading ? h("div", { className: "dgt-placeholder" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-placeholder" }, diff.error || t("diffFailed")) : diff && diff.binary ? h("div", { className: "dgt-placeholder" }, t("binaryFile")) : diff && diff.files && diff.files.length > 0 ? diff.files.map((file, index) => h(FileBlock, { key: "file:" + String(index), file, t })) : h(
         "div",
         { className: "dgt-placeholder" },
-        selected.kind === "untracked" ? t("untrackedNoDiff") : t("noDiff")
+        entry.kind === "untracked" ? t("untrackedNoDiff") : t("noDiff")
+      )
+    )
+  );
+}
+
+// src/client/components/CommitBox.tsx
+function initials(name) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+function CommitBox(props) {
+  const { status, t } = props;
+  const identity = status?.identity;
+  const staged = status?.counts?.staged ?? 0;
+  const conflicts = status?.counts?.conflicted ?? 0;
+  const branch = status?.branch || "\u2014";
+  const blocked = conflicts > 0;
+  const canCommit = staged > 0 && props.message.trim() !== "" && !blocked && !props.busy;
+  const defaultHint = blocked ? t("conflictsBlockCommit") : staged === 0 ? t("commitHint") : "";
+  return h(
+    "div",
+    { className: "dgt-commit" },
+    h(
+      "div",
+      { className: "dgt-commit-meta" },
+      h("span", { className: "dgt-avatar" }, initials(identity?.name || "")),
+      h(
+        "span",
+        { className: "dgt-commit-author" },
+        identity?.name ? identity.name + (identity.email ? " <" + identity.email + ">" : "") : t("author") + ": \u2014"
+      ),
+      h("span", { className: "dgt-commit-branch" }, "\u2387 " + branch),
+      h("span", { className: "dgt-commit-branch" }, String(staged) + " " + t("filesChanged"))
+    ),
+    h("textarea", {
+      className: "dgt-commit-input",
+      ref: props.inputRef,
+      value: props.message,
+      placeholder: t("commitPlaceholder"),
+      spellCheck: false,
+      onChange: (event) => props.onMessage(event.target.value),
+      onKeyDown: (event) => {
+        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+          event.preventDefault();
+          if (canCommit) props.onCommit();
+        }
+      }
+    }),
+    h(
+      "div",
+      { className: "dgt-commit-foot" },
+      h(
+        "span",
+        { className: "dgt-hint", "data-tone": props.hintTone === "error" ? "error" : void 0 },
+        props.hint || defaultHint
+      ),
+      h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-primary",
+          disabled: !canCommit,
+          onClick: props.onCommit
+        },
+        props.busy ? t("loading") : t("commit")
       )
     )
   );
 }
 
 // src/client/components/Workspace.tsx
+var POLL_MS = 2e3;
+function findEntry(status, path) {
+  return (status?.entries ?? []).find((entry) => entry.path === path) ?? null;
+}
+function sideOf(entry) {
+  if (entry.conflicted) return "conflicted";
+  if (entry.staged) return "staged";
+  return "unstaged";
+}
 function Workspace(props) {
   const t = typeof props.t === "function" ? props.t : (key) => key;
   const [status, setStatus] = React.useState(null);
+  const [refs, setRefs] = React.useState(null);
   const [statusError, setStatusError] = React.useState("");
-  const [refreshing, setRefreshing] = React.useState(false);
   const [selected, setSelected] = React.useState(null);
   const [diff, setDiff] = React.useState(null);
   const [diffLoading, setDiffLoading] = React.useState(false);
+  const [busy, setBusy] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [actionError, setActionError] = React.useState("");
+  const [message, setMessage] = React.useState("");
+  const [toast, setToast] = React.useState("");
+  const [notice, setNotice] = React.useState("");
+  const busyRef = React.useRef(false);
+  const commitInput = React.useRef(null);
+  const toastTimer = React.useRef(null);
+  React.useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
+  const showToast = React.useCallback((text) => {
+    setToast(text);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(""), 6e3);
+  }, []);
   const loadStatus = React.useCallback(
-    async (signal) => {
-      setRefreshing(true);
+    async (options) => {
+      if (!options?.silent) setRefreshing(true);
       try {
-        const next = await fetchStatus(signal);
-        if (signal?.aborted) return;
+        const next = await fetchStatus();
         if (next.ok) {
           setStatus(next);
           setStatusError("");
@@ -320,106 +929,194 @@ function Workspace(props) {
           setStatusError(next.error || t("statusFailed"));
         }
       } catch (error) {
-        if (signal?.aborted) return;
         setStatus(null);
         setStatusError(error instanceof Error ? error.message : String(error));
       } finally {
-        if (!signal?.aborted) setRefreshing(false);
+        if (!options?.silent) setRefreshing(false);
       }
     },
     [t]
   );
-  React.useEffect(() => {
-    const controller = new AbortController();
-    void loadStatus(controller.signal);
-    return () => controller.abort();
-  }, [loadStatus]);
-  const openDiff = React.useCallback(async (entry, signal) => {
-    setSelected(entry);
+  const loadRefs = React.useCallback(async () => {
+    try {
+      const next = await fetchRefs();
+      if (next.ok) setRefs(next);
+    } catch {
+    }
+  }, []);
+  const openDiff = React.useCallback(async (entry, side) => {
+    setSelected({ path: entry.path, side });
     setDiff(null);
     if (entry.kind === "ignored") return;
     setDiffLoading(true);
     try {
-      const next = await fetchDiff(
-        { path: entry.path, staged: isStaged(entry) ? "1" : "0" },
-        signal
-      );
-      if (!signal?.aborted) setDiff(next);
+      const next = await fetchDiff({ path: entry.path, side: sideFor(entry, side) });
+      setDiff(next);
     } catch (error) {
-      if (!signal?.aborted) setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
     } finally {
-      if (!signal?.aborted) setDiffLoading(false);
+      setDiffLoading(false);
     }
   }, []);
+  React.useEffect(() => {
+    void loadStatus();
+    void loadRefs();
+  }, [loadStatus, loadRefs]);
+  React.useEffect(() => {
+    if (selected === null) return;
+    if (findEntry(status, selected.path) === null) {
+      setSelected(null);
+      setDiff(null);
+    }
+  }, [status, selected]);
+  React.useEffect(() => {
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      if (busyRef.current) return;
+      void loadStatus({ silent: true });
+      void loadRefs();
+    }, POLL_MS);
+    const onFocus = () => {
+      void loadStatus({ silent: true });
+      void loadRefs();
+    };
+    const onVisible = () => {
+      if (typeof document === "undefined" || document.visibilityState === "visible") onFocus();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loadStatus, loadRefs]);
+  const toggle = React.useCallback(
+    async (entry, side) => {
+      if (entry.conflicted || side === "conflicted") {
+        setActionError(t("conflictsBlockCommit"));
+        return;
+      }
+      setBusy(true);
+      setActionError("");
+      try {
+        const result = side === "staged" ? await unstagePaths([entry.path]) : await stagePaths([entry.path]);
+        if (!result.ok) throw new Error(result.error || (side === "staged" ? t("unstageFailed") : t("stageFailed")));
+        const next = await fetchStatus();
+        if (next.ok) setStatus(next);
+        if (selected?.path === entry.path && next.ok) {
+          const updated = findEntry(next, entry.path);
+          if (updated) await openDiff(updated, sideOf(updated));
+        }
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [openDiff, selected, t]
+  );
+  const copyPath = React.useCallback(
+    (entry) => {
+      try {
+        void navigator.clipboard?.writeText(entry.path);
+        showToast(t("copiedPath"));
+      } catch {
+        showToast(entry.path);
+      }
+    },
+    [showToast, t]
+  );
+  const commit = React.useCallback(async () => {
+    const staged = status?.counts?.staged ?? 0;
+    const conflicts = status?.counts?.conflicted ?? 0;
+    if (busyRef.current || staged === 0 || message.trim() === "" || conflicts > 0) return;
+    setBusy(true);
+    setActionError("");
+    try {
+      const result = await commitChanges(message);
+      if (!result.ok) throw new Error(result.error || t("commitFailed"));
+      showToast([t("commitDone"), result.shortSha, result.subject].filter(Boolean).join(" \xB7 "));
+      setMessage("");
+      setSelected(null);
+      setDiff(null);
+      await loadStatus();
+      await loadRefs();
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }, [loadRefs, loadStatus, message, showToast, status, t]);
   const entries = status?.entries ?? [];
-  const staged = entries.filter(isStaged);
-  const working = entries.filter((entry) => !isStaged(entry));
-  const branchLabel = status?.branch && status.branch !== "(detached)" ? status.branch : status?.branch || "\u2014";
+  const rows = splitEntries(entries);
+  const selectedKey = selected ? rowKey(selected.path, selected.side) : "";
+  const selectedEntry = selected ? findEntry(status, selected.path) : null;
+  const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null;
+  const truncated = status?.truncated === true;
   return h(
     "div",
     { className: "dgt-root", "data-plugin": "dsh-git-tree" },
-    // top bar: repo identity, branch, ahead/behind, actions
-    h(
-      "header",
-      { className: "dgt-topbar" },
-      h(
-        "div",
-        { className: "dgt-repo" },
-        h("span", { className: "dgt-repo-name" }, status?.repoRoot ? lastSegment(status.repoRoot) : t("panel")),
-        h(
-          "span",
-          { className: "dgt-repo-path", title: status?.cwd || status?.repoRoot || "" },
-          status?.repoRoot || status?.cwd || "\u2014"
-        )
-      ),
-      h(
-        "div",
-        { className: "dgt-refs" },
-        h(Chip, { tone: "muted" }, h("span", { className: "dgt-branch-glyph", "aria-hidden": "true" }, "\u2387"), " ", branchLabel),
-        typeof status?.ahead === "number" && status.ahead > 0 ? h(Chip, { tone: "ok" }, "\u2191" + String(status.ahead)) : null,
-        typeof status?.behind === "number" && status.behind > 0 ? h(Chip, { tone: "warn" }, "\u2193" + String(status.behind)) : null,
-        status?.upstream ? h("span", { className: "dgt-upstream" }, status.upstream) : null
-      ),
-      h(
-        "div",
-        { className: "dgt-actions" },
-        refreshing ? h(Spinner) : null,
-        h(
-          "button",
-          {
-            type: "button",
-            className: "dgt-button",
-            onClick: () => void loadStatus(),
-            disabled: refreshing,
-            title: t("refresh")
-          },
-          "\u27F3 " + t("refresh")
-        )
-      )
-    ),
+    h(TopBar, {
+      status,
+      busy: refreshing || busy,
+      t,
+      onRefresh: () => void loadStatus(),
+      onCommitFocus: () => {
+        if (commitInput.current && commitInput.current.focus) commitInput.current.focus();
+      }
+    }),
     statusError !== "" ? h(
       "div",
-      { className: "dgt-banner", role: "status" },
-      h("strong", null, t("hostUnavailable")),
-      h("span", null, statusError)
+      { className: "dgt-banner", "data-tone": "error" },
+      h("span", { className: "dgt-banner-text" }, statusError)
     ) : null,
-    // three-pane workspace: refs rail / change list / diff
+    truncated ? h("div", { className: "dgt-banner" }, h("span", { className: "dgt-banner-text" }, t("truncated"))) : null,
     h(
       "div",
       { className: "dgt-body" },
-      h(RefRail, { t }),
-      h(ChangeList, {
-        status,
-        statusError,
-        entries,
-        staged,
-        working,
-        selected,
-        t,
-        onSelect: (picked) => void openDiff(picked)
-      }),
-      h(DiffView, { selected, loading: diffLoading, diff, t })
-    )
+      h(RefRail, { status, refs, t }),
+      h(
+        "div",
+        { className: "dgt-main" },
+        h(
+          "div",
+          { className: "dgt-panes" },
+          h(ChangeList, {
+            status,
+            statusError,
+            rows,
+            selectedKey,
+            t,
+            onSelect: (entry, side) => void openDiff(entry, side),
+            onToggle: (entry, side) => void toggle(entry, side),
+            onCopyPath: copyPath
+          }),
+          h(DiffView, {
+            selected: diffSelection,
+            diff,
+            loading: diffLoading,
+            t,
+            onToggleFile: () => {
+              if (diffSelection) void toggle(diffSelection.entry, diffSelection.side);
+            }
+          })
+        ),
+        h(CommitBox, {
+          status,
+          message,
+          busy,
+          hint: actionError,
+          hintTone: actionError ? "error" : "muted",
+          t,
+          inputRef: commitInput,
+          onMessage: setMessage,
+          onCommit: () => void commit()
+        })
+      )
+    ),
+    toast ? h("div", { className: "dgt-toast", role: "status" }, toast) : null,
+    notice ? h("div", { className: "dgt-toast", role: "status" }, notice) : null
   );
 }
 

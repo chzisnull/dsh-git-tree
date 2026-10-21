@@ -1,59 +1,112 @@
-// Change list pane: staged and unstaged groups with counts, empty and loading
-// states.
+// Change list pane: conflict, staged and unstaged groups with counts, plus the
+// loading and empty states.
 
 import { h } from '../react'
 import { FileRow } from './FileRow'
-import type { GitFileEntry, GitStatusPayload, Translate } from '../types'
+import type { EntrySide, GitFileEntry, GitStatusPayload, Translate } from '../types'
+
+function Group(props: {
+  label: string
+  tone?: 'error'
+  rows: GitFileEntry[]
+  side: EntrySide
+  activeKey: string
+  t: Translate
+  onSelect: (entry: GitFileEntry, side: EntrySide) => void
+  onToggle: (entry: GitFileEntry, side: EntrySide) => void
+  onCopyPath: (entry: GitFileEntry) => void
+}): any {
+  if (props.rows.length === 0) return null
+  return h(
+    'div',
+    { className: 'dgt-group-wrap' },
+    h(
+      'div',
+      { className: 'dgt-group', 'data-tone': props.tone },
+      h('span', null, props.label),
+      h('span', { className: 'dgt-group-count' }, String(props.rows.length)),
+    ),
+    props.rows.map((entry) =>
+      h(FileRow, {
+        key: props.side + ':' + entry.path,
+        entry,
+        side: props.side,
+        active: props.activeKey === props.side + '\u0000' + entry.path,
+        t: props.t,
+        onSelect: props.onSelect,
+        onToggle: props.onToggle,
+        onCopyPath: props.onCopyPath,
+      }),
+    ),
+  )
+}
 
 export function ChangeList(props: {
   status: GitStatusPayload | null
   statusError: string
-  entries: GitFileEntry[]
-  staged: GitFileEntry[]
-  working: GitFileEntry[]
-  selected: GitFileEntry | null
+  rows: { staged: GitFileEntry[]; unstaged: GitFileEntry[]; conflicted: GitFileEntry[] }
+  selectedKey: string
   t: Translate
-  onSelect: (entry: GitFileEntry) => void
+  onSelect: (entry: GitFileEntry, side: EntrySide) => void
+  onToggle: (entry: GitFileEntry, side: EntrySide) => void
+  onCopyPath: (entry: GitFileEntry) => void
 }): any {
-  const { status, statusError, entries, staged, working, selected, t, onSelect } = props
+  const { status, statusError, rows, t } = props
+  const total = (status?.entries ?? []).length
+  const empty = rows.staged.length === 0 && rows.unstaged.length === 0 && rows.conflicted.length === 0
+
   return h(
     'section',
-    { className: 'dgt-list', 'aria-label': t('changes') },
+    { className: 'dgt-list', 'aria-label': t('fileStatus') },
     h(
       'div',
       { className: 'dgt-list-head' },
-      h('span', null, t('changes')),
-      h('span', { className: 'dgt-count' }, String(entries.length)),
+      h('span', null, t('fileStatus')),
+      h('span', { className: 'dgt-group-count' }, String(total)),
     ),
     status === null && statusError === ''
       ? h('div', { className: 'dgt-placeholder' }, t('loading'))
-      : entries.length === 0
-        ? h('div', { className: 'dgt-placeholder' }, t('clean'))
+      : empty
+        ? h(
+            'div',
+            { className: 'dgt-empty' },
+            h('span', null, t('nothingToCommit')),
+            h('span', { className: 'dgt-empty-hint' }, t('nothingHint')),
+          )
         : h(
             'div',
             { className: 'dgt-scroll' },
-            staged.length > 0
-              ? h('div', { className: 'dgt-group' }, t('staged'), ' · ', String(staged.length))
-              : null,
-            staged.map((entry) =>
-              h(FileRow, {
-                key: 's:' + entry.path,
-                entry,
-                active: selected?.path === entry.path,
-                onSelect,
-              }),
-            ),
-            working.length > 0
-              ? h('div', { className: 'dgt-group' }, t('working'), ' · ', String(working.length))
-              : null,
-            working.map((entry) =>
-              h(FileRow, {
-                key: 'w:' + entry.path,
-                entry,
-                active: selected?.path === entry.path,
-                onSelect,
-              }),
-            ),
+            h(Group, {
+              label: t('conflicts'),
+              tone: 'error',
+              rows: rows.conflicted,
+              side: 'conflicted',
+              activeKey: props.selectedKey,
+              t,
+              onSelect: props.onSelect,
+              onToggle: props.onToggle,
+              onCopyPath: props.onCopyPath,
+            }),
+            h(Group, {
+              label: t('stagedFiles'),
+              rows: rows.staged,
+              side: 'staged',
+              activeKey: props.selectedKey,
+              t,
+              onSelect: props.onSelect,
+              onToggle: props.onToggle,
+              onCopyPath: props.onCopyPath,
+            }),
+            h(Group, {
+              label: t('unstagedFiles'),
+              rows: rows.unstaged,
+              side: 'unstaged',
+              activeKey: props.selectedKey,
+              t,
+              onSelect: props.onSelect,
+              onToggle: props.onToggle,
+              onCopyPath: props.onCopyPath,
+            }),
           ),
   )
 }
