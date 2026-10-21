@@ -43,6 +43,10 @@ var EN = {
   readOnly: "Read-only for now",
   workspace: "Workspace",
   fileStatus: "File status",
+  diff: "Diff",
+  itemsUnit: "items",
+  commitMessageEmpty: "Write a message to commit.",
+  commitShortcut: "\u2318\u21B5 to commit",
   changes: "Changes",
   history: "History",
   search: "Search",
@@ -95,6 +99,10 @@ var ZH = {
   readOnly: "\u6682\u4E3A\u53EA\u8BFB",
   workspace: "\u5DE5\u4F5C\u533A",
   fileStatus: "\u6587\u4EF6\u72B6\u6001",
+  diff: "\u5DEE\u5F02",
+  itemsUnit: "\u9879",
+  commitMessageEmpty: "\u586B\u5199\u63D0\u4EA4\u4FE1\u606F\u540E\u53EF\u63D0\u4EA4\u3002",
+  commitShortcut: "\u2318\u21B5 \u63D0\u4EA4",
   changes: "\u6539\u52A8",
   history: "\u5386\u53F2",
   search: "\u641C\u7D22",
@@ -144,7 +152,12 @@ var CSS = `
 .dgt-root{position:relative;box-sizing:border-box;height:100%;min-height:0;display:flex;flex-direction:column;
   background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);
   font-family:var(--dsw-font-family);font-size:12.5px;line-height:18px;
-  padding:calc(var(--dsh-frame-top-clearance,0px) + 6px) 10px 10px;}
+  padding:calc(var(--dsh-frame-top-clearance,0px) + 6px) 10px 10px;
+  /* readable semantic text: mix the state colour toward the label colour */
+  --dgt-ok:color-mix(in srgb, var(--dsw-alias-state-success-primary) 55%, var(--dsw-alias-label-primary));
+  --dgt-warn:color-mix(in srgb, var(--dsw-alias-state-warn-primary) 58%, var(--dsw-alias-label-primary));
+  --dgt-err:color-mix(in srgb, var(--dsw-alias-state-error-primary) 70%, var(--dsw-alias-label-primary));
+  --dgt-meta:var(--dsw-alias-label-secondary);}
 
 /* toolbar */
 .dgt-topbar{display:flex;align-items:center;gap:10px;flex:0 0 auto;height:44px;padding:0 10px;
@@ -229,27 +242,29 @@ var CSS = `
 
 /* list */
 .dgt-list-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto;
-  height:27px;padding:0 10px;border-bottom:1px solid var(--dsw-alias-border-l2);
+  height:28px;padding:0 10px;border-bottom:1px solid var(--dsw-alias-border-l2);
   background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);
-  font-size:11px;font-weight:500;}
+  font-size:12px;font-weight:600;}
 .dgt-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding:0;}
 .dgt-group{display:flex;align-items:center;justify-content:space-between;height:27px;padding:0 10px;
   background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l2);
-  color:var(--dsw-alias-label-secondary);font-size:11px;font-weight:500;}
+  color:var(--dsw-alias-label-secondary);font-size:11.5px;font-weight:500;}
 .dgt-group[data-tone='error']{color:var(--dsw-alias-state-error-primary);}
-.dgt-group-count{color:var(--dsw-alias-label-caption);font-variant-numeric:tabular-nums;font-weight:400;}
+.dgt-group-count{color:var(--dgt-meta);font-size:11.5px;font-variant-numeric:tabular-nums;font-weight:400;}
 .dgt-row{position:relative;display:flex;align-items:center;gap:6px;width:100%;height:27px;
   padding:0 8px;border:0;background:transparent;color:var(--dsw-alias-label-primary);
-  font:inherit;font-size:12px;text-align:left;cursor:default;}
+  font:inherit;font-size:13px;text-align:left;cursor:default;}
 .dgt-row:hover{background:var(--dsw-alias-interactive-bg-hover);}
 .dgt-row[data-active='true']{background:var(--dsw-alias-interactive-bg-active);}
-.dgt-row:focus-visible{outline:1px solid var(--dsw-alias-brand-primary);outline-offset:-1px;}
+.dgt-row:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px;}
+.dgt-row[data-menu='true']{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-row[data-active='true'] .dgt-path-name{font-weight:600;}
 .dgt-check{flex:0 0 auto;width:13px;height:13px;margin:0;accent-color:var(--dsw-alias-brand-primary);cursor:pointer;}
 .dgt-letter{flex:0 0 auto;width:12px;text-align:center;font-family:var(--ds-font-family-code);
   font-size:11px;font-weight:600;color:var(--dsw-alias-label-tertiary);}
-.dgt-letter[data-tone='ok']{color:var(--dsw-alias-state-success-primary);}
-.dgt-letter[data-tone='warn']{color:var(--dsw-alias-state-warn-primary);}
-.dgt-letter[data-tone='error']{color:var(--dsw-alias-state-error-primary);}
+.dgt-letter[data-tone='ok']{color:var(--dgt-ok);}
+.dgt-letter[data-tone='warn']{color:var(--dgt-warn);}
+.dgt-letter[data-tone='error']{color:var(--dgt-err);}
 .dgt-letter[data-tone='accent']{color:var(--dsw-alias-brand-text);}
 .dgt-path{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;}
 .dgt-path-dir{color:var(--dsw-alias-label-tertiary);}
@@ -286,12 +301,13 @@ var CSS = `
   color:var(--dsw-alias-label-primary);}
 .dgt-diff-orig{color:var(--dsw-alias-label-caption);font-size:11px;}
 .dgt-stats{display:flex;gap:6px;font-size:11px;font-variant-numeric:tabular-nums;}
-.dgt-stat-add{color:var(--dsw-alias-state-success-primary);}
-.dgt-stat-del{color:var(--dsw-alias-state-error-primary);}
-.dgt-diff-action{appearance:none;height:22px;padding:0 8px;border:1px solid var(--dsw-alias-border-l2);
+.dgt-stat-add{color:var(--dgt-ok);font-weight:500;}
+.dgt-stat-del{color:var(--dgt-err);font-weight:500;}
+.dgt-diff-action{appearance:none;height:24px;padding:0 10px;border:1px solid var(--dsw-alias-border-l2);
   border-radius:var(--dsw-radius-xs);background:var(--dsw-alias-bg-layer-1);
-  color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;cursor:pointer;}
+  color:var(--dsw-alias-label-secondary);font:inherit;font-size:11.5px;font-weight:500;cursor:pointer;}
 .dgt-diff-action:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary);}
+.dgt-diff-action[data-kind='stage']{border-color:color-mix(in srgb, var(--dsw-alias-brand-primary) 45%, var(--dsw-alias-border-l2));color:var(--dsw-alias-brand-text);}
 .dgt-diff-body{flex:1 1 auto;min-height:0;overflow:auto;background:var(--dsw-alias-bg-base);}
 .dgt-hunk-head{display:flex;align-items:center;justify-content:space-between;gap:8px;height:28px;
   padding:0 10px;border-top:1px solid var(--dsw-alias-border-l1);border-bottom:1px solid var(--dsw-alias-border-l1);
@@ -303,8 +319,8 @@ var CSS = `
 .dgt-line[data-kind='add']{background:var(--dsw-alias-file-diff-added-bg);}
 .dgt-line[data-kind='del']{background:var(--dsw-alias-file-diff-deleted-bg);}
 .dgt-line[data-kind='meta']{color:var(--dsw-alias-label-caption);font-style:italic;}
-.dgt-gutter{flex:0 0 38px;text-align:right;padding-right:6px;user-select:none;
-  color:var(--dsw-alias-label-caption);font-variant-numeric:tabular-nums;
+.dgt-gutter{flex:0 0 40px;text-align:right;padding-right:6px;user-select:none;
+  color:var(--dgt-meta);font-size:11px;font-variant-numeric:tabular-nums;
   border-right:1px solid var(--dsw-alias-border-l1);}
 .dgt-line[data-kind='add'] .dgt-gutter{background:var(--dsw-alias-file-diff-added-gutter);}
 .dgt-line[data-kind='del'] .dgt-gutter{background:var(--dsw-alias-file-diff-deleted-gutter);}
@@ -327,9 +343,9 @@ var CSS = `
   background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);
   font:inherit;font-size:12.5px;line-height:18px;}
 .dgt-commit-input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);}
-.dgt-commit-input::placeholder{color:var(--dsw-alias-label-quaternary);}
+.dgt-commit-input::placeholder{color:var(--dsw-alias-label-caption);}
 .dgt-commit-foot{display:flex;align-items:center;gap:10px;}
-.dgt-hint{flex:1 1 auto;min-width:0;color:var(--dsw-alias-label-tertiary);font-size:11px;
+.dgt-hint{flex:1 1 auto;min-width:0;color:var(--dgt-meta);font-size:11.5px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .dgt-hint[data-tone='error']{color:var(--dsw-alias-state-error-primary);}
 .dgt-primary{appearance:none;height:26px;padding:0 14px;border:1px solid transparent;
@@ -680,6 +696,7 @@ function FileRow(props) {
       className: "dgt-row",
       "data-active": props.active || void 0,
       "data-side": side,
+      "data-menu": menuOpen || void 0,
       role: "button",
       tabIndex: 0,
       title,
@@ -789,7 +806,7 @@ function ChangeList(props) {
       "div",
       { className: "dgt-list-head" },
       h("span", null, t("changes")),
-      h("span", { className: "dgt-group-count" }, String(total))
+      h("span", { className: "dgt-group-count" }, String(total) + " " + t("itemsUnit"))
     ),
     status === null && statusError === "" ? h("div", { className: "dgt-placeholder" }, t("loading")) : empty ? h(
       "div",
@@ -852,10 +869,11 @@ function FileBlock(props) {
   if (file.binary) {
     return h("div", { className: "dgt-placeholder" }, props.t("binaryFile"));
   }
+  const moved = Boolean(file.oldPath && file.newPath && file.oldPath !== file.newPath);
   return h(
     "div",
     { className: "dgt-file-block" },
-    file.status !== "modified" ? h(
+    moved ? h(
       "div",
       { className: "dgt-hunk-head" },
       h("span", null, file.status),
@@ -884,7 +902,7 @@ function DiffView(props) {
     h(
       "div",
       { className: "dgt-diff-head" },
-      h("span", { className: "dgt-diff-path" }, entry?.path ?? t("fileStatus")),
+      h("span", { className: "dgt-diff-path" }, entry?.path ?? t("diff")),
       entry?.origPath ? h("span", { className: "dgt-diff-orig" }, t("renameFrom") + " " + entry.origPath) : null,
       stats && (stats.additions > 0 || stats.deletions > 0) ? h(
         "span",
@@ -892,12 +910,21 @@ function DiffView(props) {
         h("span", { className: "dgt-stat-add" }, "+" + String(stats.additions)),
         h("span", { className: "dgt-stat-del" }, "\u2212" + String(stats.deletions))
       ) : null,
-      canAct ? h("button", { type: "button", className: "dgt-diff-action", onClick: props.onToggleFile }, actionLabel) : null
+      canAct ? h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-diff-action",
+          "data-kind": side === "staged" ? "unstage" : "stage",
+          onClick: props.onToggleFile
+        },
+        actionLabel
+      ) : null
     ),
     h(
       "div",
       { className: "dgt-diff-body" },
-      entry === null ? h("div", { className: "dgt-empty" }, t("noFileSelected")) : loading ? h("div", { className: "dgt-empty" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-empty" }, diff.error || t("diffFailed")) : diff && diff.binary ? h("div", { className: "dgt-empty" }, t("binaryFile")) : diff && diff.files && diff.files.length > 0 ? diff.files.map((file, index) => h(FileBlock, { key: "file:" + String(index), file, t })) : h(
+      entry === null ? h("div", { className: "dgt-empty" }, props.hasChanges ? t("noFileSelected") : t("nothingHint")) : loading ? h("div", { className: "dgt-empty" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-empty" }, diff.error || t("diffFailed")) : diff && diff.binary ? h("div", { className: "dgt-empty" }, t("binaryFile")) : diff && diff.files && diff.files.length > 0 ? diff.files.map((file, index) => h(FileBlock, { key: "file:" + String(index), file, t })) : h(
         "div",
         { className: "dgt-empty" },
         entry.kind === "untracked" ? t("untrackedNoDiff") : t("noDiff")
@@ -920,7 +947,7 @@ function CommitBox(props) {
   const branch = status?.branch || "\u2014";
   const blocked = conflicts > 0;
   const canCommit = staged > 0 && props.message.trim() !== "" && !blocked && !props.busy;
-  const defaultHint = blocked ? t("conflictsBlockCommit") : staged === 0 ? t("commitHint") : "";
+  const defaultHint = blocked ? t("conflictsBlockCommit") : staged === 0 ? t("commitHint") : props.message.trim() === "" ? t("commitMessageEmpty") : t("commitShortcut");
   return h(
     "div",
     { className: "dgt-commit" },
@@ -1220,6 +1247,7 @@ function Workspace(props) {
             selected: diffSelection,
             diff,
             loading: diffLoading,
+            hasChanges: entries.length > 0,
             t,
             onToggleFile: () => {
               if (diffSelection) void toggle(diffSelection.entry, diffSelection.side);

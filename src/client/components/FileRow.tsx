@@ -32,6 +32,7 @@ export function FileRow(props: {
       className: 'dgt-row',
       'data-active': props.active || undefined,
       'data-side': side,
+      'data-menu': menuOpen || undefined,
       role: 'button',
       tabIndex: 0,
       title,

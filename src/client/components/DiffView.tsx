@@ -24,10 +24,11 @@ function FileBlock(props: { file: DiffFile; t: Translate }): any {
   if (file.binary) {
     return h('div', { className: 'dgt-placeholder' }, props.t('binaryFile'))
   }
+  const moved = Boolean(file.oldPath && file.newPath && file.oldPath !== file.newPath)
   return h(
     'div',
     { className: 'dgt-file-block' },
-    file.status !== 'modified'
+    moved
       ? h(
           'div',
           { className: 'dgt-hunk-head' },
@@ -50,6 +51,7 @@ export function DiffView(props: {
   selected: { entry: GitFileEntry; side: EntrySide } | null
   diff: DiffPayload | null
   loading: boolean
+  hasChanges: boolean
   t: Translate
   onToggleFile: () => void
 }): any {
@@ -66,7 +68,7 @@ export function DiffView(props: {
     h(
       'div',
       { className: 'dgt-diff-head' },
-      h('span', { className: 'dgt-diff-path' }, entry?.path ?? t('fileStatus')),
+      h('span', { className: 'dgt-diff-path' }, entry?.path ?? t('diff')),
       entry?.origPath
         ? h('span', { className: 'dgt-diff-orig' }, t('renameFrom') + ' ' + entry.origPath)
         : null,
@@ -79,14 +81,23 @@ export function DiffView(props: {
           )
         : null,
       canAct
-        ? h('button', { type: 'button', className: 'dgt-diff-action', onClick: props.onToggleFile }, actionLabel)
+        ? h(
+            'button',
+            {
+              type: 'button',
+              className: 'dgt-diff-action',
+              'data-kind': side === 'staged' ? 'unstage' : 'stage',
+              onClick: props.onToggleFile,
+            },
+            actionLabel,
+          )
         : null,
     ),
     h(
       'div',
       { className: 'dgt-diff-body' },
       entry === null
-        ? h('div', { className: 'dgt-empty' }, t('noFileSelected'))
+        ? h('div', { className: 'dgt-empty' }, props.hasChanges ? t('noFileSelected') : t('nothingHint'))
         : loading
           ? h('div', { className: 'dgt-empty' }, t('loading'))
           : diff && diff.ok === false

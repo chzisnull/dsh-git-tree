@@ -291,6 +291,7 @@ export function Workspace(props: { t?: Translate }): any {
             selected: diffSelection,
             diff,
             loading: diffLoading,
+            hasChanges: entries.length > 0,
             t,
             onToggleFile: () => {
               if (diffSelection) void toggle(diffSelection.entry, diffSelection.side)

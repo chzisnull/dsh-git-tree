@@ -62,7 +62,7 @@ export function ChangeList(props: {
       'div',
       { className: 'dgt-list-head' },
       h('span', null, t('changes')),
-      h('span', { className: 'dgt-group-count' }, String(total)),
+      h('span', { className: 'dgt-group-count' }, String(total) + ' ' + t('itemsUnit')),
     ),
     status === null && statusError === ''
       ? h('div', { className: 'dgt-placeholder' }, t('loading'))

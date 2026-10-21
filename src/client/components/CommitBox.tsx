@@ -30,7 +30,13 @@ export function CommitBox(props: {
   const blocked = conflicts > 0
   const canCommit = staged > 0 && props.message.trim() !== '' && !blocked && !props.busy
 
-  const defaultHint = blocked ? t('conflictsBlockCommit') : staged === 0 ? t('commitHint') : ''
+  const defaultHint = blocked
+    ? t('conflictsBlockCommit')
+    : staged === 0
+      ? t('commitHint')
+      : props.message.trim() === ''
+        ? t('commitMessageEmpty')
+        : t('commitShortcut')
 
   return h(
     'div',
