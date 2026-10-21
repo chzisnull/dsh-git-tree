@@ -65,6 +65,9 @@ var EN = {
   checkout: "Check out",
   checkedOut: "Checked out",
   copyRefName: "Copy name",
+  copySha: "Copy SHA",
+  copyCommitMessage: "Copy commit message",
+  branchFromCommit: "New branch from this commit",
   checkOutFailed: "Check out failed",
   dirtyWorktree: "Commit or stash your changes before switching branches.",
   showAllBranches: "All branches",
@@ -119,6 +122,18 @@ var EN = {
   commitDone: "Committed",
   commitFailed: "Commit failed",
   stageFailed: "Stage failed",
+  conflict: "Conflict",
+  commitThis: "Commit\u2026",
+  discardChanges: "Discard changes",
+  removeFile: "Delete file",
+  removeUntracked: "Delete untracked file",
+  discardTitle: "Discard changes",
+  discardBody: "Uncommitted changes in this file will be lost. This cannot be undone.",
+  removeTitle: "Delete file",
+  removeBody: "The file will be deleted from the working tree. This cannot be undone.",
+  removeUntrackedBody: "The untracked file will be deleted from disk. This cannot be undone.",
+  discardDone: "Changes discarded",
+  removeDone: "File deleted",
   unstageFailed: "Unstage failed",
   loading: "Loading\u2026",
   statusFailed: "Could not read the working copy.",
@@ -163,6 +178,9 @@ var ZH = {
   checkout: "\u68C0\u51FA",
   checkedOut: "\u5DF2\u68C0\u51FA",
   copyRefName: "\u590D\u5236\u540D\u79F0",
+  copySha: "\u590D\u5236 SHA",
+  copyCommitMessage: "\u590D\u5236\u63D0\u4EA4\u4FE1\u606F",
+  branchFromCommit: "\u4ECE\u6B64\u63D0\u4EA4\u65B0\u5EFA\u5206\u652F",
   checkOutFailed: "\u68C0\u51FA\u5931\u8D25",
   dirtyWorktree: "\u6709\u672A\u63D0\u4EA4\u6539\u52A8\uFF0C\u5148\u63D0\u4EA4\u6216\u8D2E\u85CF\u518D\u5207\u6362\u5206\u652F\u3002",
   showAllBranches: "\u6240\u6709\u5206\u652F",
@@ -217,6 +235,18 @@ var ZH = {
   commitDone: "\u5DF2\u63D0\u4EA4",
   commitFailed: "\u63D0\u4EA4\u5931\u8D25",
   stageFailed: "\u6682\u5B58\u5931\u8D25",
+  conflict: "\u51B2\u7A81",
+  commitThis: "\u63D0\u4EA4\u2026",
+  discardChanges: "\u653E\u5F03\u66F4\u6539",
+  removeFile: "\u5220\u9664\u6587\u4EF6",
+  removeUntracked: "\u5220\u9664\u672A\u8DDF\u8E2A\u6587\u4EF6",
+  discardTitle: "\u653E\u5F03\u66F4\u6539",
+  discardBody: "\u8FD9\u4E2A\u6587\u4EF6\u91CC\u672A\u63D0\u4EA4\u7684\u4FEE\u6539\u4F1A\u4E22\u5931\uFF0C\u4E14\u65E0\u6CD5\u64A4\u9500\u3002",
+  removeTitle: "\u5220\u9664\u6587\u4EF6",
+  removeBody: "\u6587\u4EF6\u5C06\u4ECE\u5DE5\u4F5C\u533A\u5220\u9664\uFF0C\u4E14\u65E0\u6CD5\u64A4\u9500\u3002",
+  removeUntrackedBody: "\u672A\u8DDF\u8E2A\u6587\u4EF6\u5C06\u4ECE\u78C1\u76D8\u5220\u9664\uFF0C\u4E14\u65E0\u6CD5\u64A4\u9500\u3002",
+  discardDone: "\u5DF2\u653E\u5F03\u66F4\u6539",
+  removeDone: "\u5DF2\u5220\u9664\u6587\u4EF6",
   unstageFailed: "\u53D6\u6D88\u6682\u5B58\u5931\u8D25",
   loading: "\u52A0\u8F7D\u4E2D\u2026",
   statusFailed: "\u8BFB\u53D6\u5DE5\u4F5C\u533A\u5931\u8D25\u3002",
@@ -303,15 +333,15 @@ var CSS = `
 /* reference rail */
 .dgt-rail{flex:0 0 224px;min-width:0;display:flex;flex-direction:column;overflow:auto;
   padding:4px 0 8px;border-right:1px solid var(--dsw-alias-border-l2);
-  background:var(--dsw-alias-bg-layer-1);}
+  background:var(--dsw-alias-bg-layer-2);}
 .dgt-rail-title{display:flex;align-items:center;justify-content:space-between;height:26px;padding:0 12px;
   margin-top:6px;color:var(--dsw-alias-label-tertiary);font-size:10px;font-weight:600;
   letter-spacing:.06em;text-transform:uppercase;}
 .dgt-rail-title:first-child{margin-top:0;}
 .dgt-rail-row{display:flex;align-items:center;gap:6px;height:26px;padding:0 12px 0 20px;
   color:var(--dsw-alias-label-secondary);white-space:nowrap;}
-.dgt-rail-row[data-active='true']{background:var(--dsw-alias-interactive-bg-active);
-  color:var(--dsw-alias-label-primary);}
+.dgt-rail-row[data-active='true']{background:color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, var(--dsw-alias-bg-layer-1));
+  color:var(--dsw-alias-label-primary);font-weight:600;}
 .dgt-rail-row[data-current='true']{color:var(--dsw-alias-label-primary);font-weight:500;}
 .dgt-rail-row[data-muted='true']{color:var(--dsw-alias-label-caption);}
 .dgt-rail-icon{display:inline-flex;align-items:center;color:var(--dsw-alias-label-tertiary);flex:0 0 auto;}
@@ -450,8 +480,18 @@ var CSS = `
 .dgt-row[data-menu='true']{background:var(--dsw-alias-interactive-bg-hover);}
 .dgt-row[data-active='true'] .dgt-path-name{font-weight:600;}
 .dgt-check{flex:0 0 auto;width:13px;height:13px;margin:0;accent-color:var(--dsw-alias-brand-primary);cursor:pointer;}
-.dgt-letter{flex:0 0 auto;width:12px;text-align:center;font-family:var(--ds-font-family-code);
-  font-size:11px;font-weight:600;color:var(--dsw-alias-label-tertiary);}
+.dgt-badge{flex:0 0 auto;display:inline-grid;place-items:center;width:16px;height:16px;border-radius:4px;
+  font-family:var(--ds-font-family-code);font-size:10.5px;font-weight:600;color:var(--dsw-alias-label-secondary);
+  background:var(--dsw-alias-bg-layer-3);}
+.dgt-badge[data-tone='ok']{background:color-mix(in srgb, var(--dsw-alias-state-success-primary) 18%, var(--dsw-alias-bg-layer-1));color:var(--dgt-ok);}
+.dgt-badge[data-tone='warn']{background:color-mix(in srgb, var(--dsw-alias-state-warn-primary) 20%, var(--dsw-alias-bg-layer-1));color:var(--dgt-warn);}
+.dgt-badge[data-tone='error']{background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 16%, var(--dsw-alias-bg-layer-1));color:var(--dgt-err);}
+.dgt-badge[data-tone='accent']{background:color-mix(in srgb, var(--dsw-alias-brand-primary) 16%, var(--dsw-alias-bg-layer-1));color:var(--dsw-alias-brand-text);}
+.dgt-rowact{appearance:none;flex:0 0 auto;margin-left:auto;padding:1px 6px;border:0;border-radius:4px;
+  background:transparent;color:var(--dsw-alias-brand-text);font:inherit;font-size:11.5px;cursor:pointer;opacity:0;}
+.dgt-row:hover .dgt-rowact,.dgt-row:focus-within .dgt-rowact{opacity:1;}
+.dgt-rowact:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-rowact[data-disabled]{opacity:1;color:var(--dgt-warn);cursor:default;}
 .dgt-letter[data-tone='ok']{color:var(--dgt-ok);}
 .dgt-letter[data-tone='warn']{color:var(--dgt-warn);}
 .dgt-letter[data-tone='error']{color:var(--dgt-err);}
@@ -542,7 +582,8 @@ var CSS = `
   border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-brand-primary);
   color:var(--dsw-alias-label-primary-inverted);font:inherit;font-size:12px;font-weight:500;cursor:pointer;}
 .dgt-primary:hover:not(:disabled){opacity:.92;}
-.dgt-primary:disabled{background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-caption);cursor:default;}
+.dgt-primary:disabled{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);
+  color:var(--dsw-alias-label-secondary);cursor:default;}
 .dgt-overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
   background:var(--dsw-alias-bg-mask-1);}
 .dgt-dialog{width:340px;max-width:88vw;display:flex;flex-direction:column;gap:8px;padding:14px;
@@ -558,6 +599,19 @@ var CSS = `
 .dgt-dialog-error{font-size:11.5px;color:var(--dgt-err);}
 .dgt-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px;}
 .dgt-danger{background:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-label-primary-inverted);}
+.dgt-ctxmenu{position:fixed;z-index:80;min-width:200px;max-width:280px;padding:5px;
+  border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);
+  background:var(--dsw-alias-bg-layer-3);box-shadow:0 12px 32px var(--dsw-alias-bg-mask-1);}
+.dgt-ctxmenu-title{padding:5px 8px 6px;margin-bottom:4px;border-bottom:1px solid var(--dsw-alias-border-l1);
+  font-size:11px;color:var(--dsw-alias-label-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-ctxmenu-item{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;
+  height:28px;padding:0 8px;border:0;border-radius:var(--dsw-radius-xs);background:transparent;
+  color:var(--dsw-alias-label-primary);font:inherit;font-size:12.5px;text-align:left;cursor:pointer;}
+.dgt-ctxmenu-item:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-ctxmenu-item:disabled{color:var(--dsw-alias-label-caption);cursor:default;}
+.dgt-ctxmenu-item[data-danger='true']:not(:disabled){color:var(--dgt-err);}
+.dgt-ctxmenu-item kbd{font:10.5px var(--ds-font-family-code);color:var(--dsw-alias-label-tertiary);}
+.dgt-ctxmenu-divider{height:1px;margin:4px 2px;background:var(--dsw-alias-border-l1);}
 .dgt-toast{position:absolute;right:14px;bottom:118px;z-index:6;max-width:60%;
   padding:6px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);
   background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);font-size:12px;
@@ -572,6 +626,8 @@ var REFS_ROUTE = "api/git-tree/refs";
 var HISTORY_ROUTE = "api/git-tree/history";
 var COMMIT_INFO_ROUTE = "api/git-tree/commit-info";
 var CHECKOUT_ROUTE = "api/git-tree/checkout";
+var DISCARD_ROUTE = "api/git-tree/discard";
+var REMOVE_ROUTE = "api/git-tree/remove";
 var BRANCH_CREATE_ROUTE = "api/git-tree/branch/create";
 var BRANCH_RENAME_ROUTE = "api/git-tree/branch/rename";
 var BRANCH_DELETE_ROUTE = "api/git-tree/branch/delete";
@@ -619,6 +675,12 @@ function fetchCommitInfo(params, signal) {
 }
 function fetchHistory(params, signal) {
   return getJson(HISTORY_ROUTE, params, signal);
+}
+function discardPaths(paths, side, cwd) {
+  return postJson(DISCARD_ROUTE + query({ cwd }), { paths, side });
+}
+function removePaths(paths, untracked, cwd) {
+  return postJson(REMOVE_ROUTE + query({ cwd }), { paths, untracked });
 }
 function checkoutBranch(branch, cwd) {
   return postJson(CHECKOUT_ROUTE + query({ cwd }), { branch });
@@ -954,6 +1016,10 @@ function RefRow(props) {
       tabIndex: 0,
       title: ref.subject ? ref.name + " \u2014 " + ref.subject : ref.name,
       onClick: () => props.onOpen(ref, props.kind),
+      onContextMenu: (event) => {
+        event.preventDefault();
+        props.onContextMenu(ref, props.kind, event);
+      },
       onDoubleClick: () => {
         if (props.kind === "branch") props.onCheckout(ref.name);
       },
@@ -1094,7 +1160,8 @@ function RefRail(props) {
           onCheckout: props.onCheckout,
           onCopy: props.onCopyRef,
           onRename: props.onRename,
-          onDelete: props.onDelete
+          onDelete: props.onDelete,
+          onContextMenu: props.onContextMenu
         })
       ) : h("div", { className: "dgt-rail-empty" }, "\u2014")
     ),
@@ -1117,35 +1184,44 @@ function RefRail(props) {
 }
 
 // src/client/components/FileRow.tsx
+function letterOf(entry, side) {
+  return statusLetter(entry, side);
+}
 function FileRow(props) {
-  const popover = usePopover();
-  const menuOpen = popover.open;
-  const anchor = menuOpen && popover.triggerRef.current ? popover.triggerRef.current.getBoundingClientRect() : null;
-  const menuStyle = anchor ? { position: "fixed", left: anchor.right + 4, top: anchor.top - 4, right: "auto" } : void 0;
   const entry = props.entry;
   const side = props.side;
   const t = props.t;
-  const letter = statusLetter(entry, side);
+  const letter = letterOf(entry, side);
   const tone = statusTone(letter);
   const { dir, name } = splitPath(entry.path);
   const conflict = side === "conflicted" || entry.conflicted;
   const actionLabel = side === "staged" ? t("unstageFile") : t("stageFile");
   const title = entry.origPath ? entry.path + " \u2014 " + t("renameFrom") + " " + entry.origPath : entry.path;
+  const openMenu = (event) => {
+    event.preventDefault();
+    props.onContextMenu(entry, side, event);
+  };
   return h(
     "div",
     {
       className: "dgt-row",
       "data-active": props.active || void 0,
       "data-side": side,
-      "data-menu": menuOpen || void 0,
       role: "button",
       tabIndex: 0,
       title,
       onClick: () => props.onSelect(entry, side),
+      onContextMenu: openMenu,
       onKeyDown: (event) => {
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           props.onSelect(entry, side);
+        }
+        if (event.key === "F10" && event.shiftKey) {
+          event.preventDefault();
+          const rect = event.currentTarget.getBoundingClientRect();
+          props.onContextMenu(entry, side, { clientX: rect.left + 24, clientY: rect.top + 18, preventDefault() {
+          } });
         }
       }
     },
@@ -1159,61 +1235,25 @@ function FileRow(props) {
       onClick: (event) => event.stopPropagation(),
       onChange: () => props.onToggle(entry, side)
     }),
-    h("span", { className: "dgt-letter", "data-tone": tone }, letter),
+    h("span", { className: "dgt-badge", "data-tone": tone }, letter),
     h(
       "span",
       { className: "dgt-path" },
       dir ? h("span", { className: "dgt-path-dir" }, dir) : null,
       h("span", { className: "dgt-path-name" }, name)
     ),
-    h(
+    conflict ? h("span", { className: "dgt-rowact", "data-disabled": true, title: t("conflictsBlockCommit") }, t("conflict")) : h(
       "button",
       {
         type: "button",
-        className: "dgt-more",
-        "data-open": menuOpen || void 0,
-        title: t("fileActions"),
-        "aria-label": t("fileActions"),
-        ref: popover.triggerRef,
+        className: "dgt-rowact",
         onClick: (event) => {
           event.stopPropagation();
-          popover.toggle();
+          props.onToggle(entry, side);
         }
       },
-      h(MoreIcon)
-    ),
-    menuOpen ? h(
-      "div",
-      {
-        className: "dgt-menu",
-        ref: popover.menuRef,
-        style: menuStyle,
-        "data-flyout": true,
-        onClick: (event) => event.stopPropagation()
-      },
-      conflict ? null : h(
-        "button",
-        {
-          type: "button",
-          onClick: () => {
-            popover.close();
-            props.onToggle(entry, side);
-          }
-        },
-        actionLabel
-      ),
-      h(
-        "button",
-        {
-          type: "button",
-          onClick: () => {
-            popover.close();
-            props.onCopyPath(entry);
-          }
-        },
-        t("copyPath")
-      )
-    ) : null
+      actionLabel
+    )
   );
 }
 
@@ -1238,7 +1278,8 @@ function Group(props) {
         t: props.t,
         onSelect: props.onSelect,
         onToggle: props.onToggle,
-        onCopyPath: props.onCopyPath
+        onCopyPath: props.onCopyPath,
+        onContextMenu: props.onContextMenu
       })
     )
   );
@@ -1273,7 +1314,8 @@ function ChangeList(props) {
         t,
         onSelect: props.onSelect,
         onToggle: props.onToggle,
-        onCopyPath: props.onCopyPath
+        onCopyPath: props.onCopyPath,
+        onContextMenu: props.onContextMenu
       }),
       h(Group, {
         label: t("stagedFiles"),
@@ -1283,7 +1325,8 @@ function ChangeList(props) {
         t,
         onSelect: props.onSelect,
         onToggle: props.onToggle,
-        onCopyPath: props.onCopyPath
+        onCopyPath: props.onCopyPath,
+        onContextMenu: props.onContextMenu
       }),
       h(Group, {
         label: t("unstagedFiles"),
@@ -1293,7 +1336,8 @@ function ChangeList(props) {
         t,
         onSelect: props.onSelect,
         onToggle: props.onToggle,
-        onCopyPath: props.onCopyPath
+        onCopyPath: props.onCopyPath,
+        onContextMenu: props.onContextMenu
       })
     )
   );
@@ -1435,6 +1479,11 @@ function CommitBox(props) {
       ),
       h(
         "button",
+        { type: "button", className: "dgt-button", onClick: () => props.onMessage("") },
+        t("cancel")
+      ),
+      h(
+        "button",
         {
           type: "button",
           className: "dgt-primary",
@@ -1464,7 +1513,8 @@ function StatusView(props) {
         t,
         onSelect: props.onSelect,
         onToggle: props.onToggle,
-        onCopyPath: props.onCopyPath
+        onCopyPath: props.onCopyPath,
+        onContextMenu: props.onContextMenu
       }),
       h(DiffView, {
         selected: props.diffSelection,
@@ -1600,7 +1650,7 @@ function Detail(props) {
     h(
       "div",
       { className: "dgt-detail-diff" },
-      props.selectedFile === "" ? h("div", { className: "dgt-placeholder" }, t("selectCommitFile")) : props.fileDiffLoading ? h("div", { className: "dgt-placeholder" }, t("loading")) : props.fileDiff && props.fileDiff.ok === false ? h("div", { className: "dgt-placeholder dgt-error" }, props.fileDiff.error || t("diffFailed")) : props.fileDiff && props.fileDiff.binary ? h("div", { className: "dgt-placeholder" }, t("binaryFile")) : props.fileDiff && props.fileDiff.files && props.fileDiff.files.length > 0 ? props.fileDiff.files.map(
+      files.length === 0 ? h("div", { className: "dgt-placeholder" }, t("noFiles")) : props.selectedFile === "" ? h("div", { className: "dgt-placeholder" }, t("selectCommitFile")) : props.fileDiffLoading ? h("div", { className: "dgt-placeholder" }, t("loading")) : props.fileDiff && props.fileDiff.ok === false ? h("div", { className: "dgt-placeholder dgt-error" }, props.fileDiff.error || t("diffFailed")) : props.fileDiff && props.fileDiff.binary ? h("div", { className: "dgt-placeholder" }, t("binaryFile")) : props.fileDiff && props.fileDiff.files && props.fileDiff.files.length > 0 ? props.fileDiff.files.map(
         (file, index) => h(DiffFileBlock, { key: "detail-file:" + String(index), file, t })
       ) : h("div", { className: "dgt-placeholder" }, t("noDiff"))
     )
@@ -1716,6 +1766,10 @@ function HistoryView(props) {
                 role: "button",
                 tabIndex: 0,
                 onClick: () => props.onSelect(commit),
+                onContextMenu: (event) => {
+                  event.preventDefault();
+                  props.onContextMenu(commit, event);
+                },
                 onKeyDown: (event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
@@ -1839,6 +1893,78 @@ function ConfirmDialog(props) {
   );
 }
 
+// src/client/components/ContextMenu.tsx
+function ContextMenu(props) {
+  const menuRef = React.useRef(null);
+  const [placed, setPlaced] = React.useState({ left: props.state.x, top: props.state.y });
+  React.useEffect(() => {
+    const node = menuRef.current;
+    if (node && node.getBoundingClientRect) {
+      const rect = node.getBoundingClientRect();
+      const width = typeof window !== "undefined" ? window.innerWidth : 1440;
+      const height = typeof window !== "undefined" ? window.innerHeight : 900;
+      const left = Math.min(props.state.x, width - rect.width - 8);
+      const top = Math.min(props.state.y, height - rect.height - 8);
+      setPlaced({ left: Math.max(8, left), top: Math.max(8, top) });
+    }
+    const close = () => props.onClose();
+    const timer = setTimeout(() => {
+      document.addEventListener("mousedown", onDown, true);
+      document.addEventListener("keydown", onKey, true);
+      window.addEventListener("scroll", close, true);
+      window.addEventListener("resize", close);
+      window.addEventListener("blur", close);
+    }, 0);
+    function onDown(event) {
+      if (menuRef.current && menuRef.current.contains && menuRef.current.contains(event.target)) return;
+      close();
+    }
+    function onKey(event) {
+      if (event.key === "Escape") close();
+    }
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
+      window.removeEventListener("blur", close);
+    };
+  }, [props.state.x, props.state.y, props.onClose]);
+  return h(
+    "div",
+    {
+      className: "dgt-ctxmenu",
+      ref: menuRef,
+      role: "menu",
+      style: { left: placed.left + "px", top: placed.top + "px" },
+      onContextMenu: (event) => event.preventDefault()
+    },
+    props.state.title ? h("div", { className: "dgt-ctxmenu-title" }, props.state.title) : null,
+    props.state.items.map(
+      (item, index) => item.divider ? h("div", { key: "div:" + String(index), className: "dgt-ctxmenu-divider" }) : h(
+        "button",
+        {
+          key: item.label + ":" + String(index),
+          type: "button",
+          role: "menuitem",
+          className: "dgt-ctxmenu-item",
+          "data-danger": item.danger || void 0,
+          disabled: item.disabled || void 0,
+          title: item.disabled ? item.hint : void 0,
+          onClick: () => {
+            if (item.disabled) return;
+            props.onClose();
+            item.onSelect?.();
+          }
+        },
+        h("span", null, item.label),
+        item.hint && !item.disabled ? h("kbd", null, item.hint) : null
+      )
+    )
+  );
+}
+
 // src/client/components/Workspace.tsx
 var POLL_MS = 2e3;
 var REPO_KEY = "dsh-git-tree/repository";
@@ -1877,6 +2003,7 @@ function Workspace(props) {
   const [commitFileDiff, setCommitFileDiff] = React.useState(null);
   const [commitFileDiffLoading, setCommitFileDiffLoading] = React.useState(false);
   const [dialog, setDialog] = React.useState(null);
+  const [contextMenu, setContextMenu] = React.useState(null);
   const [dialogBusy, setDialogBusy] = React.useState(false);
   const [dialogError, setDialogError] = React.useState("");
   const [statusError, setStatusError] = React.useState("");
@@ -2077,7 +2204,7 @@ function Workspace(props) {
       setDialogBusy(true);
       setDialogError("");
       try {
-        const result = await createBranch(name, repoPath || void 0);
+        const result = await createBranch(name, repoPath || void 0, dialog?.start);
         if (!result.ok) throw new Error(result.error || t("branchActionFailed"));
         await afterBranchChange(t("branchCreated") + " \xB7 " + name);
       } catch (error) {
@@ -2086,7 +2213,7 @@ function Workspace(props) {
         setDialogBusy(false);
       }
     },
-    [afterBranchChange, repoPath, t]
+    [afterBranchChange, dialog?.start, repoPath, t]
   );
   const submitRename = React.useCallback(
     async (to) => {
@@ -2226,6 +2353,165 @@ function Workspace(props) {
     },
     [showToast, t]
   );
+  const copyText = React.useCallback(
+    (text, toast2) => {
+      try {
+        void navigator.clipboard?.writeText(text);
+        showToast(toast2);
+      } catch {
+        showToast(text);
+      }
+    },
+    [showToast]
+  );
+  const commitThis = React.useCallback(
+    async (entry, side) => {
+      if (entry.conflicted) return;
+      setBusy(true);
+      setActionError("");
+      try {
+        if (side !== "staged") {
+          const staged = await stagePaths([entry.path], repoPath || void 0);
+          if (!staged.ok) throw new Error(staged.error || t("stageFailed"));
+          await loadStatus({ silent: true });
+        }
+        setTimeout(() => {
+          if (commitInput.current && commitInput.current.focus) commitInput.current.focus();
+        }, 0);
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [loadStatus, repoPath, t]
+  );
+  const submitDiscard = React.useCallback(async () => {
+    const path = dialog?.path ?? "";
+    const side = dialog?.side === "staged" ? "staged" : "unstaged";
+    setDialogBusy(true);
+    setDialogError("");
+    try {
+      const result = await discardPaths([path], side, repoPath || void 0);
+      if (!result.ok) throw new Error(result.error || t("branchActionFailed"));
+      closeDialog();
+      showToast(t("discardDone") + " \xB7 " + path);
+      setSelected(null);
+      setDiff(null);
+      await loadStatus();
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDialogBusy(false);
+    }
+  }, [closeDialog, dialog?.path, dialog?.side, loadStatus, repoPath, showToast, t]);
+  const submitRemove = React.useCallback(async () => {
+    const path = dialog?.path ?? "";
+    const untracked = dialog?.kind === "remove-untracked";
+    setDialogBusy(true);
+    setDialogError("");
+    try {
+      const result = await removePaths([path], untracked, repoPath || void 0);
+      if (!result.ok) throw new Error(result.error || t("branchActionFailed"));
+      closeDialog();
+      showToast(t("removeDone") + " \xB7 " + path);
+      setSelected(null);
+      setDiff(null);
+      await loadStatus();
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDialogBusy(false);
+    }
+  }, [closeDialog, dialog?.kind, dialog?.path, loadStatus, repoPath, showToast, t]);
+  const fileMenu = (entry, side, event) => {
+    const conflict = side === "conflicted" || entry.conflicted;
+    const untracked = entry.kind === "untracked";
+    const items = [
+      {
+        label: t("commitThis"),
+        disabled: conflict,
+        hint: conflict ? t("conflictsBlockCommit") : "\u2318\u21B5",
+        onSelect: () => void commitThis(entry, side)
+      },
+      { divider: true }
+    ];
+    if (!conflict) {
+      items.push({
+        label: side === "staged" ? t("unstageFile") : t("stageFile"),
+        onSelect: () => void toggle(entry, side)
+      });
+    }
+    items.push({
+      label: t("discardChanges"),
+      danger: true,
+      disabled: conflict,
+      hint: conflict ? t("conflictsBlockCommit") : void 0,
+      onSelect: () => {
+        setDialogError("");
+        setDialog({ kind: "discard", path: entry.path, side });
+      }
+    });
+    items.push({
+      label: untracked ? t("removeUntracked") : t("removeFile"),
+      danger: true,
+      onSelect: () => {
+        setDialogError("");
+        setDialog({ kind: untracked ? "remove-untracked" : "remove", path: entry.path });
+      }
+    });
+    items.push({ divider: true });
+    items.push({ label: t("copyPath"), onSelect: () => copyPath(entry) });
+    setContextMenu({ x: event.clientX, y: event.clientY, title: entry.path, items });
+  };
+  const refMenu = (record, kind, event) => {
+    const items = kind === "tag" ? [
+      { label: t("copyRefName"), onSelect: () => copyText(record.name, t("copiedPath")) },
+      { label: t("history"), onSelect: () => openRef(record, "tag") }
+    ] : [
+      {
+        label: t("checkout"),
+        disabled: record.current,
+        hint: record.current ? t("currentBranchCannotDelete") : void 0,
+        onSelect: () => void checkout(record.name)
+      },
+      { label: t("renameBranch"), onSelect: () => {
+        setDialogError("");
+        setDialog({ kind: "rename", branch: record.name });
+      } },
+      {
+        label: t("deleteBranch"),
+        danger: true,
+        disabled: record.current,
+        hint: record.current ? t("currentBranchCannotDelete") : void 0,
+        onSelect: () => {
+          setDialogError("");
+          setDialog({ kind: "delete", branch: record.name });
+        }
+      },
+      { divider: true },
+      { label: t("copyRefName"), onSelect: () => copyText(record.name, t("copiedPath")) }
+    ];
+    setContextMenu({ x: event.clientX, y: event.clientY, title: record.name, items });
+  };
+  const commitMenu = (commit2, event) => {
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      title: commit2.sha.slice(0, 12),
+      items: [
+        { label: t("copySha"), onSelect: () => copyText(commit2.sha, t("copiedPath")) },
+        {
+          label: t("branchFromCommit"),
+          onSelect: () => {
+            setDialogError("");
+            setDialog({ kind: "create", start: commit2.sha });
+          }
+        },
+        { label: t("copyCommitMessage"), onSelect: () => copyText(commit2.subject, t("copiedPath")) }
+      ]
+    });
+  };
   const openLocalAction = React.useCallback(
     async (target) => {
       setOpening(true);
@@ -2281,6 +2567,19 @@ function Workspace(props) {
   const selectedEntry = selected ? findEntry(status, selected.path) : null;
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null;
   const truncated = status?.truncated === true;
+  const autoSelectRef = React.useRef("");
+  React.useEffect(() => {
+    if (view !== "status" || status === null) return;
+    const key = (repoPath || status.cwd || "") + "|" + (status.oid || "");
+    if (autoSelectRef.current === key) return;
+    autoSelectRef.current = key;
+    if (selected !== null) return;
+    const split = splitEntries(status.entries ?? []);
+    const first = split.conflicted[0] ?? split.staged[0] ?? split.unstaged[0];
+    if (!first) return;
+    const side = split.conflicted.includes(first) ? "conflicted" : split.staged.includes(first) ? "staged" : "unstaged";
+    void openDiff(first, side);
+  }, [status, view, selected, repoPath, openDiff]);
   const renderView = () => {
     switch (view) {
       case "history":
@@ -2300,12 +2599,12 @@ function Workspace(props) {
           error: historyError,
           scope: historyScope,
           selectedSha: historySha,
-          detail: commitDetail,
-          detailLoading: commitDetailLoading,
-          detailError: commitDetailError,
-          selectedFile: commitFile,
-          fileDiff: commitFileDiff,
-          fileDiffLoading: commitFileDiffLoading,
+          detail: historySha === "" ? null : commitDetail,
+          detailLoading: historySha === "" ? false : commitDetailLoading,
+          detailError: historySha === "" ? "" : commitDetailError,
+          selectedFile: historySha === "" ? "" : commitFile,
+          fileDiff: historySha === "" ? null : commitFileDiff,
+          fileDiffLoading: historySha === "" ? false : commitFileDiffLoading,
           t,
           onScope: (scope) => {
             setHistoryScope(scope);
@@ -2318,6 +2617,7 @@ function Workspace(props) {
           onSelect: (commit2) => setHistorySha(commit2.sha),
           onSelectFile: (path) => void openCommitFile(path),
           onParent: (sha) => setHistorySha(sha),
+          onContextMenu: (commit2, event) => commitMenu(commit2, event),
           onLoadMore: () => void loadHistory(false)
         });
       case "status":
@@ -2339,6 +2639,7 @@ function Workspace(props) {
           onSelect: (entry, side) => void openDiff(entry, side),
           onToggle: (entry, side) => void toggle(entry, side),
           onCopyPath: copyPath,
+          onContextMenu: (entry, side, event) => fileMenu(entry, side, event),
           onMessage: setMessage,
           onCommit: () => void commit()
         });
@@ -2376,6 +2677,7 @@ function Workspace(props) {
       onOpenRef: openRef,
       onCheckout: (name) => void checkout(name),
       onCopyRef: copyRef,
+      onContextMenu: (record, kind, event) => refMenu(record, kind, event),
       onCreate: () => {
         setDialogError("");
         setDialog({ kind: "create" });
@@ -2420,6 +2722,27 @@ function Workspace(props) {
       t,
       onCancel: closeDialog,
       onConfirm: () => void submitDelete()
+    }) : null,
+    contextMenu ? h(ContextMenu, { state: contextMenu, onClose: () => setContextMenu(null) }) : null,
+    dialog?.kind === "discard" ? h(ConfirmDialog, {
+      title: t("discardTitle"),
+      body: (dialog.path ?? "") + " \u2014 " + t("discardBody"),
+      submitLabel: t("discardChanges"),
+      busy: dialogBusy,
+      error: dialogError,
+      t,
+      onCancel: closeDialog,
+      onConfirm: () => void submitDiscard()
+    }) : null,
+    dialog?.kind === "remove" || dialog?.kind === "remove-untracked" ? h(ConfirmDialog, {
+      title: t("removeTitle"),
+      body: (dialog.path ?? "") + " \u2014 " + (dialog.kind === "remove-untracked" ? t("removeUntrackedBody") : t("removeBody")),
+      submitLabel: t("removeFile"),
+      busy: dialogBusy,
+      error: dialogError,
+      t,
+      onCancel: closeDialog,
+      onConfirm: () => void submitRemove()
     }) : null,
     toast ? h("div", { className: "dgt-toast", role: "status" }, toast) : null,
     notice ? h("div", { className: "dgt-toast", role: "status" }, notice) : null

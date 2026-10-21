@@ -134,7 +134,9 @@ function Detail(props: {
     h(
       'div',
       { className: 'dgt-detail-diff' },
-      props.selectedFile === ''
+      files.length === 0
+        ? h('div', { className: 'dgt-placeholder' }, t('noFiles'))
+        : props.selectedFile === ''
         ? h('div', { className: 'dgt-placeholder' }, t('selectCommitFile'))
         : props.fileDiffLoading
           ? h('div', { className: 'dgt-placeholder' }, t('loading'))
@@ -179,6 +181,7 @@ export function HistoryView(props: {
   onSelectFile: (path: string) => void
   onParent: (sha: string) => void
   onClearScope: () => void
+  onContextMenu: (commit: HistoryCommit, event: any) => void
 }): any {
   const { commits, t } = props
   const scoped = props.scope.startsWith('branch:') || props.scope.startsWith('tag:')
@@ -302,6 +305,10 @@ export function HistoryView(props: {
                         role: 'button',
                         tabIndex: 0,
                         onClick: () => props.onSelect(commit),
+                        onContextMenu: (event: any) => {
+                          event.preventDefault()
+                          props.onContextMenu(commit, event)
+                        },
                         onKeyDown: (event: any) => {
                           if (event.key === 'Enter' || event.key === ' ') {
                             event.preventDefault()

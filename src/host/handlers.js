@@ -427,6 +427,41 @@ export async function handleUnstage(ctx, request) {
   return json({ ok: true, unstaged: paths })
 }
 
+/**
+ * Throw away working-tree changes. A staged row is restored on both sides
+ * (index and work tree), an unstaged row only in the work tree. Destructive by
+ * nature; the client confirms before calling this.
+ */
+export async function handleDiscard(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const paths = safePathList(body.paths)
+  const staged = body.side === 'staged'
+  const subprocess = subprocessOf(ctx)
+
+  const argv = ['restore']
+  if (staged) argv.push('--staged')
+  argv.push('--worktree', '--', ...paths)
+  await git(subprocess, argv, cwd, { maxBytes: 256 * 1024 })
+  return json({ ok: true, discarded: paths, side: staged ? 'staged' : 'unstaged' })
+}
+
+/** Remove tracked files (git rm) or untracked files (git clean) from the repo. */
+export async function handleRemove(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const paths = safePathList(body.paths)
+  const untracked = body.untracked === true
+  const subprocess = subprocessOf(ctx)
+
+  if (untracked) {
+    await git(subprocess, ['clean', '-f', '--', ...paths], cwd, { maxBytes: 256 * 1024 })
+  } else {
+    await git(subprocess, ['rm', '-f', '--quiet', '--', ...paths], cwd, { maxBytes: 256 * 1024 })
+  }
+  return json({ ok: true, removed: paths, untracked })
+}
+
 export async function handleCommit(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
   const body = await readJsonBody(request)

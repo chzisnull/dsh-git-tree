@@ -77,6 +77,11 @@ export function CommitBox(props: {
       ),
       h(
         'button',
+        { type: 'button', className: 'dgt-button', onClick: () => props.onMessage('') },
+        t('cancel'),
+      ),
+      h(
+        'button',
         {
           type: 'button',
           className: 'dgt-primary',

@@ -35,6 +35,7 @@ function RefRow(props: {
   onCopy: (name: string) => void
   onRename: (name: string) => void
   onDelete: (name: string) => void
+  onContextMenu: (record: RefRecord, kind: 'branch' | 'tag', event: any) => void
 }): any {
   const popover = usePopover()
   const menuOpen = popover.open
@@ -52,6 +53,10 @@ function RefRow(props: {
       tabIndex: 0,
       title: ref.subject ? ref.name + ' — ' + ref.subject : ref.name,
       onClick: () => props.onOpen(ref, props.kind),
+      onContextMenu: (event: any) => {
+        event.preventDefault()
+        props.onContextMenu(ref, props.kind, event)
+      },
       onDoubleClick: () => {
         if (props.kind === 'branch') props.onCheckout(ref.name)
       },
@@ -173,6 +178,7 @@ export function RefRail(props: {
   onCreate: () => void
   onRename: (name: string) => void
   onDelete: (name: string) => void
+  onContextMenu: (record: RefRecord, kind: 'branch' | 'tag', event: any) => void
 }): any {
   const { refs, t } = props
   const branches = refs?.branches ?? []
@@ -217,6 +223,7 @@ export function RefRail(props: {
               onCopy: props.onCopyRef,
               onRename: props.onRename,
               onDelete: props.onDelete,
+              onContextMenu: props.onContextMenu,
             }),
           )
         : h('div', { className: 'dgt-rail-empty' }, '—'),

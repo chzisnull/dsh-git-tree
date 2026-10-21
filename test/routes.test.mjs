@@ -155,7 +155,7 @@ test('host plugin declares its name and hard service dependencies', () => {
   assert.deepEqual(inject, ['connection', 'subprocess'])
 })
 
-test('apply registers the twelve authenticated exact Fetch routes', () => {
+test('apply registers the sixteen authenticated exact Fetch routes', () => {
   const ctx = fakeContext()
   apply(ctx)
 
@@ -169,9 +169,11 @@ test('apply registers the twelve authenticated exact Fetch routes', () => {
       '/api/git-tree/commit',
       '/api/git-tree/commit-info',
       '/api/git-tree/diff',
+      '/api/git-tree/discard',
       '/api/git-tree/history',
       '/api/git-tree/open',
       '/api/git-tree/refs',
+      '/api/git-tree/remove',
       '/api/git-tree/stage',
       '/api/git-tree/status',
       '/api/git-tree/unstage',
@@ -186,6 +188,8 @@ test('apply registers the twelve authenticated exact Fetch routes', () => {
       '/api/git-tree/unstage',
       '/api/git-tree/commit',
       '/api/git-tree/checkout',
+      '/api/git-tree/discard',
+      '/api/git-tree/remove',
       '/api/git-tree/open',
       '/api/git-tree/branch/create',
       '/api/git-tree/branch/rename',
@@ -615,6 +619,51 @@ test('branch delete refuses the current branch and unmerged branches', async () 
   })
   assert.equal(refused.response.status, 409)
   assert.equal(refused.body.code, 'branch-not-merged')
+})
+
+test('discard restores the work tree or both sides with a fixed argv', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const unstaged = await call(ctx, '/api/git-tree/discard', {
+    method: 'POST',
+    body: { paths: ['src/app.js'], side: 'unstaged' },
+  })
+  assert.equal(unstaged.body.ok, true)
+  const restore = ctx.spawns.find((spawn) => spawn.argv[1] === 'restore')
+  assert.deepEqual(restore.argv.slice(1), ['restore', '--worktree', '--', 'src/app.js'])
+
+  const staged = fakeContext()
+  apply(staged)
+  await call(staged, '/api/git-tree/discard', { method: 'POST', body: { paths: ['src/app.js'], side: 'staged' } })
+  const restore2 = staged.spawns.find((spawn) => spawn.argv[1] === 'restore')
+  assert.deepEqual(restore2.argv.slice(1), ['restore', '--staged', '--worktree', '--', 'src/app.js'])
+})
+
+test('remove deletes tracked files with git rm and untracked with git clean', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  await call(ctx, '/api/git-tree/remove', { method: 'POST', body: { paths: ['old.md'] } })
+  const rm = ctx.spawns.find((spawn) => spawn.argv[1] === 'rm')
+  assert.deepEqual(rm.argv.slice(1), ['rm', '-f', '--quiet', '--', 'old.md'])
+
+  const untracked = fakeContext()
+  apply(untracked)
+  await call(untracked, '/api/git-tree/remove', {
+    method: 'POST',
+    body: { paths: ['scratch.txt'], untracked: true },
+  })
+  const clean = untracked.spawns.find((spawn) => spawn.argv[1] === 'clean')
+  assert.deepEqual(clean.argv.slice(1), ['clean', '-f', '--', 'scratch.txt'])
+})
+
+test('discard and remove refuse unsafe paths before spawning git', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  for (const route of ['/api/git-tree/discard', '/api/git-tree/remove']) {
+    const { body } = await call(ctx, route, { method: 'POST', body: { paths: ['../escape'] } })
+    assert.equal(body.ok, false, route + ' must refuse traversal')
+  }
+  assert.equal(ctx.spawns.length, 0)
 })
 
 test('refs route parses branches, remotes and tags and marks the current branch', async () => {

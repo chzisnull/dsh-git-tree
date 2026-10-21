@@ -20,6 +20,7 @@ import type {
 import {
   checkoutBranch,
   commitChanges,
+  discardPaths,
   createBranch,
   deleteBranch,
   renameBranch,
@@ -30,6 +31,7 @@ import {
   fetchStatus,
   fetchWorkspaces,
   openLocal,
+  removePaths,
   stagePaths,
   unstagePaths,
 } from '../routes'
@@ -39,6 +41,8 @@ import { RefRail } from './RefRail'
 import { StatusView } from './views/StatusView'
 import { HistoryView } from './views/HistoryView'
 import { ConfirmDialog, PromptDialog } from './Dialogs'
+import { ContextMenu } from './ContextMenu'
+import type { ContextMenuEntry, ContextMenuState } from './ContextMenu'
 import type { ViewKind } from '../types'
 
 const POLL_MS = 2000
@@ -84,7 +88,14 @@ export function Workspace(props: { t?: Translate }): any {
   const [commitFileDiff, setCommitFileDiff] = React.useState<DiffPayload | null>(null)
   const [commitFileDiffLoading, setCommitFileDiffLoading] = React.useState(false)
 
-  const [dialog, setDialog] = React.useState<{ kind: 'create' | 'rename' | 'delete'; branch?: string } | null>(null)
+  const [dialog, setDialog] = React.useState<{
+    kind: 'create' | 'rename' | 'delete' | 'discard' | 'remove' | 'remove-untracked'
+    branch?: string
+    start?: string
+    path?: string
+    side?: EntrySide
+  } | null>(null)
+  const [contextMenu, setContextMenu] = React.useState<ContextMenuState | null>(null)
   const [dialogBusy, setDialogBusy] = React.useState(false)
   const [dialogError, setDialogError] = React.useState('')
   const [statusError, setStatusError] = React.useState('')
@@ -302,7 +313,7 @@ export function Workspace(props: { t?: Translate }): any {
       setDialogBusy(true)
       setDialogError('')
       try {
-        const result = await createBranch(name, repoPath || undefined)
+        const result = await createBranch(name, repoPath || undefined, dialog?.start)
         if (!result.ok) throw new Error(result.error || t('branchActionFailed'))
         await afterBranchChange(t('branchCreated') + ' · ' + name)
       } catch (error) {
@@ -311,7 +322,7 @@ export function Workspace(props: { t?: Translate }): any {
         setDialogBusy(false)
       }
     },
-    [afterBranchChange, repoPath, t],
+    [afterBranchChange, dialog?.start, repoPath, t],
   )
 
   const submitRename = React.useCallback(
@@ -472,6 +483,169 @@ export function Workspace(props: { t?: Translate }): any {
     [showToast, t],
   )
 
+  const copyText = React.useCallback(
+    (text: string, toast: string) => {
+      try {
+        void navigator.clipboard?.writeText(text)
+        showToast(toast)
+      } catch {
+        showToast(text)
+      }
+    },
+    [showToast],
+  )
+
+  const commitThis = React.useCallback(
+    async (entry: GitFileEntry, side: EntrySide) => {
+      if (entry.conflicted) return
+      setBusy(true)
+      setActionError('')
+      try {
+        if (side !== 'staged') {
+          const staged = await stagePaths([entry.path], repoPath || undefined)
+          if (!staged.ok) throw new Error(staged.error || t('stageFailed'))
+          await loadStatus({ silent: true })
+        }
+        setTimeout(() => {
+          if (commitInput.current && commitInput.current.focus) commitInput.current.focus()
+        }, 0)
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : String(error))
+      } finally {
+        setBusy(false)
+      }
+    },
+    [loadStatus, repoPath, t],
+  )
+
+  const submitDiscard = React.useCallback(async () => {
+    const path = dialog?.path ?? ''
+    const side = dialog?.side === 'staged' ? 'staged' : 'unstaged'
+    setDialogBusy(true)
+    setDialogError('')
+    try {
+      const result = await discardPaths([path], side, repoPath || undefined)
+      if (!result.ok) throw new Error(result.error || t('branchActionFailed'))
+      closeDialog()
+      showToast(t('discardDone') + ' · ' + path)
+      setSelected(null)
+      setDiff(null)
+      await loadStatus()
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setDialogBusy(false)
+    }
+  }, [closeDialog, dialog?.path, dialog?.side, loadStatus, repoPath, showToast, t])
+
+  const submitRemove = React.useCallback(async () => {
+    const path = dialog?.path ?? ''
+    const untracked = dialog?.kind === 'remove-untracked'
+    setDialogBusy(true)
+    setDialogError('')
+    try {
+      const result = await removePaths([path], untracked, repoPath || undefined)
+      if (!result.ok) throw new Error(result.error || t('branchActionFailed'))
+      closeDialog()
+      showToast(t('removeDone') + ' · ' + path)
+      setSelected(null)
+      setDiff(null)
+      await loadStatus()
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setDialogBusy(false)
+    }
+  }, [closeDialog, dialog?.kind, dialog?.path, loadStatus, repoPath, showToast, t])
+
+  const fileMenu = (entry: GitFileEntry, side: EntrySide, event: any) => {
+    const conflict = side === 'conflicted' || entry.conflicted
+    const untracked = entry.kind === 'untracked'
+    const items: ContextMenuEntry[] = [
+      {
+        label: t('commitThis'),
+        disabled: conflict,
+        hint: conflict ? t('conflictsBlockCommit') : '⌘↵',
+        onSelect: () => void commitThis(entry, side),
+      },
+      { divider: true },
+    ]
+    if (!conflict) {
+      items.push({
+        label: side === 'staged' ? t('unstageFile') : t('stageFile'),
+        onSelect: () => void toggle(entry, side),
+      })
+    }
+    items.push({
+      label: t('discardChanges'),
+      danger: true,
+      disabled: conflict,
+      hint: conflict ? t('conflictsBlockCommit') : undefined,
+      onSelect: () => {
+        setDialogError('')
+        setDialog({ kind: 'discard', path: entry.path, side })
+      },
+    })
+    items.push({
+      label: untracked ? t('removeUntracked') : t('removeFile'),
+      danger: true,
+      onSelect: () => {
+        setDialogError('')
+        setDialog({ kind: untracked ? 'remove-untracked' : 'remove', path: entry.path })
+      },
+    })
+    items.push({ divider: true })
+    items.push({ label: t('copyPath'), onSelect: () => copyPath(entry) })
+    setContextMenu({ x: event.clientX, y: event.clientY, title: entry.path, items })
+  }
+
+  const refMenu = (record: RefRecord, kind: 'branch' | 'tag', event: any) => {
+    const items: ContextMenuEntry[] =
+      kind === 'tag'
+        ? [
+            { label: t('copyRefName'), onSelect: () => copyText(record.name, t('copiedPath')) },
+            { label: t('history'), onSelect: () => openRef(record, 'tag') },
+          ]
+        : [
+            {
+              label: t('checkout'),
+              disabled: record.current,
+              hint: record.current ? t('currentBranchCannotDelete') : undefined,
+              onSelect: () => void checkout(record.name),
+            },
+            { label: t('renameBranch'), onSelect: () => { setDialogError(''); setDialog({ kind: 'rename', branch: record.name }) } },
+            {
+              label: t('deleteBranch'),
+              danger: true,
+              disabled: record.current,
+              hint: record.current ? t('currentBranchCannotDelete') : undefined,
+              onSelect: () => { setDialogError(''); setDialog({ kind: 'delete', branch: record.name }) },
+            },
+            { divider: true },
+            { label: t('copyRefName'), onSelect: () => copyText(record.name, t('copiedPath')) },
+          ]
+    setContextMenu({ x: event.clientX, y: event.clientY, title: record.name, items })
+  }
+
+  const commitMenu = (commit: HistoryCommit, event: any) => {
+    setContextMenu({
+      x: event.clientX,
+      y: event.clientY,
+      title: commit.sha.slice(0, 12),
+      items: [
+        { label: t('copySha'), onSelect: () => copyText(commit.sha, t('copiedPath')) },
+        {
+          label: t('branchFromCommit'),
+          onSelect: () => {
+            setDialogError('')
+            setDialog({ kind: 'create', start: commit.sha })
+          },
+        },
+        { label: t('copyCommitMessage'), onSelect: () => copyText(commit.subject, t('copiedPath')) },
+      ],
+    })
+  }
+
   const openLocalAction = React.useCallback(
     async (target: OpenTarget) => {
       setOpening(true)
@@ -532,6 +706,24 @@ export function Workspace(props: { t?: Translate }): any {
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null
   const truncated = status?.truncated === true
 
+  const autoSelectRef = React.useRef('')
+  React.useEffect(() => {
+    if (view !== 'status' || status === null) return
+    const key = (repoPath || status.cwd || '') + '|' + (status.oid || '')
+    if (autoSelectRef.current === key) return
+    autoSelectRef.current = key
+    if (selected !== null) return
+    const split = splitEntries(status.entries ?? [])
+    const first = split.conflicted[0] ?? split.staged[0] ?? split.unstaged[0]
+    if (!first) return
+    const side: EntrySide = split.conflicted.includes(first)
+      ? 'conflicted'
+      : split.staged.includes(first)
+        ? 'staged'
+        : 'unstaged'
+    void openDiff(first, side)
+  }, [status, view, selected, repoPath, openDiff])
+
   const renderView = () => {
     switch (view) {
       case 'history':
@@ -551,12 +743,12 @@ export function Workspace(props: { t?: Translate }): any {
           error: historyError,
           scope: historyScope,
           selectedSha: historySha,
-          detail: commitDetail,
-          detailLoading: commitDetailLoading,
-          detailError: commitDetailError,
-          selectedFile: commitFile,
-          fileDiff: commitFileDiff,
-          fileDiffLoading: commitFileDiffLoading,
+          detail: historySha === '' ? null : commitDetail,
+          detailLoading: historySha === '' ? false : commitDetailLoading,
+          detailError: historySha === '' ? '' : commitDetailError,
+          selectedFile: historySha === '' ? '' : commitFile,
+          fileDiff: historySha === '' ? null : commitFileDiff,
+          fileDiffLoading: historySha === '' ? false : commitFileDiffLoading,
           t,
           onScope: (scope: HistoryScope) => {
             setHistoryScope(scope)
@@ -569,6 +761,7 @@ export function Workspace(props: { t?: Translate }): any {
           onSelect: (commit: HistoryCommit) => setHistorySha(commit.sha),
           onSelectFile: (path: string) => void openCommitFile(path),
           onParent: (sha: string) => setHistorySha(sha),
+          onContextMenu: (commit: HistoryCommit, event: any) => commitMenu(commit, event),
           onLoadMore: () => void loadHistory(false),
         })
       case 'status':
@@ -590,6 +783,7 @@ export function Workspace(props: { t?: Translate }): any {
           onSelect: (entry: GitFileEntry, side: EntrySide) => void openDiff(entry, side),
           onToggle: (entry: GitFileEntry, side: EntrySide) => void toggle(entry, side),
           onCopyPath: copyPath,
+          onContextMenu: (entry: GitFileEntry, side: EntrySide, event: any) => fileMenu(entry, side, event),
           onMessage: setMessage,
           onCommit: () => void commit(),
         })
@@ -632,6 +826,7 @@ export function Workspace(props: { t?: Translate }): any {
           onOpenRef: openRef,
           onCheckout: (name: string) => void checkout(name),
           onCopyRef: copyRef,
+          onContextMenu: (record: RefRecord, kind: 'branch' | 'tag', event: any) => refMenu(record, kind, event),
           onCreate: () => {
             setDialogError('')
             setDialog({ kind: 'create' })
@@ -682,6 +877,34 @@ export function Workspace(props: { t?: Translate }): any {
           t,
           onCancel: closeDialog,
           onConfirm: () => void submitDelete(),
+        })
+      : null,
+    contextMenu ? h(ContextMenu, { state: contextMenu, onClose: () => setContextMenu(null) }) : null,
+    dialog?.kind === 'discard'
+      ? h(ConfirmDialog, {
+          title: t('discardTitle'),
+          body: (dialog.path ?? '') + ' — ' + t('discardBody'),
+          submitLabel: t('discardChanges'),
+          busy: dialogBusy,
+          error: dialogError,
+          t,
+          onCancel: closeDialog,
+          onConfirm: () => void submitDiscard(),
+        })
+      : null,
+    dialog?.kind === 'remove' || dialog?.kind === 'remove-untracked'
+      ? h(ConfirmDialog, {
+          title: t('removeTitle'),
+          body:
+            (dialog.path ?? '') +
+            ' — ' +
+            (dialog.kind === 'remove-untracked' ? t('removeUntrackedBody') : t('removeBody')),
+          submitLabel: t('removeFile'),
+          busy: dialogBusy,
+          error: dialogError,
+          t,
+          onCancel: closeDialog,
+          onConfirm: () => void submitRemove(),
         })
       : null,
     toast ? h('div', { className: 'dgt-toast', role: 'status' }, toast) : null,

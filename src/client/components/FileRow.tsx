@@ -1,11 +1,13 @@
-// One row of the change list. Sourcetree's row shape: checkbox, status letter,
-// path (directory muted, name emphasized), and a hover-only menu.
+// One change row: checkbox, status badge, path, and a hover action. The row also
+// answers right-click (and Shift+F10) with the panel context menu.
 
 import { h } from '../react'
 import type { EntrySide, GitFileEntry, Translate } from '../types'
 import { splitPath, statusLetter, statusTone } from '../model'
-import { MoreIcon } from '../icons'
-import { usePopover } from '../menu'
+
+function letterOf(entry: GitFileEntry, side: EntrySide): string {
+  return statusLetter(entry, side)
+}
 
 export function FileRow(props: {
   entry: GitFileEntry
@@ -14,21 +16,22 @@ export function FileRow(props: {
   t: Translate
   onSelect: (entry: GitFileEntry, side: EntrySide) => void
   onToggle: (entry: GitFileEntry, side: EntrySide) => void
-  onCopyPath: (entry: GitFileEntry) => void
+  onContextMenu: (entry: GitFileEntry, side: EntrySide, event: any) => void
 }): any {
-  const popover = usePopover()
-  const menuOpen = popover.open
-  const anchor = menuOpen && popover.triggerRef.current ? popover.triggerRef.current.getBoundingClientRect() : null
-  const menuStyle = anchor ? { position: 'fixed', left: anchor.right + 4, top: anchor.top - 4, right: 'auto' } : undefined
   const entry = props.entry
   const side = props.side
   const t = props.t
-  const letter = statusLetter(entry, side)
+  const letter = letterOf(entry, side)
   const tone = statusTone(letter)
   const { dir, name } = splitPath(entry.path)
   const conflict = side === 'conflicted' || entry.conflicted
   const actionLabel = side === 'staged' ? t('unstageFile') : t('stageFile')
   const title = entry.origPath ? entry.path + ' — ' + t('renameFrom') + ' ' + entry.origPath : entry.path
+
+  const openMenu = (event: any) => {
+    event.preventDefault()
+    props.onContextMenu(entry, side, event)
+  }
 
   return h(
     'div',
@@ -36,15 +39,20 @@ export function FileRow(props: {
       className: 'dgt-row',
       'data-active': props.active || undefined,
       'data-side': side,
-      'data-menu': menuOpen || undefined,
       role: 'button',
       tabIndex: 0,
       title,
       onClick: () => props.onSelect(entry, side),
+      onContextMenu: openMenu,
       onKeyDown: (event: any) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault()
           props.onSelect(entry, side)
+        }
+        if (event.key === 'F10' && event.shiftKey) {
+          event.preventDefault()
+          const rect = event.currentTarget.getBoundingClientRect()
+          props.onContextMenu(entry, side, { clientX: rect.left + 24, clientY: rect.top + 18, preventDefault() {} })
         }
       },
     },
@@ -58,64 +66,26 @@ export function FileRow(props: {
       onClick: (event: any) => event.stopPropagation(),
       onChange: () => props.onToggle(entry, side),
     }),
-    h('span', { className: 'dgt-letter', 'data-tone': tone }, letter),
+    h('span', { className: 'dgt-badge', 'data-tone': tone }, letter),
     h(
       'span',
       { className: 'dgt-path' },
       dir ? h('span', { className: 'dgt-path-dir' }, dir) : null,
       h('span', { className: 'dgt-path-name' }, name),
     ),
-    h(
-      'button',
-      {
-        type: 'button',
-        className: 'dgt-more',
-        'data-open': menuOpen || undefined,
-        title: t('fileActions'),
-        'aria-label': t('fileActions'),
-        ref: popover.triggerRef,
-        onClick: (event: any) => {
-          event.stopPropagation()
-          popover.toggle()
-        },
-      },
-      h(MoreIcon),
-    ),
-    menuOpen
-      ? h(
-          'div',
+    conflict
+      ? h('span', { className: 'dgt-rowact', 'data-disabled': true, title: t('conflictsBlockCommit') }, t('conflict'))
+      : h(
+          'button',
           {
-            className: 'dgt-menu',
-            ref: popover.menuRef,
-            style: menuStyle,
-            'data-flyout': true,
-            onClick: (event: any) => event.stopPropagation(),
-          },
-          conflict
-            ? null
-            : h(
-                'button',
-                {
-                  type: 'button',
-                  onClick: () => {
-                    popover.close()
-                    props.onToggle(entry, side)
-                  },
-                },
-                actionLabel,
-              ),
-          h(
-            'button',
-            {
-              type: 'button',
-              onClick: () => {
-                popover.close()
-                props.onCopyPath(entry)
-              },
+            type: 'button',
+            className: 'dgt-rowact',
+            onClick: (event: any) => {
+              event.stopPropagation()
+              props.onToggle(entry, side)
             },
-            t('copyPath'),
-          ),
-        )
-      : null,
+          },
+          actionLabel,
+        ),
   )
 }

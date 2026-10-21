@@ -21,6 +21,8 @@ const REFS_ROUTE = 'api/git-tree/refs'
 const HISTORY_ROUTE = 'api/git-tree/history'
 const COMMIT_INFO_ROUTE = 'api/git-tree/commit-info'
 const CHECKOUT_ROUTE = 'api/git-tree/checkout'
+const DISCARD_ROUTE = 'api/git-tree/discard'
+const REMOVE_ROUTE = 'api/git-tree/remove'
 const BRANCH_CREATE_ROUTE = 'api/git-tree/branch/create'
 const BRANCH_RENAME_ROUTE = 'api/git-tree/branch/rename'
 const BRANCH_DELETE_ROUTE = 'api/git-tree/branch/delete'
@@ -90,6 +92,14 @@ export function fetchHistory(
   signal?: AbortSignal,
 ): Promise<HistoryPayload> {
   return getJson<HistoryPayload>(HISTORY_ROUTE, params, signal)
+}
+
+export function discardPaths(paths: string[], side: 'staged' | 'unstaged', cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(DISCARD_ROUTE + query({ cwd }), { paths, side })
+}
+
+export function removePaths(paths: string[], untracked: boolean, cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(REMOVE_ROUTE + query({ cwd }), { paths, untracked })
 }
 
 export function checkoutBranch(branch: string, cwd?: string): Promise<MutationPayload> {

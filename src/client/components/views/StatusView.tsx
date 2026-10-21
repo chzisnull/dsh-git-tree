@@ -31,6 +31,7 @@ export function StatusView(props: {
   onSelect: (entry: GitFileEntry, side: EntrySide) => void
   onToggle: (entry: GitFileEntry, side: EntrySide) => void
   onCopyPath: (entry: GitFileEntry) => void
+  onContextMenu: (entry: GitFileEntry, side: EntrySide, event: any) => void
   onMessage: (value: string) => void
   onCommit: () => void
 }): any {
@@ -51,6 +52,7 @@ export function StatusView(props: {
         onSelect: props.onSelect,
         onToggle: props.onToggle,
         onCopyPath: props.onCopyPath,
+        onContextMenu: props.onContextMenu,
       }),
       h(DiffView, {
         selected: props.diffSelection,

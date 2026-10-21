@@ -15,6 +15,7 @@ function Group(props: {
   onSelect: (entry: GitFileEntry, side: EntrySide) => void
   onToggle: (entry: GitFileEntry, side: EntrySide) => void
   onCopyPath: (entry: GitFileEntry) => void
+  onContextMenu: (entry: GitFileEntry, side: EntrySide, event: any) => void
 }): any {
   if (props.rows.length === 0) return null
   return h(
@@ -36,6 +37,7 @@ function Group(props: {
         onSelect: props.onSelect,
         onToggle: props.onToggle,
         onCopyPath: props.onCopyPath,
+        onContextMenu: props.onContextMenu,
       }),
     ),
   )
@@ -50,6 +52,7 @@ export function ChangeList(props: {
   onSelect: (entry: GitFileEntry, side: EntrySide) => void
   onToggle: (entry: GitFileEntry, side: EntrySide) => void
   onCopyPath: (entry: GitFileEntry) => void
+  onContextMenu: (entry: GitFileEntry, side: EntrySide, event: any) => void
 }): any {
   const { status, statusError, rows, t } = props
   const total = (status?.entries ?? []).length
@@ -86,6 +89,7 @@ export function ChangeList(props: {
               onSelect: props.onSelect,
               onToggle: props.onToggle,
               onCopyPath: props.onCopyPath,
+              onContextMenu: props.onContextMenu,
             }),
             h(Group, {
               label: t('stagedFiles'),
@@ -96,6 +100,7 @@ export function ChangeList(props: {
               onSelect: props.onSelect,
               onToggle: props.onToggle,
               onCopyPath: props.onCopyPath,
+              onContextMenu: props.onContextMenu,
             }),
             h(Group, {
               label: t('unstagedFiles'),
@@ -106,6 +111,7 @@ export function ChangeList(props: {
               onSelect: props.onSelect,
               onToggle: props.onToggle,
               onCopyPath: props.onCopyPath,
+              onContextMenu: props.onContextMenu,
             }),
           ),
   )

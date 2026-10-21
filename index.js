@@ -37,10 +37,12 @@ import {
   handleCheckout,
   handleCommit,
   handleCommitInfo,
+  handleDiscard,
   handleDiff,
   handleOpen,
   handleHistory,
   handleRefs,
+  handleRemove,
   handleStage,
   handleStatus,
   handleUnstage,
@@ -73,6 +75,8 @@ const ROUTES = [
   { path: '/api/git-tree/stage', methods: ['POST'], handler: handleStage },
   { path: '/api/git-tree/unstage', methods: ['POST'], handler: handleUnstage },
   { path: '/api/git-tree/commit', methods: ['POST'], handler: handleCommit },
+  { path: '/api/git-tree/discard', methods: ['POST'], handler: handleDiscard },
+  { path: '/api/git-tree/remove', methods: ['POST'], handler: handleRemove },
   { path: '/api/git-tree/open', methods: ['POST'], handler: handleOpen },
 ]
 
