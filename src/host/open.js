@@ -17,7 +17,7 @@ export const OPEN_TARGETS = Object.freeze(['finder', 'terminal'])
  * Finder: `open <cwd>`; Terminal: `open -a Terminal <cwd>`.
  */
 export function openArgv(target, cwd, platform = process.platform) {
-  if (target !== 'finder' && target !== 'terminal') {
+  if (!OPEN_TARGETS.includes(target)) {
     throw new RequestError('未知的打开目标', 400, 'unknown-target')
   }
   if (platform !== 'darwin') {
