@@ -71,6 +71,12 @@ export function Workspace(props: { t?: Translate }): any {
   const [historyError, setHistoryError] = React.useState('')
   const [historyScope, setHistoryScope] = React.useState<HistoryScope>('all')
   const [historySha, setHistorySha] = React.useState('')
+  const [searchQuery, setSearchQuery] = React.useState('')
+  const [searchAuthor, setSearchAuthor] = React.useState('')
+  const [searchPath, setSearchPath] = React.useState('')
+  const [appliedQuery, setAppliedQuery] = React.useState('')
+  const [appliedAuthor, setAppliedAuthor] = React.useState('')
+  const [appliedPath, setAppliedPath] = React.useState('')
   const [commitDetail, setCommitDetail] = React.useState<CommitDetailPayload | null>(null)
   const [commitDetailLoading, setCommitDetailLoading] = React.useState(false)
   const [commitDetailError, setCommitDetailError] = React.useState('')
@@ -157,12 +163,16 @@ export function Workspace(props: { t?: Translate }): any {
       setHistoryLoading(true)
       setHistoryError('')
       const skip = reset ? 0 : historyCommits.length
+      const filtering = view === 'search'
       try {
         const next = await fetchHistory({
           cwd: repoPath || undefined,
           scope: historyScope,
           limit: '200',
           skip: String(skip),
+          ...(filtering && appliedQuery !== '' ? { query: appliedQuery } : {}),
+          ...(filtering && appliedAuthor !== '' ? { author: appliedAuthor } : {}),
+          ...(filtering && appliedPath !== '' ? { path: appliedPath } : {}),
         })
         if (!next.ok) {
           setHistoryError(next.error || t('historyFailed'))
@@ -179,7 +189,7 @@ export function Workspace(props: { t?: Translate }): any {
         setHistoryLoading(false)
       }
     },
-    [historyCommits, historyScope, repoPath, t],
+    [appliedAuthor, appliedPath, appliedQuery, historyCommits, historyScope, repoPath, t, view],
   )
 
   const loadCommitDetail = React.useCallback(
@@ -339,13 +349,30 @@ export function Workspace(props: { t?: Translate }): any {
     }
   }, [afterBranchChange, dialog, historyScope, repoPath, t])
 
-  // Reload whenever the view, repository or branch scope changes.
+  // Debounce the search inputs into applied filters.
   React.useEffect(() => {
-    if (view !== 'history') return
+    if (view !== 'search') return
+    const id = setTimeout(() => {
+      setAppliedQuery(searchQuery.trim())
+      setAppliedAuthor(searchAuthor.trim())
+      setAppliedPath(searchPath.trim())
+    }, 350)
+    return () => clearTimeout(id)
+  }, [view, searchQuery, searchAuthor, searchPath])
+
+  // Reload whenever the view, repository, scope or applied filters change.
+  React.useEffect(() => {
+    if (view !== 'history' && view !== 'search') return
     setHistorySha('')
+    if (view === 'search' && appliedQuery === '' && appliedAuthor === '' && appliedPath === '') {
+      setHistoryCommits([])
+      setHistoryError('')
+      setHistoryLoading(false)
+      return
+    }
     void loadHistory(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, repoPath, historyScope])
+  }, [view, repoPath, historyScope, appliedQuery, appliedAuthor, appliedPath])
 
   // Registered workspaces for the toolbar switcher; restore the last choice.
   React.useEffect(() => {
@@ -508,7 +535,15 @@ export function Workspace(props: { t?: Translate }): any {
   const renderView = () => {
     switch (view) {
       case 'history':
+      case 'search':
         return h(HistoryView, {
+          mode: view === 'search' ? 'search' : 'history',
+          query: searchQuery,
+          author: searchAuthor,
+          path: searchPath,
+          onQuery: setSearchQuery,
+          onAuthor: setSearchAuthor,
+          onPath: setSearchPath,
           commits: historyCommits,
           laneCount: historyLaneCount,
           hasMore: historyHasMore,

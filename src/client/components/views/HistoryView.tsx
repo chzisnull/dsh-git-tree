@@ -158,6 +158,13 @@ export function HistoryView(props: {
   loading: boolean
   error: string
   scope: HistoryScope
+  mode: 'history' | 'search'
+  query: string
+  author: string
+  path: string
+  onQuery: (value: string) => void
+  onAuthor: (value: string) => void
+  onPath: (value: string) => void
   selectedSha: string
   detail: CommitDetailPayload | null
   detailLoading: boolean
@@ -185,6 +192,36 @@ export function HistoryView(props: {
       h(
         'div',
         { className: 'dgt-htoolbar' },
+        props.mode === 'search'
+          ? h(
+              'div',
+              { className: 'dgt-searchbar' },
+              h('input', {
+                className: 'dgt-search-input',
+                value: props.query,
+                placeholder: t('searchPlaceholder'),
+                'aria-label': t('searchPlaceholder'),
+                spellCheck: false,
+                onChange: (event: any) => props.onQuery(event.target.value),
+              }),
+              h('input', {
+                className: 'dgt-search-input dgt-search-narrow',
+                value: props.author,
+                placeholder: t('searchAuthorPlaceholder'),
+                'aria-label': t('searchAuthorPlaceholder'),
+                spellCheck: false,
+                onChange: (event: any) => props.onAuthor(event.target.value),
+              }),
+              h('input', {
+                className: 'dgt-search-input dgt-search-narrow',
+                value: props.path,
+                placeholder: t('searchPathPlaceholder'),
+                'aria-label': t('searchPathPlaceholder'),
+                spellCheck: false,
+                onChange: (event: any) => props.onPath(event.target.value),
+              }),
+            )
+          : null,
         h(
           'div',
           { className: 'dgt-seg', role: 'group' },
@@ -245,7 +282,13 @@ export function HistoryView(props: {
           : props.error !== ''
             ? h('div', { className: 'dgt-placeholder dgt-error' }, props.error)
             : commits.length === 0
-              ? h('div', { className: 'dgt-empty' }, t('noCommits'))
+              ? h(
+                  'div',
+                  { className: 'dgt-empty' },
+                  props.mode === 'search' && props.query.trim() === '' && props.author.trim() === '' && props.path.trim() === ''
+                    ? t('searchEmptyPrompt')
+                    : t('noCommits'),
+                )
               : h(
                   'div',
                   { className: 'dgt-hlist' },
