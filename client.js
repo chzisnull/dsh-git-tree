@@ -73,6 +73,13 @@ var EN = {
   mergeBody: "will be merged into the current branch. Conflicts, if any, stay in the change list.",
   mergeSelfHint: "The current branch cannot merge into itself",
   merged: "Merged",
+  push: "Push",
+  pushTitle: "Push branch",
+  pushBody: "will be pushed to its upstream. Nothing is forced.",
+  pushAfterCommit: "Push after commit",
+  pushed: "Pushed",
+  pushFailed: "Push failed",
+  pushNoRemote: "This repository has no remote configured",
   mergeFailed: "Merge failed",
   checkedOut: "Checked out",
   copyRefName: "Copy name",
@@ -204,6 +211,13 @@ var ZH = {
   mergeBody: "\u5C06\u5408\u5E76\u5230\u5F53\u524D\u5206\u652F\uFF1B\u82E5\u6709\u51B2\u7A81\uFF0C\u51B2\u7A81\u6587\u4EF6\u4F1A\u7559\u5728\u6539\u52A8\u5217\u8868\u91CC\u3002",
   mergeSelfHint: "\u5F53\u524D\u5206\u652F\u4E0D\u80FD\u5408\u5E76\u5230\u81EA\u8EAB",
   merged: "\u5DF2\u5408\u5E76",
+  push: "\u63A8\u9001",
+  pushTitle: "\u63A8\u9001\u5206\u652F",
+  pushBody: "\u5C06\u63A8\u9001\u5230\u5B83\u7684 upstream\uFF0C\u4E0D\u4F1A force\u3002",
+  pushAfterCommit: "\u63D0\u4EA4\u540E\u7ACB\u5373\u63A8\u9001",
+  pushed: "\u5DF2\u63A8\u9001",
+  pushFailed: "\u63A8\u9001\u5931\u8D25",
+  pushNoRemote: "\u5F53\u524D\u4ED3\u5E93\u6CA1\u6709\u914D\u7F6E\u8FDC\u7AEF",
   mergeFailed: "\u5408\u5E76\u5931\u8D25",
   checkedOut: "\u5DF2\u68C0\u51FA",
   copyRefName: "\u590D\u5236\u540D\u79F0",
@@ -590,6 +604,8 @@ var CSS = `
   color:var(--dsw-alias-label-primary);font:inherit;font-size:12.5px;line-height:19px;}
 .dgt-commit-input:focus{outline:none;border-color:var(--dgt-accent);}
 .dgt-commit-input::placeholder{color:var(--dsw-alias-label-tertiary);}
+.dgt-commit-check{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dsw-alias-label-secondary);cursor:pointer;}
+.dgt-commit-check input{accent-color:var(--dgt-accent-strong);margin:0;width:13px;height:13px;}
 .dgt-commit-foot{display:flex;align-items:center;gap:10px;}
 .dgt-hint{flex:1 1 auto;min-width:0;color:var(--dsw-alias-label-tertiary);font-size:10.5px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -661,6 +677,7 @@ var CHECKOUT_ROUTE = "api/git-tree/checkout";
 var DISCARD_ROUTE = "api/git-tree/discard";
 var REMOVE_ROUTE = "api/git-tree/remove";
 var MERGE_ROUTE = "api/git-tree/merge";
+var PUSH_ROUTE = "api/git-tree/push";
 var BRANCH_CREATE_ROUTE = "api/git-tree/branch/create";
 var BRANCH_RENAME_ROUTE = "api/git-tree/branch/rename";
 var BRANCH_DELETE_ROUTE = "api/git-tree/branch/delete";
@@ -708,6 +725,9 @@ function fetchCommitInfo(params, signal) {
 }
 function fetchHistory(params, signal) {
   return getJson(HISTORY_ROUTE, params, signal);
+}
+function pushBranch(cwd) {
+  return postJson(PUSH_ROUTE + query({ cwd }), {});
 }
 function mergeBranch(branch, cwd) {
   return postJson(MERGE_ROUTE + query({ cwd }), { branch });
@@ -812,6 +832,12 @@ function CommitIcon() {
   return svg([
     h("circle", { cx: 8, cy: 8, r: 4.2, fill: "none", stroke: "currentColor", strokeWidth: 1.3 }),
     h("path", { d: "M8 1.4v2.4M8 12.2v2.4", fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round" })
+  ]);
+}
+function PushIcon() {
+  return svg([
+    h("path", { d: "M8 13V3.4", fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round" }),
+    h("path", { d: "M4.8 6.4 8 3.2l3.2 3.2", fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round" })
   ]);
 }
 function BranchIcon() {
@@ -985,6 +1011,18 @@ function TopBar(props) {
     h(
       "div",
       { className: "dgt-actions" },
+      h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-iconbtn",
+          title: props.canPush ? t("push") : t("pushNoRemote"),
+          "aria-label": t("push"),
+          disabled: !props.canPush || props.busy,
+          onClick: props.onPush
+        },
+        h(PushIcon)
+      ),
       h(
         "button",
         {
@@ -1562,6 +1600,16 @@ function CommitBox(props) {
         }
       }
     }),
+    props.canPush ? h(
+      "label",
+      { className: "dgt-commit-check" },
+      h("input", {
+        type: "checkbox",
+        checked: props.pushAfter,
+        onChange: (event) => props.onPushAfter(event.target.checked)
+      }),
+      h("span", null, t("pushAfterCommit"))
+    ) : null,
     h(
       "div",
       { className: "dgt-commit-foot" },
@@ -1630,6 +1678,9 @@ function StatusView(props) {
           hintTone: props.actionError ? "error" : "muted",
           t,
           inputRef: props.commitInputRef,
+          canPush: props.canPush,
+          pushAfter: props.pushAfter,
+          onPushAfter: props.onPushAfter,
           onMessage: props.onMessage,
           onCommit: props.onCommit
         })
@@ -2121,6 +2172,7 @@ function Workspace(props) {
   const [commitFileDiffLoading, setCommitFileDiffLoading] = React.useState(false);
   const [dialog, setDialog] = React.useState(null);
   const [contextMenu, setContextMenu] = React.useState(null);
+  const [pushAfter, setPushAfter] = React.useState(false);
   const [dialogBusy, setDialogBusy] = React.useState(false);
   const [dialogError, setDialogError] = React.useState("");
   const [statusError, setStatusError] = React.useState("");
@@ -2563,6 +2615,23 @@ function Workspace(props) {
       setDialogBusy(false);
     }
   }, [closeDialog, dialog?.kind, dialog?.path, loadStatus, repoPath, showToast, t]);
+  const submitPush = React.useCallback(async () => {
+    setDialogBusy(true);
+    setDialogError("");
+    try {
+      const result = await pushBranch(repoPath || void 0);
+      if (!result.ok) throw new Error(result.error || t("pushFailed"));
+      closeDialog();
+      showToast(t("pushed") + " \xB7 " + (result.upstream || status?.branch || ""));
+      await loadStatus();
+      await loadRefs();
+      if (view !== "status") await loadHistory(true);
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDialogBusy(false);
+    }
+  }, [closeDialog, loadHistory, loadRefs, loadStatus, repoPath, showToast, status?.branch, t, view]);
   const submitMerge = React.useCallback(async () => {
     const branch = dialog?.branch ?? "";
     setDialogBusy(true);
@@ -2708,10 +2777,18 @@ function Workspace(props) {
     try {
       const result = await commitChanges(message, repoPath || void 0);
       if (!result.ok) throw new Error(result.error || t("commitFailed"));
-      showToast([t("commitDone"), result.shortSha, result.subject].filter(Boolean).join(" \xB7 "));
+      const receipt = [t("commitDone"), result.shortSha, result.subject].filter(Boolean).join(" \xB7 ");
       setMessage("");
       setSelected(null);
       setDiff(null);
+      if (pushAfter) {
+        const pushed = await pushBranch(repoPath || void 0);
+        showToast(
+          pushed.ok ? receipt + " \xB7 " + t("pushed") : receipt + " \xB7 " + t("pushFailed") + "\uFF1A" + (pushed.error || "")
+        );
+      } else {
+        showToast(receipt);
+      }
       await loadStatus();
       await loadRefs();
     } catch (error) {
@@ -2719,7 +2796,7 @@ function Workspace(props) {
     } finally {
       setBusy(false);
     }
-  }, [loadRefs, loadStatus, message, repoPath, showToast, status, t]);
+  }, [loadRefs, loadStatus, message, pushAfter, repoPath, showToast, status, t]);
   const switchWorkspace = React.useCallback((path) => {
     setRepoPath(path);
     try {
@@ -2740,6 +2817,7 @@ function Workspace(props) {
   const selectedEntry = selected ? findEntry(status, selected.path) : null;
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null;
   const truncated = status?.truncated === true;
+  const canPush = (refs?.remotes?.length ?? 0) > 0;
   const autoSelectRef = React.useRef("");
   React.useEffect(() => {
     if (view !== "status" || status === null) return;
@@ -2814,6 +2892,9 @@ function Workspace(props) {
           onToggle: (entry, side) => void toggle(entry, side),
           onCopyPath: copyPath,
           onContextMenu: (entry, side, event) => fileMenu(entry, side, event),
+          canPush,
+          pushAfter,
+          onPushAfter: setPushAfter,
           onMessage: setMessage,
           onCommit: () => void commit()
         });
@@ -2832,6 +2913,11 @@ function Workspace(props) {
       onRefresh: () => void loadStatus(),
       onOpen: (target) => void openLocalAction(target),
       onSelectWorkspace: switchWorkspace,
+      canPush,
+      onPush: () => {
+        setDialogError("");
+        setDialog({ kind: "push" });
+      },
       onCommitFocus: () => {
         if (commitInput.current && commitInput.current.focus) commitInput.current.focus();
       }
@@ -2902,6 +2988,16 @@ function Workspace(props) {
       onConfirm: () => void submitDelete()
     }) : null,
     contextMenu ? h(ContextMenu, { state: contextMenu, onClose: () => setContextMenu(null) }) : null,
+    dialog?.kind === "push" ? h(ConfirmDialog, {
+      title: t("pushTitle"),
+      body: (status?.branch || "\u2014") + " \u2192 " + (status?.upstream || "origin/" + (status?.branch || "")) + " \xB7 " + String(status?.ahead ?? 0) + " " + t("ahead") + " \xB7 " + t("pushBody"),
+      submitLabel: t("push"),
+      busy: dialogBusy,
+      error: dialogError,
+      t,
+      onCancel: closeDialog,
+      onConfirm: () => void submitPush()
+    }) : null,
     dialog?.kind === "merge" ? h(ConfirmDialog, {
       title: t("mergeTitle"),
       body: (dialog.branch ?? "") + " \u2014 " + t("mergeBody") + " (" + (status?.branch || "\u2014") + ")",

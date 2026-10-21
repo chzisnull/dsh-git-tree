@@ -25,6 +25,13 @@ export function CommitIcon(): any {
   ])
 }
 
+export function PushIcon(): any {
+  return svg([
+    h('path', { d: 'M8 13V3.4', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round' }),
+    h('path', { d: 'M4.8 6.4 8 3.2l3.2 3.2', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+  ])
+}
+
 export function BranchIcon(): any {
   return svg([
     h('path', { d: 'M4.5 3v6.2a2.6 2.6 0 0 0 2.6 2.6h3.4', fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round' }),

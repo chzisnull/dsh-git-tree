@@ -8,7 +8,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.5.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel. Remotes are out of scope on purpose.
+Version 0.6.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel. Remotes are out of scope on purpose.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Repository switcher** in the toolbar: pick any workspace registered in DSH; every route then runs against that repository.
@@ -21,13 +21,15 @@ Version 0.5.0 is the **local workbench slice**: file status, history, search and
 - **Search view**: find commits by message, author or file path; results reuse the history list and detail.
 - **Branches**: click a branch to browse its history, double-click to check out; create, rename and delete local branches from the rail. Checkout refuses a dirty working copy instead of stashing your changes.
 - **Right-click actions**: file rows offer commit (stage + focus the message), stage/unstage, discard changes, delete file / delete untracked file and copy path; branch rows offer checkout, rename, delete and copy name; commit rows offer copy SHA, new branch from this commit and copy message. Destructive items confirm first and only live items are red.
+- **Push**: push the current branch to its upstream (setting the upstream on first push). Never forces; authentication and non-fast-forward failures are translated into readable next steps.
+- **Commit and push**: a checkbox in the commit card pushes right after a successful commit. A failed push never rolls the commit back.
 - **Local actions**: reveal the repository in Finder or open it in Terminal (macOS).
 - **Live**: the panel polls status every 2s while visible and refetches immediately after a write.
 - **Small write surface by construction**: file-level stage, unstage and commit only. No `reset --hard`, no push, no amend, no discard route exists.
 
 ## Status
 
-| Area | 0.5.0 |
+| Area | 0.6.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | repository switcher (DSH workspaces) | done |
@@ -41,6 +43,7 @@ Version 0.5.0 is the **local workbench slice**: file status, history, search and
 | branch navigation + checkout | done |
 | branch create / rename / delete | done |
 | right-click actions + discard / delete | done |
+| push / commit and push | done |
 | Finder / Terminal | done |
 | auto refresh | done |
 | right-sidebar tab (compact mode) | not yet |
@@ -80,6 +83,7 @@ POST /api/git-tree/commit                  → { message } → { sha, shortSha, 
 POST /api/git-tree/checkout                → { branch } → refuses a dirty work tree
 POST /api/git-tree/branch/create|rename|delete
 POST /api/git-tree/open                    → { target: 'finder' | 'terminal' }
+POST /api/git-tree/push                    → current branch → its upstream (no force)
 POST /api/git-tree/discard                 → { paths[], side } → git restore
 POST /api/git-tree/remove                  → { paths[], untracked } → git rm / git clean
 ```
@@ -115,7 +119,7 @@ Restart DSH after installing: the host half is mounted at app startup. Nothing i
 ```sh
 node build.mjs     # src/client/index.tsx → client.js (committed artifact)
 npm run check      # node --check on both halves
-npm test           # 70 assertions: manifest, host routes, parsers, client boot, import guard
+npm test           # 78 assertions: manifest, host routes, parsers, client boot, import guard
 ```
 
 `build.mjs` resolves esbuild from this package's `node_modules`, then from an installed `dsh-workbench`; if neither is present it stops with the exact command to fix that (`npm i -D esbuild`).

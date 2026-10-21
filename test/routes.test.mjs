@@ -67,7 +67,11 @@ const NAME_STATUS_FIXTURE = ['M\tsrc/app.js', 'A\tdocs/new.md', 'R100\told.md\tn
 function defaultResult(argv) {
   const command = argv[1]
   if (command === 'status') return { exitCode: 0, stdout: STATUS_FIXTURE, stderr: '' }
-  if (command === 'rev-parse') return { exitCode: 0, stdout: WORKSPACE + '\n', stderr: '' }
+  if (command === 'rev-parse') {
+    if (argv.includes('@{u}')) return { exitCode: 128, stdout: '', stderr: 'no upstream configured' }
+    return { exitCode: 0, stdout: WORKSPACE + '\n', stderr: '' }
+  }
+  if (command === 'remote') return { exitCode: 0, stdout: 'origin\n', stderr: '' }
   if (command === 'config') {
     return { exitCode: 0, stdout: 'user.name Fixture Dev\nuser.email fixture@example.com\n', stderr: '' }
   }
@@ -156,7 +160,7 @@ test('host plugin declares its name and hard service dependencies', () => {
   assert.deepEqual(inject, ['connection', 'subprocess'])
 })
 
-test('apply registers the seventeen authenticated exact Fetch routes', () => {
+test('apply registers the eighteen authenticated exact Fetch routes', () => {
   const ctx = fakeContext()
   apply(ctx)
 
@@ -174,6 +178,7 @@ test('apply registers the seventeen authenticated exact Fetch routes', () => {
       '/api/git-tree/history',
       '/api/git-tree/merge',
       '/api/git-tree/open',
+      '/api/git-tree/push',
       '/api/git-tree/refs',
       '/api/git-tree/remove',
       '/api/git-tree/stage',
@@ -194,6 +199,7 @@ test('apply registers the seventeen authenticated exact Fetch routes', () => {
       '/api/git-tree/remove',
       '/api/git-tree/merge',
       '/api/git-tree/open',
+      '/api/git-tree/push',
       '/api/git-tree/branch/create',
       '/api/git-tree/branch/rename',
       '/api/git-tree/branch/delete',
@@ -688,13 +694,24 @@ test('merge merges a local branch into the current one, unicode names included',
   assert.deepEqual(mergeCall.argv.slice(1), ['merge', '--no-edit', 'feature-chz-ui改版'])
 })
 
-test('merge refuses a dirty work tree, a self merge and an unknown branch', async () => {
-  const dirty = fakeContext()
+test('merge lets git decide about local changes, refuses self and unknown', async () => {
+  const dirty = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'merge') {
+        return {
+          exitCode: 2,
+          stdout: '',
+          stderr: 'error: Your local changes to the following files would be overwritten by merge:\n\tsrc/app.js\nPlease commit your changes or stash them before you merge.\nAborting',
+        }
+      }
+      return defaultResult(argv)
+    },
+  })
   apply(dirty)
   const refused = await call(dirty, '/api/git-tree/merge', { method: 'POST', body: { branch: 'topic' } })
   assert.equal(refused.response.status, 409)
   assert.equal(refused.body.code, 'dirty-worktree')
-  assert.equal(dirty.spawns.filter((spawn) => spawn.argv[1] === 'merge').length, 0)
+  assert.equal(dirty.spawns.filter((spawn) => spawn.argv[1] === 'merge').length, 1, 'git runs and decides')
 
   const self = fakeContext()
   apply(self)
@@ -734,6 +751,85 @@ test('branch names may contain unicode but not characters git forbids', () => {
   for (const bad of ['a b', 'x~1', 'a..b', 'a:b', 'x.lock', '-rf', '@']) {
     assert.equal(isSafeBranchName(bad), false, bad)
   }
+})
+
+test('push uses the upstream when one exists and never forces', async () => {
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'rev-parse' && argv.includes('@{u}')) return { exitCode: 0, stdout: 'origin/main\n', stderr: '' }
+      if (argv[1] === 'push') return { exitCode: 0, stdout: 'Everything up-to-date', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/push', { method: 'POST', body: {} })
+  assert.equal(body.ok, true)
+  assert.equal(body.branch, 'main')
+  const push = ctx.spawns.find((spawn) => spawn.argv[1] === 'push')
+  assert.deepEqual(push.argv.slice(1), ['push'])
+  assert.ok(!push.argv.includes('--force'))
+})
+
+test('push sets the upstream when the branch has none', async () => {
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'push') return { exitCode: 0, stdout: '', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/push', { method: 'POST', body: {} })
+  assert.equal(body.ok, true)
+  const push = ctx.spawns.find((spawn) => spawn.argv[1] === 'push')
+  assert.deepEqual(push.argv.slice(1), ['push', '-u', 'origin', 'main'])
+})
+
+test('push refuses without a remote or on a detached head', async () => {
+  const noRemote = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'remote') return { exitCode: 0, stdout: '', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(noRemote)
+  const { body } = await call(noRemote, '/api/git-tree/push', { method: 'POST', body: {} })
+  assert.equal(body.code, 'no-remote')
+  assert.equal(noRemote.spawns.filter((spawn) => spawn.argv[1] === 'push').length, 0)
+
+  const detached = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'symbolic-ref') return { exitCode: 1, stdout: '', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(detached)
+  const result = await call(detached, '/api/git-tree/push', { method: 'POST', body: {} })
+  assert.equal(result.body.code, 'detached-head')
+})
+
+test('push translates authentication and non-fast-forward failures', async () => {
+  const auth = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'push') return { exitCode: 128, stdout: '', stderr: 'fatal: Authentication failed for https://example/repo.git' }
+      return defaultResult(argv)
+    },
+  })
+  apply(auth)
+  const authResult = await call(auth, '/api/git-tree/push', { method: 'POST', body: {} })
+  assert.equal(authResult.response.status, 409)
+  assert.equal(authResult.body.code, 'auth-failed')
+
+  const behind = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'push') {
+        return { exitCode: 1, stdout: '', stderr: '! [rejected] main -> main (non-fast-forward)\nhint: Updates were rejected because the tip of your current branch is behind' }
+      }
+      return defaultResult(argv)
+    },
+  })
+  apply(behind)
+  const behindResult = await call(behind, '/api/git-tree/push', { method: 'POST', body: {} })
+  assert.equal(behindResult.body.code, 'non-fast-forward')
 })
 
 test('refs route parses branches, remotes and tags and marks the current branch', async () => {

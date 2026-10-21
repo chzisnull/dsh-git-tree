@@ -384,18 +384,8 @@ export async function handleMerge(ctx, request) {
     throw new RequestError('分支不存在', 404, 'unknown-branch')
   }
 
-  const statusText = await git(
-    subprocess,
-    ['status', '--porcelain=v2', '--branch', '--untracked-files=all', '-z'],
-    cwd,
-    { maxBytes: MAX_STATUS_BYTES },
-  )
-  const dirty = parsePorcelainV2(statusText).entries.some(
-    (entry) =>
-      entry.kind !== 'untracked' && entry.kind !== 'ignored' && (entry.staged || entry.unstaged || entry.conflicted),
-  )
-  if (dirty) throw new RequestError('有未提交改动，先提交或贮藏再合并', 409, 'dirty-worktree')
-
+  // git merges happily when local edits do not overlap the merge; only refuse
+  // (with git's own reason) when the merge would overwrite uncommitted work.
   try {
     await git(subprocess, ['merge', '--no-edit', branch], cwd, { maxBytes: MAX_DIFF_BYTES })
   } catch (error) {
@@ -403,9 +393,74 @@ export async function handleMerge(ctx, request) {
     if (/CONFLICT|Automatic merge failed|fix conflicts/i.test(detail)) {
       throw new RequestError('合并产生冲突，冲突文件已列在改动里', 409, 'merge-conflict')
     }
+    if (/commit your changes or stash|would be overwritten|not possible because you have unmerged/i.test(detail)) {
+      throw new RequestError('本地改动会被这次合并覆盖，先提交或贮藏再合并', 409, 'dirty-worktree')
+    }
     throw error
   }
   return json({ ok: true, branch, current })
+}
+
+/** Current upstream as `<remote>/<branch>`, or '' when the branch has none. */
+async function readUpstream(subprocess, cwd) {
+  try {
+    const out = await git(subprocess, ['rev-parse', '--abbrev-ref', '--symbolic-full-name', '@{u}'], cwd, {
+      maxBytes: 8 * 1024,
+    })
+    return out.trim()
+  } catch {
+    return ''
+  }
+}
+
+async function readRemotes(subprocess, cwd) {
+  try {
+    const out = await git(subprocess, ['remote'], cwd, { maxBytes: 16 * 1024 })
+    return out
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Push the current branch. With an upstream, a plain `git push`; without one,
+ * `push -u <remote> <branch>` so the next push is a no-argument one. Never
+ * forces and never pushes other branches.
+ */
+export async function handlePush(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const subprocess = subprocessOf(ctx)
+
+  const current = await currentBranchOf(subprocess, cwd)
+  if (current === '') throw new RequestError('当前处于分离头指针状态，无法推送', 409, 'detached-head')
+
+  const remotes = await readRemotes(subprocess, cwd)
+  if (remotes.length === 0) throw new RequestError('当前仓库没有配置远端', 409, 'no-remote')
+
+  const upstream = await readUpstream(subprocess, cwd)
+  const remote = upstream ? upstream.split('/')[0] : remotes.includes('origin') ? 'origin' : remotes[0]
+  const argv = upstream ? ['push'] : ['push', '-u', remote, current]
+
+  try {
+    await git(subprocess, argv, cwd, { maxBytes: MAX_DIFF_BYTES, timeoutMs: 60_000 })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    if (/Authentication failed|could not read Username|terminal prompts disabled|Permission denied|HTTP 40[13]/i.test(detail)) {
+      throw new RequestError('推送需要认证：请先在终端登录一次，再回来重试', 409, 'auth-failed')
+    }
+    if (/Updates were rejected|non-fast-forward|fetch first/i.test(detail)) {
+      throw new RequestError('远端有新提交，先拉取或合并后再推送', 409, 'non-fast-forward')
+    }
+    if (/no upstream branch|set-upstream/i.test(detail)) {
+      throw new RequestError('当前分支没有 upstream，推送一次后会自动建立', 409, 'no-upstream')
+    }
+    throw error
+  }
+
+  return json({ ok: true, branch: current, upstream: upstream || remote + '/' + current })
 }
 
 export async function handleRefs(ctx, request) {

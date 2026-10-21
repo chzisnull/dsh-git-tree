@@ -24,6 +24,7 @@ const CHECKOUT_ROUTE = 'api/git-tree/checkout'
 const DISCARD_ROUTE = 'api/git-tree/discard'
 const REMOVE_ROUTE = 'api/git-tree/remove'
 const MERGE_ROUTE = 'api/git-tree/merge'
+const PUSH_ROUTE = 'api/git-tree/push'
 const BRANCH_CREATE_ROUTE = 'api/git-tree/branch/create'
 const BRANCH_RENAME_ROUTE = 'api/git-tree/branch/rename'
 const BRANCH_DELETE_ROUTE = 'api/git-tree/branch/delete'
@@ -93,6 +94,10 @@ export function fetchHistory(
   signal?: AbortSignal,
 ): Promise<HistoryPayload> {
   return getJson<HistoryPayload>(HISTORY_ROUTE, params, signal)
+}
+
+export function pushBranch(cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(PUSH_ROUTE + query({ cwd }), {})
 }
 
 export function mergeBranch(branch: string, cwd?: string): Promise<MutationPayload> {

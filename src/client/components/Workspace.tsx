@@ -22,6 +22,7 @@ import {
   commitChanges,
   discardPaths,
   mergeBranch,
+  pushBranch,
   createBranch,
   deleteBranch,
   renameBranch,
@@ -90,13 +91,14 @@ export function Workspace(props: { t?: Translate }): any {
   const [commitFileDiffLoading, setCommitFileDiffLoading] = React.useState(false)
 
   const [dialog, setDialog] = React.useState<{
-    kind: 'create' | 'rename' | 'delete' | 'discard' | 'remove' | 'remove-untracked' | 'merge'
+    kind: 'create' | 'rename' | 'delete' | 'discard' | 'remove' | 'remove-untracked' | 'merge' | 'push'
     branch?: string
     start?: string
     path?: string
     side?: EntrySide
   } | null>(null)
   const [contextMenu, setContextMenu] = React.useState<ContextMenuState | null>(null)
+  const [pushAfter, setPushAfter] = React.useState(false)
   const [dialogBusy, setDialogBusy] = React.useState(false)
   const [dialogError, setDialogError] = React.useState('')
   const [statusError, setStatusError] = React.useState('')
@@ -585,6 +587,24 @@ export function Workspace(props: { t?: Translate }): any {
     }
   }, [closeDialog, dialog?.kind, dialog?.path, loadStatus, repoPath, showToast, t])
 
+  const submitPush = React.useCallback(async () => {
+    setDialogBusy(true)
+    setDialogError('')
+    try {
+      const result = await pushBranch(repoPath || undefined)
+      if (!result.ok) throw new Error(result.error || t('pushFailed'))
+      closeDialog()
+      showToast(t('pushed') + ' · ' + (result.upstream || status?.branch || ''))
+      await loadStatus()
+      await loadRefs()
+      if (view !== 'status') await loadHistory(true)
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setDialogBusy(false)
+    }
+  }, [closeDialog, loadHistory, loadRefs, loadStatus, repoPath, showToast, status?.branch, t, view])
+
   const submitMerge = React.useCallback(async () => {
     const branch = dialog?.branch ?? ''
     setDialogBusy(true)
@@ -729,10 +749,18 @@ export function Workspace(props: { t?: Translate }): any {
     try {
       const result = await commitChanges(message, repoPath || undefined)
       if (!result.ok) throw new Error(result.error || t('commitFailed'))
-      showToast([t('commitDone'), result.shortSha, result.subject].filter(Boolean).join(' · '))
+      const receipt = [t('commitDone'), result.shortSha, result.subject].filter(Boolean).join(' · ')
       setMessage('')
       setSelected(null)
       setDiff(null)
+      if (pushAfter) {
+        const pushed = await pushBranch(repoPath || undefined)
+        showToast(
+          pushed.ok ? receipt + ' · ' + t('pushed') : receipt + ' · ' + t('pushFailed') + '：' + (pushed.error || ''),
+        )
+      } else {
+        showToast(receipt)
+      }
       await loadStatus()
       await loadRefs()
     } catch (error) {
@@ -740,7 +768,7 @@ export function Workspace(props: { t?: Translate }): any {
     } finally {
       setBusy(false)
     }
-  }, [loadRefs, loadStatus, message, repoPath, showToast, status, t])
+  }, [loadRefs, loadStatus, message, pushAfter, repoPath, showToast, status, t])
 
   const switchWorkspace = React.useCallback((path: string) => {
     setRepoPath(path)
@@ -764,6 +792,7 @@ export function Workspace(props: { t?: Translate }): any {
   const selectedEntry = selected ? findEntry(status, selected.path) : null
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null
   const truncated = status?.truncated === true
+  const canPush = (refs?.remotes?.length ?? 0) > 0
 
   const autoSelectRef = React.useRef('')
   React.useEffect(() => {
@@ -851,6 +880,9 @@ export function Workspace(props: { t?: Translate }): any {
           onToggle: (entry: GitFileEntry, side: EntrySide) => void toggle(entry, side),
           onCopyPath: copyPath,
           onContextMenu: (entry: GitFileEntry, side: EntrySide, event: any) => fileMenu(entry, side, event),
+          canPush,
+          pushAfter,
+          onPushAfter: setPushAfter,
           onMessage: setMessage,
           onCommit: () => void commit(),
         })
@@ -870,6 +902,11 @@ export function Workspace(props: { t?: Translate }): any {
       onRefresh: () => void loadStatus(),
       onOpen: (target: OpenTarget) => void openLocalAction(target),
       onSelectWorkspace: switchWorkspace,
+      canPush,
+      onPush: () => {
+        setDialogError('')
+        setDialog({ kind: 'push' })
+      },
       onCommitFocus: () => {
         if (commitInput.current && commitInput.current.focus) commitInput.current.focus()
       },
@@ -951,6 +988,27 @@ export function Workspace(props: { t?: Translate }): any {
         })
       : null,
     contextMenu ? h(ContextMenu, { state: contextMenu, onClose: () => setContextMenu(null) }) : null,
+    dialog?.kind === 'push'
+      ? h(ConfirmDialog, {
+          title: t('pushTitle'),
+          body:
+            (status?.branch || '—') +
+            ' → ' +
+            (status?.upstream || 'origin/' + (status?.branch || '')) +
+            ' · ' +
+            String(status?.ahead ?? 0) +
+            ' ' +
+            t('ahead') +
+            ' · ' +
+            t('pushBody'),
+          submitLabel: t('push'),
+          busy: dialogBusy,
+          error: dialogError,
+          t,
+          onCancel: closeDialog,
+          onConfirm: () => void submitPush(),
+        })
+      : null,
     dialog?.kind === 'merge'
       ? h(ConfirmDialog, {
           title: t('mergeTitle'),

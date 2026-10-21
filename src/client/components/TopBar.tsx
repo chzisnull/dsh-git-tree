@@ -7,7 +7,7 @@ import { h, React } from '../react'
 import type { GitStatusPayload, OpenTarget, Translate, WorkspaceRecord } from '../types'
 import { lastSegment } from '../model'
 import { Chip } from './atoms'
-import { CommitIcon, FolderIcon, RefreshIcon, TerminalIcon } from '../icons'
+import { CommitIcon, FolderIcon, PushIcon, RefreshIcon, TerminalIcon } from '../icons'
 import { usePopover } from '../menu'
 
 export function TopBar(props: {
@@ -113,6 +113,18 @@ export function TopBar(props: {
     h(
       'div',
       { className: 'dgt-actions' },
+      h(
+        'button',
+        {
+          type: 'button',
+          className: 'dgt-iconbtn',
+          title: props.canPush ? t('push') : t('pushNoRemote'),
+          'aria-label': t('push'),
+          disabled: !props.canPush || props.busy,
+          onClick: props.onPush,
+        },
+        h(PushIcon),
+      ),
       h(
         'button',
         {

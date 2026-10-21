@@ -34,6 +34,9 @@ export function StatusView(props: {
   onContextMenu: (entry: GitFileEntry, side: EntrySide, event: any) => void
   onMessage: (value: string) => void
   onCommit: () => void
+  canPush: boolean
+  pushAfter: boolean
+  onPushAfter: (value: boolean) => void
 }): any {
   const { t } = props
 
@@ -75,6 +78,9 @@ export function StatusView(props: {
           hintTone: props.actionError ? 'error' : 'muted',
           t,
           inputRef: props.commitInputRef,
+          canPush: props.canPush,
+          pushAfter: props.pushAfter,
+          onPushAfter: props.onPushAfter,
           onMessage: props.onMessage,
           onCommit: props.onCommit,
         }),

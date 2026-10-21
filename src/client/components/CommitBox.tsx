@@ -21,6 +21,9 @@ export function CommitBox(props: {
   onMessage: (value: string) => void
   onCommit: () => void
   inputRef?: any
+  canPush: boolean
+  pushAfter: boolean
+  onPushAfter: (value: boolean) => void
 }): any {
   const { status, t } = props
   const identity = status?.identity
@@ -72,6 +75,18 @@ export function CommitBox(props: {
         }
       },
     }),
+    props.canPush
+      ? h(
+          'label',
+          { className: 'dgt-commit-check' },
+          h('input', {
+            type: 'checkbox',
+            checked: props.pushAfter,
+            onChange: (event: any) => props.onPushAfter(event.target.checked),
+          }),
+          h('span', null, t('pushAfterCommit')),
+        )
+      : null,
     h(
       'div',
       { className: 'dgt-commit-foot' },
