@@ -3,7 +3,7 @@
 // commit box). The two local open actions only exist on macOS; elsewhere they
 // are not rendered at all rather than shown as dead buttons.
 
-import { h } from '../react'
+import { h, React } from '../react'
 import type { GitStatusPayload, OpenTarget, Translate, WorkspaceRecord } from '../types'
 import { lastSegment } from '../model'
 import { Chip } from './atoms'
@@ -25,6 +25,12 @@ export function TopBar(props: {
   const { status, t } = props
   const popover = usePopover()
   const open = popover.open
+  const [filter, setFilter] = React.useState('')
+  const visible = props.workspaces.filter((workspace) => {
+    const needle = filter.trim().toLowerCase()
+    if (needle === '') return true
+    return (workspace.title + ' ' + workspace.path).toLowerCase().includes(needle)
+  })
   const branch = status?.branch && status.branch !== '(detached)' ? status.branch : status?.branch || '—'
   const ahead = status?.ahead ?? 0
   const behind = status?.behind ?? 0
@@ -58,9 +64,18 @@ export function TopBar(props: {
         ? h(
             'div',
             { className: 'dgt-repo-menu', role: 'listbox', 'aria-label': t('switchRepository'), ref: popover.menuRef },
-            props.workspaces.length === 0
+            h('input', {
+              className: 'dgt-repo-filter',
+              value: filter,
+              placeholder: t('repoFilter'),
+              'aria-label': t('repoFilter'),
+              spellCheck: false,
+              autoFocus: true,
+              onChange: (event: any) => setFilter(event.target.value),
+            }),
+            visible.length === 0
               ? h('div', { className: 'dgt-repo-menu-empty' }, t('noRepositories'))
-              : props.workspaces.map((workspace) =>
+              : visible.map((workspace) =>
                   h(
                     'button',
                     {
@@ -75,7 +90,12 @@ export function TopBar(props: {
                         props.onSelectWorkspace(workspace.path)
                       },
                     },
-                    h('span', { className: 'dgt-repo-menu-title' }, workspace.title),
+                    h(
+                      'span',
+                      { className: 'dgt-repo-menu-title' },
+                      workspace.path === repoPath ? h('span', { className: 'dgt-repo-check' }, '✓') : null,
+                      workspace.title,
+                    ),
                     h('span', { className: 'dgt-repo-menu-path' }, workspace.path),
                   ),
                 ),

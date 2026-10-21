@@ -195,36 +195,6 @@ export function HistoryView(props: {
       h(
         'div',
         { className: 'dgt-htoolbar' },
-        props.mode === 'search'
-          ? h(
-              'div',
-              { className: 'dgt-searchbar' },
-              h('input', {
-                className: 'dgt-search-input',
-                value: props.query,
-                placeholder: t('searchPlaceholder'),
-                'aria-label': t('searchPlaceholder'),
-                spellCheck: false,
-                onChange: (event: any) => props.onQuery(event.target.value),
-              }),
-              h('input', {
-                className: 'dgt-search-input dgt-search-narrow',
-                value: props.author,
-                placeholder: t('searchAuthorPlaceholder'),
-                'aria-label': t('searchAuthorPlaceholder'),
-                spellCheck: false,
-                onChange: (event: any) => props.onAuthor(event.target.value),
-              }),
-              h('input', {
-                className: 'dgt-search-input dgt-search-narrow',
-                value: props.path,
-                placeholder: t('searchPathPlaceholder'),
-                'aria-label': t('searchPathPlaceholder'),
-                spellCheck: false,
-                onChange: (event: any) => props.onPath(event.target.value),
-              }),
-            )
-          : null,
         h(
           'div',
           { className: 'dgt-seg', role: 'group' },
@@ -249,9 +219,7 @@ export function HistoryView(props: {
             t('currentBranchOnly'),
           ),
         ),
-        props.mode === 'search' && commits.length > 0
-          ? h('span', { className: 'dgt-resultcount' }, String(commits.length) + ' ' + t('commitsUnit'))
-          : null,
+        h('span', { className: 'dgt-resultcount' }, String(commits.length) + ' ' + t('commitsUnit')),
         scoped
           ? h(
               'span',
@@ -270,12 +238,56 @@ export function HistoryView(props: {
               ),
             )
           : null,
+        props.mode === 'search'
+          ? h(
+              'div',
+              { className: 'dgt-searchbar' },
+              h(
+                'label',
+                { className: 'dgt-filter' },
+                h('span', null, t('filterMessage')),
+                h('input', {
+                  className: 'dgt-search-input',
+                  value: props.query,
+                  placeholder: t('searchPlaceholder'),
+                  'aria-label': t('searchPlaceholder'),
+                  spellCheck: false,
+                  onChange: (event: any) => props.onQuery(event.target.value),
+                }),
+              ),
+              h(
+                'label',
+                { className: 'dgt-filter dgt-filter-narrow' },
+                h('span', null, t('filterAuthor')),
+                h('input', {
+                  className: 'dgt-search-input',
+                  value: props.author,
+                  'aria-label': t('searchAuthorPlaceholder'),
+                  spellCheck: false,
+                  onChange: (event: any) => props.onAuthor(event.target.value),
+                }),
+              ),
+              h(
+                'label',
+                { className: 'dgt-filter dgt-filter-narrow' },
+                h('span', null, t('filterPath')),
+                h('input', {
+                  className: 'dgt-search-input',
+                  value: props.path,
+                  'aria-label': t('searchPathPlaceholder'),
+                  spellCheck: false,
+                  onChange: (event: any) => props.onPath(event.target.value),
+                }),
+              ),
+            )
+          : null,
       ),
       h(
         'div',
         { className: 'dgt-hhead', role: 'row' },
         h('span', null, t('historyColumn')),
         h('span', null, t('description')),
+        h('span', null, t('refsColumn')),
         h('span', null, t('commitColumn')),
         h('span', null, t('authorColumn')),
         h('span', null, t('dateColumn')),
@@ -324,13 +336,20 @@ export function HistoryView(props: {
                         'span',
                         { className: 'dgt-hsubject', title: commit.subject },
                         h('span', { className: 'dgt-hsubject-text' }, commit.subject),
-                        commit.refs.map((ref) =>
+                      ),
+                      h(
+                        'span',
+                        { className: 'dgt-hrefs' },
+                        commit.refs.slice(0, 2).map((ref) =>
                           h(
                             'span',
-                            { key: ref.kind + ':' + ref.name, className: 'dgt-refchip', 'data-kind': ref.kind },
+                            { key: ref.kind + ':' + ref.name, className: 'dgt-refchip', 'data-kind': ref.kind, title: ref.name },
                             ref.name,
                           ),
                         ),
+                        commit.refs.length > 2
+                          ? h('span', { className: 'dgt-refchip', 'data-kind': 'more' }, '+' + String(commit.refs.length - 2))
+                          : null,
                       ),
                       h('span', { className: 'dgt-hsha' }, commit.sha.slice(0, 8)),
                       h('span', { className: 'dgt-hauthor', title: commit.author }, commit.author),

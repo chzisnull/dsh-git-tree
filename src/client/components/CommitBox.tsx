@@ -57,7 +57,6 @@ export function CommitBox(props: {
       'div',
       { className: 'dgt-commit-label' },
       h('span', null, t('commitMessageLabel')),
-      h('span', null, t('commitShortcut')),
     ),
     h('textarea', {
       className: 'dgt-commit-input',
