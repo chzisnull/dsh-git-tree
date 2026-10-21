@@ -62,7 +62,7 @@ function GitTreeIcon(props: AnyProps): any {
  * registry exists; `ctx.slots.inject(ownerKey, …)` then waits for the owning
  * packages' slot declarations instead of racing them.
  */
-export const inject = ['slots']
+export const inject = ['slots', 'locale']
 
 export function apply(ctx: ClientCtx): void {
   // 1. stylesheet owned by this plugin: unloaded with it (no document.body append).

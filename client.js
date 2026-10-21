@@ -450,7 +450,7 @@ function GitTreeIcon(props) {
     h("circle", { cx: 6.9, cy: 11.6, r: 1.55, fill: "currentColor" })
   );
 }
-var inject = ["slots"];
+var inject = ["slots", "locale"];
 function apply(ctx) {
   ctx.effect(() => {
     if (typeof document === "undefined") return () => {
