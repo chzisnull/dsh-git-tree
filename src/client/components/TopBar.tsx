@@ -3,11 +3,12 @@
 // commit box). The two local open actions only exist on macOS; elsewhere they
 // are not rendered at all rather than shown as dead buttons.
 
-import { h, React } from '../react'
+import { h } from '../react'
 import type { GitStatusPayload, OpenTarget, Translate, WorkspaceRecord } from '../types'
 import { lastSegment } from '../model'
 import { Chip } from './atoms'
 import { CommitIcon, FolderIcon, RefreshIcon, TerminalIcon } from '../icons'
+import { usePopover } from '../menu'
 
 export function TopBar(props: {
   status: GitStatusPayload | null
@@ -22,7 +23,8 @@ export function TopBar(props: {
   onSelectWorkspace: (path: string) => void
 }): any {
   const { status, t } = props
-  const [open, setOpen] = React.useState(false)
+  const popover = usePopover()
+  const open = popover.open
   const branch = status?.branch && status.branch !== '(detached)' ? status.branch : status?.branch || '—'
   const ahead = status?.ahead ?? 0
   const behind = status?.behind ?? 0
@@ -45,7 +47,8 @@ export function TopBar(props: {
           title: t('switchRepository'),
           'aria-haspopup': 'listbox',
           'aria-expanded': open,
-          onClick: () => setOpen(!open),
+          ref: popover.triggerRef,
+          onClick: popover.toggle,
         },
         h('span', { className: 'dgt-repo-name' }, title),
         h('span', { className: 'dgt-repo-caret', 'aria-hidden': 'true' }, '▾'),
@@ -54,7 +57,7 @@ export function TopBar(props: {
       open
         ? h(
             'div',
-            { className: 'dgt-repo-menu', role: 'listbox', 'aria-label': t('switchRepository') },
+            { className: 'dgt-repo-menu', role: 'listbox', 'aria-label': t('switchRepository'), ref: popover.menuRef },
             props.workspaces.length === 0
               ? h('div', { className: 'dgt-repo-menu-empty' }, t('noRepositories'))
               : props.workspaces.map((workspace) =>
@@ -68,7 +71,7 @@ export function TopBar(props: {
                       'aria-selected': workspace.path === repoPath,
                       'data-current': workspace.path === repoPath || undefined,
                       onClick: () => {
-                        setOpen(false)
+                        popover.close()
                         props.onSelectWorkspace(workspace.path)
                       },
                     },

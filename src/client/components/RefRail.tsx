@@ -2,9 +2,10 @@
 // A branch opens its history on click, checks out on double click or from its
 // menu. Remote refs are out of scope and are not rendered at all.
 
-import { h, React } from '../react'
+import { h } from '../react'
 import type { GitStatusPayload, RefRecord, RefsPayload, Translate, ViewKind } from '../types'
 import { BranchIcon, MoreIcon, TagIcon } from '../icons'
+import { usePopover } from '../menu'
 
 function Section(props: { title: string; count?: number; action?: any; children?: any }): any {
   return h(
@@ -35,7 +36,10 @@ function RefRow(props: {
   onRename: (name: string) => void
   onDelete: (name: string) => void
 }): any {
-  const [menuOpen, setMenuOpen] = React.useState(false)
+  const popover = usePopover()
+  const menuOpen = popover.open
+  const anchor = menuOpen && popover.triggerRef.current ? popover.triggerRef.current.getBoundingClientRect() : null
+  const menuStyle = anchor ? { position: 'fixed', left: anchor.right + 4, top: anchor.top, right: 'auto' } : undefined
   const ref = props.record
   const Icon = props.kind === 'branch' ? BranchIcon : TagIcon
   return h(
@@ -68,9 +72,10 @@ function RefRow(props: {
         className: 'dgt-rail-more',
         title: props.t('fileActions'),
         'aria-label': props.t('fileActions'),
+        ref: popover.triggerRef,
         onClick: (event: any) => {
           event.stopPropagation()
-          setMenuOpen(!menuOpen)
+          popover.toggle()
         },
       },
       h(MoreIcon),
@@ -78,14 +83,20 @@ function RefRow(props: {
     menuOpen
       ? h(
           'div',
-          { className: 'dgt-menu', onClick: (event: any) => event.stopPropagation() },
+          {
+            className: 'dgt-menu',
+            ref: popover.menuRef,
+            style: menuStyle,
+            'data-flyout': true,
+            onClick: (event: any) => event.stopPropagation(),
+          },
           props.kind === 'branch'
             ? h(
                 'button',
                 {
                   type: 'button',
                   onClick: () => {
-                    setMenuOpen(false)
+                    popover.close()
                     props.onCheckout(ref.name)
                   },
                 },
@@ -98,7 +109,7 @@ function RefRow(props: {
                 {
                   type: 'button',
                   onClick: () => {
-                    setMenuOpen(false)
+                    popover.close()
                     props.onRename(ref.name)
                   },
                 },
@@ -114,7 +125,7 @@ function RefRow(props: {
                   title: ref.current ? props.t('currentBranchCannotDelete') : undefined,
                   onClick: () => {
                     if (ref.current) return
-                    setMenuOpen(false)
+                    popover.close()
                     props.onDelete(ref.name)
                   },
                 },
@@ -126,7 +137,7 @@ function RefRow(props: {
             {
               type: 'button',
               onClick: () => {
-                setMenuOpen(false)
+                popover.close()
                 props.onCopy(ref.name)
               },
             },

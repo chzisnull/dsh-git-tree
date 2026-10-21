@@ -1,10 +1,11 @@
 // One row of the change list. Sourcetree's row shape: checkbox, status letter,
 // path (directory muted, name emphasized), and a hover-only menu.
 
-import { h, React } from '../react'
+import { h } from '../react'
 import type { EntrySide, GitFileEntry, Translate } from '../types'
 import { splitPath, statusLetter, statusTone } from '../model'
 import { MoreIcon } from '../icons'
+import { usePopover } from '../menu'
 
 export function FileRow(props: {
   entry: GitFileEntry
@@ -15,7 +16,10 @@ export function FileRow(props: {
   onToggle: (entry: GitFileEntry, side: EntrySide) => void
   onCopyPath: (entry: GitFileEntry) => void
 }): any {
-  const [menuOpen, setMenuOpen] = React.useState(false)
+  const popover = usePopover()
+  const menuOpen = popover.open
+  const anchor = menuOpen && popover.triggerRef.current ? popover.triggerRef.current.getBoundingClientRect() : null
+  const menuStyle = anchor ? { position: 'fixed', left: anchor.right + 4, top: anchor.top - 4, right: 'auto' } : undefined
   const entry = props.entry
   const side = props.side
   const t = props.t
@@ -69,9 +73,10 @@ export function FileRow(props: {
         'data-open': menuOpen || undefined,
         title: t('fileActions'),
         'aria-label': t('fileActions'),
+        ref: popover.triggerRef,
         onClick: (event: any) => {
           event.stopPropagation()
-          setMenuOpen(!menuOpen)
+          popover.toggle()
         },
       },
       h(MoreIcon),
@@ -79,7 +84,13 @@ export function FileRow(props: {
     menuOpen
       ? h(
           'div',
-          { className: 'dgt-menu', onClick: (event: any) => event.stopPropagation() },
+          {
+            className: 'dgt-menu',
+            ref: popover.menuRef,
+            style: menuStyle,
+            'data-flyout': true,
+            onClick: (event: any) => event.stopPropagation(),
+          },
           conflict
             ? null
             : h(
@@ -87,7 +98,7 @@ export function FileRow(props: {
                 {
                   type: 'button',
                   onClick: () => {
-                    setMenuOpen(false)
+                    popover.close()
                     props.onToggle(entry, side)
                   },
                 },
@@ -98,7 +109,7 @@ export function FileRow(props: {
             {
               type: 'button',
               onClick: () => {
-                setMenuOpen(false)
+                popover.close()
                 props.onCopyPath(entry)
               },
             },

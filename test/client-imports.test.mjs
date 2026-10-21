@@ -24,3 +24,24 @@ const missing = [...referenced].filter((name) => exports.has(name) && !imported.
 test('every route helper used by the workspace shell is imported', () => {
   assert.deepEqual(missing, [], 'add these to the routes import: ' + missing.join(', '))
 })
+
+test('every local hook used by the shell components is imported', () => {
+  const files = ['Workspace.tsx', 'TopBar.tsx', 'RefRail.tsx', 'ChangeList.tsx', 'FileRow.tsx']
+  const missingHooks = []
+  for (const name of files) {
+    const source = readFileSync(join(root, 'src/client/components', name), 'utf8')
+    const imported = new Set([...source.matchAll(/import\s*\{([^}]+)\}\s*from/g)].flatMap((match) =>
+      match[1].split(',').map((part) => part.trim()).filter(Boolean),
+    ))
+    const used = new Set([...source.matchAll(/\b(use[A-Z]\w+)\b/g)].map((match) => match[1]))
+    for (const hook of used) {
+      if (!imported.has(hook) && hook !== 'useState' && hook !== 'useEffect' && hook !== 'useCallback' && hook !== 'useRef') {
+        // React hooks arrive through the shared React binding, not named imports.
+        if (new RegExp('React\\.' + hook).test(source) || new RegExp(hook + '\\(').test(source)) {
+          missingHooks.push(name + ': ' + hook)
+        }
+      }
+    }
+  }
+  assert.deepEqual(missingHooks, [], 'missing imports: ' + missingHooks.join(', '))
+})

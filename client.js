@@ -762,10 +762,44 @@ function TerminalIcon() {
   ]);
 }
 
+// src/client/menu.ts
+var activeClose = null;
+function usePopover() {
+  const [open, setOpen] = React.useState(false);
+  const menuRef = React.useRef(null);
+  const triggerRef = React.useRef(null);
+  const close = React.useCallback(() => setOpen(false), []);
+  React.useEffect(() => {
+    if (!open) return;
+    if (activeClose && activeClose !== close) activeClose();
+    activeClose = close;
+    const contains = (node, target) => Boolean(node && node.contains && node.contains(target));
+    const onDown = (event) => {
+      if (contains(menuRef.current, event.target) || contains(triggerRef.current, event.target)) return;
+      close();
+    };
+    const onKey = (event) => {
+      if (event.key === "Escape") close();
+    };
+    const onScroll = () => close();
+    document.addEventListener("mousedown", onDown, true);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      if (activeClose === close) activeClose = null;
+      document.removeEventListener("mousedown", onDown, true);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [open, close]);
+  return { open, toggle: () => setOpen((value) => !value), close, menuRef, triggerRef };
+}
+
 // src/client/components/TopBar.tsx
 function TopBar(props) {
   const { status, t } = props;
-  const [open, setOpen] = React.useState(false);
+  const popover = usePopover();
+  const open = popover.open;
   const branch = status?.branch && status.branch !== "(detached)" ? status.branch : status?.branch || "\u2014";
   const ahead = status?.ahead ?? 0;
   const behind = status?.behind ?? 0;
@@ -787,7 +821,8 @@ function TopBar(props) {
           title: t("switchRepository"),
           "aria-haspopup": "listbox",
           "aria-expanded": open,
-          onClick: () => setOpen(!open)
+          ref: popover.triggerRef,
+          onClick: popover.toggle
         },
         h("span", { className: "dgt-repo-name" }, title),
         h("span", { className: "dgt-repo-caret", "aria-hidden": "true" }, "\u25BE")
@@ -795,7 +830,7 @@ function TopBar(props) {
       h("span", { className: "dgt-repo-path", title: repoPath }, repoPath || "\u2014"),
       open ? h(
         "div",
-        { className: "dgt-repo-menu", role: "listbox", "aria-label": t("switchRepository") },
+        { className: "dgt-repo-menu", role: "listbox", "aria-label": t("switchRepository"), ref: popover.menuRef },
         props.workspaces.length === 0 ? h("div", { className: "dgt-repo-menu-empty" }, t("noRepositories")) : props.workspaces.map(
           (workspace) => h(
             "button",
@@ -807,7 +842,7 @@ function TopBar(props) {
               "aria-selected": workspace.path === repoPath,
               "data-current": workspace.path === repoPath || void 0,
               onClick: () => {
-                setOpen(false);
+                popover.close();
                 props.onSelectWorkspace(workspace.path);
               }
             },
@@ -903,7 +938,10 @@ function Section(props) {
   );
 }
 function RefRow(props) {
-  const [menuOpen, setMenuOpen] = React.useState(false);
+  const popover = usePopover();
+  const menuOpen = popover.open;
+  const anchor = menuOpen && popover.triggerRef.current ? popover.triggerRef.current.getBoundingClientRect() : null;
+  const menuStyle = anchor ? { position: "fixed", left: anchor.right + 4, top: anchor.top, right: "auto" } : void 0;
   const ref = props.record;
   const Icon = props.kind === "branch" ? BranchIcon : TagIcon;
   return h(
@@ -936,22 +974,29 @@ function RefRow(props) {
         className: "dgt-rail-more",
         title: props.t("fileActions"),
         "aria-label": props.t("fileActions"),
+        ref: popover.triggerRef,
         onClick: (event) => {
           event.stopPropagation();
-          setMenuOpen(!menuOpen);
+          popover.toggle();
         }
       },
       h(MoreIcon)
     ),
     menuOpen ? h(
       "div",
-      { className: "dgt-menu", onClick: (event) => event.stopPropagation() },
+      {
+        className: "dgt-menu",
+        ref: popover.menuRef,
+        style: menuStyle,
+        "data-flyout": true,
+        onClick: (event) => event.stopPropagation()
+      },
       props.kind === "branch" ? h(
         "button",
         {
           type: "button",
           onClick: () => {
-            setMenuOpen(false);
+            popover.close();
             props.onCheckout(ref.name);
           }
         },
@@ -962,7 +1007,7 @@ function RefRow(props) {
         {
           type: "button",
           onClick: () => {
-            setMenuOpen(false);
+            popover.close();
             props.onRename(ref.name);
           }
         },
@@ -976,7 +1021,7 @@ function RefRow(props) {
           title: ref.current ? props.t("currentBranchCannotDelete") : void 0,
           onClick: () => {
             if (ref.current) return;
-            setMenuOpen(false);
+            popover.close();
             props.onDelete(ref.name);
           }
         },
@@ -987,7 +1032,7 @@ function RefRow(props) {
         {
           type: "button",
           onClick: () => {
-            setMenuOpen(false);
+            popover.close();
             props.onCopy(ref.name);
           }
         },
@@ -1073,7 +1118,10 @@ function RefRail(props) {
 
 // src/client/components/FileRow.tsx
 function FileRow(props) {
-  const [menuOpen, setMenuOpen] = React.useState(false);
+  const popover = usePopover();
+  const menuOpen = popover.open;
+  const anchor = menuOpen && popover.triggerRef.current ? popover.triggerRef.current.getBoundingClientRect() : null;
+  const menuStyle = anchor ? { position: "fixed", left: anchor.right + 4, top: anchor.top - 4, right: "auto" } : void 0;
   const entry = props.entry;
   const side = props.side;
   const t = props.t;
@@ -1126,22 +1174,29 @@ function FileRow(props) {
         "data-open": menuOpen || void 0,
         title: t("fileActions"),
         "aria-label": t("fileActions"),
+        ref: popover.triggerRef,
         onClick: (event) => {
           event.stopPropagation();
-          setMenuOpen(!menuOpen);
+          popover.toggle();
         }
       },
       h(MoreIcon)
     ),
     menuOpen ? h(
       "div",
-      { className: "dgt-menu", onClick: (event) => event.stopPropagation() },
+      {
+        className: "dgt-menu",
+        ref: popover.menuRef,
+        style: menuStyle,
+        "data-flyout": true,
+        onClick: (event) => event.stopPropagation()
+      },
       conflict ? null : h(
         "button",
         {
           type: "button",
           onClick: () => {
-            setMenuOpen(false);
+            popover.close();
             props.onToggle(entry, side);
           }
         },
@@ -1152,7 +1207,7 @@ function FileRow(props) {
         {
           type: "button",
           onClick: () => {
-            setMenuOpen(false);
+            popover.close();
             props.onCopyPath(entry);
           }
         },
