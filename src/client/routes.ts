@@ -20,6 +20,7 @@ const DIFF_ROUTE = 'api/git-tree/diff'
 const REFS_ROUTE = 'api/git-tree/refs'
 const HISTORY_ROUTE = 'api/git-tree/history'
 const COMMIT_INFO_ROUTE = 'api/git-tree/commit-info'
+const CHECKOUT_ROUTE = 'api/git-tree/checkout'
 const STAGE_ROUTE = 'api/git-tree/stage'
 const UNSTAGE_ROUTE = 'api/git-tree/unstage'
 const COMMIT_ROUTE = 'api/git-tree/commit'
@@ -86,6 +87,10 @@ export function fetchHistory(
   signal?: AbortSignal,
 ): Promise<HistoryPayload> {
   return getJson<HistoryPayload>(HISTORY_ROUTE, params, signal)
+}
+
+export function checkoutBranch(branch: string, cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(CHECKOUT_ROUTE + query({ cwd }), { branch })
 }
 
 export function stagePaths(paths: string[], cwd?: string): Promise<MutationPayload> {

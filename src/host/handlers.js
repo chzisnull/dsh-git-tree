@@ -176,6 +176,10 @@ export async function handleHistory(ctx, request) {
     const branch = scope.slice('branch:'.length)
     if (!isSafeBranchName(branch)) throw new RequestError('无效的分支名', 400, 'invalid-branch-name')
     argv.push('refs/heads/' + branch)
+  } else if (scope.startsWith('tag:')) {
+    const tag = scope.slice('tag:'.length)
+    if (!isSafeBranchName(tag)) throw new RequestError('无效的标签名', 400, 'invalid-branch-name')
+    argv.push('refs/tags/' + tag)
   } else {
     argv.push('--branches', '--tags', 'HEAD')
   }
@@ -237,6 +241,42 @@ export async function handleCommitInfo(ctx, request) {
     refs: parseDecoration(parsed.decoration),
     files: parseNameStatus(nameStatus),
   })
+}
+
+export async function handleCheckout(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const branch = body.branch
+  if (!isSafeBranchName(branch)) throw new RequestError('无效的分支名', 400, 'invalid-branch-name')
+  const subprocess = subprocessOf(ctx)
+
+  try {
+    await git(subprocess, ['rev-parse', '--verify', 'refs/heads/' + branch], cwd, { maxBytes: 8 * 1024 })
+  } catch {
+    throw new RequestError('分支不存在', 404, 'unknown-branch')
+  }
+
+  const statusText = await git(
+    subprocess,
+    ['status', '--porcelain=v2', '--branch', '--untracked-files=all', '-z'],
+    cwd,
+    { maxBytes: MAX_STATUS_BYTES },
+  )
+  const dirty = parsePorcelainV2(statusText).entries.some(
+    (entry) => entry.kind !== 'untracked' && entry.kind !== 'ignored' && (entry.staged || entry.unstaged || entry.conflicted),
+  )
+  if (dirty) throw new RequestError('有未提交改动，先提交或贮藏再切换分支', 409, 'dirty-worktree')
+
+  try {
+    await git(subprocess, ['checkout', '--quiet', branch], cwd, { maxBytes: 256 * 1024 })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    if (/would be overwritten|local changes|untracked working tree/i.test(detail)) {
+      throw new RequestError(detail, 409, 'checkout-blocked')
+    }
+    throw error
+  }
+  return json({ ok: true, branch })
 }
 
 export async function handleRefs(ctx, request) {

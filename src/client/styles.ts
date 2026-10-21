@@ -175,6 +175,21 @@ export const CSS = `
 .dgt-detail-diff{flex:1 1 auto;min-width:0;overflow:auto;background:var(--dsw-alias-bg-base);}
 .dgt-rail-btn{appearance:none;border:0;width:100%;background:transparent;text-align:left;
   font:inherit;font-size:13px;cursor:pointer;}
+.dgt-rail-ref{position:relative;cursor:pointer;}
+.dgt-rail-ref:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-rail-ref[data-menu='true']{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-rail-ref .dgt-rail-more{display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;margin-left:auto;padding:0;border:0;border-radius:var(--dsw-radius-xs);
+  background:transparent;color:var(--dsw-alias-label-tertiary);opacity:0;cursor:pointer;}
+.dgt-rail-ref:hover .dgt-rail-more,.dgt-rail-ref:focus-within .dgt-rail-more,
+.dgt-rail-ref[data-menu='true'] .dgt-rail-more{opacity:1;}
+.dgt-rail-more:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary);}
+.dgt-scope{display:inline-flex;align-items:center;gap:2px;height:22px;padding:0 4px 0 8px;
+  border-radius:999px;background:var(--dsw-alias-bg-layer-1);
+  border:1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 30%, var(--dsw-alias-border-l2));
+  color:var(--dsw-alias-brand-text);font-size:11.5px;}
+.dgt-scope-clear{appearance:none;border:0;background:transparent;color:inherit;cursor:pointer;
+  font:inherit;font-size:13px;line-height:1;padding:0 2px;}
 
 /* list */
 .dgt-list-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto;

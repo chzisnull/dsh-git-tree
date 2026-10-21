@@ -62,6 +62,12 @@ var EN = {
   parentsField: "Parents",
   noFiles: "No files in this commit.",
   selectCommitFile: "Select a file to see its diff.",
+  checkout: "Check out",
+  checkedOut: "Checked out",
+  copyRefName: "Copy name",
+  checkOutFailed: "Check out failed",
+  dirtyWorktree: "Commit or stash your changes before switching branches.",
+  showAllBranches: "All branches",
   itemsUnit: "items",
   commitMessageEmpty: "Write a message to commit.",
   commitShortcut: "\u2318\u21B5 to commit",
@@ -136,6 +142,12 @@ var ZH = {
   parentsField: "\u7236\u7EA7",
   noFiles: "\u8BE5\u63D0\u4EA4\u6CA1\u6709\u53D8\u66F4\u6587\u4EF6\u3002",
   selectCommitFile: "\u9009\u62E9\u6587\u4EF6\u67E5\u770B\u8BE5\u63D0\u4EA4\u5185\u7684\u5DEE\u5F02\u3002",
+  checkout: "\u68C0\u51FA",
+  checkedOut: "\u5DF2\u68C0\u51FA",
+  copyRefName: "\u590D\u5236\u540D\u79F0",
+  checkOutFailed: "\u68C0\u51FA\u5931\u8D25",
+  dirtyWorktree: "\u6709\u672A\u63D0\u4EA4\u6539\u52A8\uFF0C\u5148\u63D0\u4EA4\u6216\u8D2E\u85CF\u518D\u5207\u6362\u5206\u652F\u3002",
+  showAllBranches: "\u6240\u6709\u5206\u652F",
   itemsUnit: "\u9879",
   commitMessageEmpty: "\u586B\u5199\u63D0\u4EA4\u4FE1\u606F\u540E\u53EF\u63D0\u4EA4\u3002",
   commitShortcut: "\u2318\u21B5 \u63D0\u4EA4",
@@ -354,6 +366,21 @@ var CSS = `
 .dgt-detail-diff{flex:1 1 auto;min-width:0;overflow:auto;background:var(--dsw-alias-bg-base);}
 .dgt-rail-btn{appearance:none;border:0;width:100%;background:transparent;text-align:left;
   font:inherit;font-size:13px;cursor:pointer;}
+.dgt-rail-ref{position:relative;cursor:pointer;}
+.dgt-rail-ref:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-rail-ref[data-menu='true']{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-rail-ref .dgt-rail-more{display:inline-flex;align-items:center;justify-content:center;
+  width:18px;height:18px;margin-left:auto;padding:0;border:0;border-radius:var(--dsw-radius-xs);
+  background:transparent;color:var(--dsw-alias-label-tertiary);opacity:0;cursor:pointer;}
+.dgt-rail-ref:hover .dgt-rail-more,.dgt-rail-ref:focus-within .dgt-rail-more,
+.dgt-rail-ref[data-menu='true'] .dgt-rail-more{opacity:1;}
+.dgt-rail-more:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary);}
+.dgt-scope{display:inline-flex;align-items:center;gap:2px;height:22px;padding:0 4px 0 8px;
+  border-radius:999px;background:var(--dsw-alias-bg-layer-1);
+  border:1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 30%, var(--dsw-alias-border-l2));
+  color:var(--dsw-alias-brand-text);font-size:11.5px;}
+.dgt-scope-clear{appearance:none;border:0;background:transparent;color:inherit;cursor:pointer;
+  font:inherit;font-size:13px;line-height:1;padding:0 2px;}
 
 /* list */
 .dgt-list-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto;
@@ -792,18 +819,72 @@ function Section(props) {
   );
 }
 function RefRow(props) {
+  const [menuOpen, setMenuOpen] = React.useState(false);
   const ref = props.record;
   const Icon = props.kind === "branch" ? BranchIcon : TagIcon;
   return h(
     "div",
     {
-      className: "dgt-rail-row",
+      className: "dgt-rail-row dgt-rail-ref",
       "data-current": ref.current || void 0,
-      title: ref.subject ? ref.name + " \u2014 " + ref.subject : ref.name
+      "data-menu": menuOpen || void 0,
+      role: "button",
+      tabIndex: 0,
+      title: ref.subject ? ref.name + " \u2014 " + ref.subject : ref.name,
+      onClick: () => props.onOpen(ref, props.kind),
+      onDoubleClick: () => {
+        if (props.kind === "branch") props.onCheckout(ref.name);
+      },
+      onKeyDown: (event) => {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          props.onOpen(ref, props.kind);
+        }
+      }
     },
     h("span", { className: "dgt-rail-icon" }, h(Icon)),
     ref.current ? h("span", { className: "dgt-rail-dot" }) : null,
-    h("span", { className: "dgt-rail-name" }, ref.name)
+    h("span", { className: "dgt-rail-name" }, ref.name),
+    h(
+      "button",
+      {
+        type: "button",
+        className: "dgt-rail-more",
+        title: props.t("fileActions"),
+        "aria-label": props.t("fileActions"),
+        onClick: (event) => {
+          event.stopPropagation();
+          setMenuOpen(!menuOpen);
+        }
+      },
+      h(MoreIcon)
+    ),
+    menuOpen ? h(
+      "div",
+      { className: "dgt-menu", onClick: (event) => event.stopPropagation() },
+      props.kind === "branch" ? h(
+        "button",
+        {
+          type: "button",
+          onClick: () => {
+            setMenuOpen(false);
+            props.onCheckout(ref.name);
+          }
+        },
+        props.t("checkout")
+      ) : null,
+      h(
+        "button",
+        {
+          type: "button",
+          onClick: () => {
+            setMenuOpen(false);
+            props.onCopy(ref.name);
+          }
+        },
+        props.t("copyRefName")
+      )
+    ) : null
   );
 }
 function ViewRow(props) {
@@ -830,18 +911,36 @@ function RefRail(props) {
       { title: t("workspace") },
       h(ViewRow, { label: t("fileStatus"), active: props.view === "status", onSelect: () => props.onView("status") }),
       h(ViewRow, { label: t("history"), active: props.view === "history", onSelect: () => props.onView("history") })
-      // Search arrives with its own slice; until then it is not rendered at all
-      // rather than shown as a dead row.
     ),
     h(
       Section,
       { title: t("branches"), count: branches.length },
-      branches.length > 0 ? branches.map((ref) => h(RefRow, { key: "b:" + ref.name, record: ref, kind: "branch" })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
+      branches.length > 0 ? branches.map(
+        (ref) => h(RefRow, {
+          key: "b:" + ref.name,
+          record: ref,
+          kind: "branch",
+          t,
+          onOpen: props.onOpenRef,
+          onCheckout: props.onCheckout,
+          onCopy: props.onCopyRef
+        })
+      ) : h("div", { className: "dgt-rail-empty" }, "\u2014")
     ),
     h(
       Section,
       { title: t("tags"), count: tags.length },
-      tags.length > 0 ? tags.map((ref) => h(RefRow, { key: "t:" + ref.name, record: ref, kind: "tag" })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
+      tags.length > 0 ? tags.map(
+        (ref) => h(RefRow, {
+          key: "t:" + ref.name,
+          record: ref,
+          kind: "tag",
+          t,
+          onOpen: props.onOpenRef,
+          onCheckout: props.onCheckout,
+          onCopy: props.onCopyRef
+        })
+      ) : h("div", { className: "dgt-rail-empty" }, "\u2014")
     )
   );
 }
@@ -1328,6 +1427,7 @@ function Detail(props) {
 }
 function HistoryView(props) {
   const { commits, t } = props;
+  const scoped = props.scope.startsWith("branch:") || props.scope.startsWith("tag:");
   return h(
     "div",
     { className: "dgt-main" },
@@ -1360,7 +1460,23 @@ function HistoryView(props) {
             },
             t("currentBranchOnly")
           )
-        )
+        ),
+        scoped ? h(
+          "span",
+          { className: "dgt-scope" },
+          props.scope.replace(/^(branch|tag):/, ""),
+          h(
+            "button",
+            {
+              type: "button",
+              className: "dgt-scope-clear",
+              title: t("showAllBranches"),
+              "aria-label": t("showAllBranches"),
+              onClick: props.onClearScope
+            },
+            "\xD7"
+          )
+        ) : null
       ),
       h(
         "div",
@@ -1610,6 +1726,45 @@ function Workspace(props) {
     },
     [historySha, repoPath]
   );
+  const openRef = React.useCallback((record, kind) => {
+    setHistoryScope((kind === "branch" ? "branch:" : "tag:") + record.name);
+    setHistorySha("");
+    setView("history");
+  }, []);
+  const checkout = React.useCallback(
+    async (name) => {
+      setBusy(true);
+      setActionError("");
+      try {
+        const result = await checkoutBranch(name, repoPath || void 0);
+        if (!result.ok) throw new Error(result.error || t("checkOutFailed"));
+        showToast(t("checkedOut") + " \xB7 " + name);
+        setSelected(null);
+        setDiff(null);
+        setHistorySha("");
+        await loadStatus();
+        await loadRefs();
+      } catch (error) {
+        const message2 = error instanceof Error ? error.message : String(error);
+        setActionError(message2);
+        showToast(message2);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [loadRefs, loadStatus, repoPath, showToast, t]
+  );
+  const copyRef = React.useCallback(
+    (name) => {
+      try {
+        void navigator.clipboard?.writeText(name);
+        showToast(t("copiedPath"));
+      } catch {
+        showToast(name);
+      }
+    },
+    [showToast, t]
+  );
   React.useEffect(() => {
     if (view !== "history") return;
     setHistorySha("");
@@ -1777,6 +1932,10 @@ function Workspace(props) {
             setHistoryScope(scope);
             setHistorySha("");
           },
+          onClearScope: () => {
+            setHistoryScope("all");
+            setHistorySha("");
+          },
           onSelect: (commit2) => setHistorySha(commit2.sha),
           onSelectFile: (path) => void openCommitFile(path),
           onParent: (sha) => setHistorySha(sha),
@@ -1829,7 +1988,16 @@ function Workspace(props) {
       h("span", { className: "dgt-banner-text" }, statusError)
     ) : null,
     truncated ? h("div", { className: "dgt-banner" }, h("span", { className: "dgt-banner-text" }, t("truncated"))) : null,
-    h("div", { className: "dgt-body" }, h(RefRail, { status, refs, view, t, onView: setView }), renderView()),
+    h("div", { className: "dgt-body" }, h(RefRail, {
+      status,
+      refs,
+      view,
+      t,
+      onView: setView,
+      onOpenRef: openRef,
+      onCheckout: (name) => void checkout(name),
+      onCopyRef: copyRef
+    }), renderView()),
     toast ? h("div", { className: "dgt-toast", role: "status" }, toast) : null,
     notice ? h("div", { className: "dgt-toast", role: "status" }, notice) : null
   );

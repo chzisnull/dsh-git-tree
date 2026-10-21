@@ -171,8 +171,10 @@ export function HistoryView(props: {
   onLoadMore: () => void
   onSelectFile: (path: string) => void
   onParent: (sha: string) => void
+  onClearScope: () => void
 }): any {
   const { commits, t } = props
+  const scoped = props.scope.startsWith('branch:') || props.scope.startsWith('tag:')
 
   return h(
     'div',
@@ -207,6 +209,24 @@ export function HistoryView(props: {
             t('currentBranchOnly'),
           ),
         ),
+        scoped
+          ? h(
+              'span',
+              { className: 'dgt-scope' },
+              props.scope.replace(/^(branch|tag):/, ''),
+              h(
+                'button',
+                {
+                  type: 'button',
+                  className: 'dgt-scope-clear',
+                  title: t('showAllBranches'),
+                  'aria-label': t('showAllBranches'),
+                  onClick: props.onClearScope,
+                },
+                '×',
+              ),
+            )
+          : null,
       ),
       h(
         'div',
