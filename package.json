@@ -31,6 +31,7 @@
     "cordis.patch.yml",
     "locale",
     "src/client",
+    "src/host",
     "build.mjs",
     "README.md",
     "README.zh.md",
@@ -39,7 +40,7 @@
   "scripts": {
     "build": "node build.mjs",
     "check": "node --check index.js && node --check client.js",
-    "test": "node --test test/manifest.test.mjs test/routes.test.mjs test/ui-contract.test.mjs"
+    "test": "node --test test/manifest.test.mjs test/routes.test.mjs test/ui-contract.test.mjs test/host-modules.test.mjs"
   },
   "dsh": {
     "bundle": {

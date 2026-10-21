@@ -27,224 +27,61 @@ __export(index_exports, {
   inject: () => inject
 });
 module.exports = __toCommonJS(index_exports);
+
+// src/client/react.ts
 var React = require("react");
 var h = React.createElement;
+
+// src/client/locale.ts
 var NS = "dsh-git-tree";
-var PANEL_ID = "git-tree";
-var STATUS_ROUTE = "api/git-tree/status";
-var DIFF_ROUTE = "api/git-tree/diff";
-function query(params) {
-  const search = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) if (value !== void 0 && value !== "") search.set(key, value);
-  const text = search.toString();
-  return text === "" ? "" : "?" + text;
-}
-async function getJson(route, params, signal) {
-  const response = await fetch(route + query(params), {
-    signal,
-    headers: { accept: "application/json" }
-  });
-  if (!response.ok) throw new Error("HTTP " + String(response.status));
-  return await response.json();
-}
-function Chip(props) {
-  return h("span", { className: "dgt-chip", "data-tone": props.tone ?? "muted" }, props.children);
-}
-function Spinner() {
-  return h("span", { className: "dgt-spinner", "aria-hidden": "true" });
-}
-function FileRow(props) {
-  const entry = props.entry;
-  const code = (entry.x + entry.y).trim() || "??";
-  return h(
-    "button",
-    {
-      type: "button",
-      className: "dgt-file",
-      "data-active": props.active || void 0,
-      "data-kind": entry.kind,
-      title: entry.path,
-      onClick: () => props.onSelect(entry)
-    },
-    h("span", { className: "dgt-file-code", "data-status": entry.x === "?" ? "?" : entry.x === "A" ? "A" : entry.y === "M" || entry.x === "M" ? "M" : "D" }, code),
-    h("span", { className: "dgt-file-path" }, entry.path)
-  );
-}
-function GitTreePanel(props) {
-  const t = typeof props.t === "function" ? props.t : (key) => key;
-  const [status, setStatus] = React.useState(null);
-  const [statusError, setStatusError] = React.useState("");
-  const [refreshing, setRefreshing] = React.useState(false);
-  const [selected, setSelected] = React.useState(null);
-  const [diff, setDiff] = React.useState(null);
-  const [diffLoading, setDiffLoading] = React.useState(false);
-  const loadStatus = React.useCallback(async (signal) => {
-    setRefreshing(true);
-    try {
-      const next = await getJson(STATUS_ROUTE, {}, signal);
-      if (signal?.aborted) return;
-      if (next.ok) {
-        setStatus(next);
-        setStatusError("");
-      } else {
-        setStatus(null);
-        setStatusError(next.error || t("statusFailed"));
-      }
-    } catch (error) {
-      if (signal?.aborted) return;
-      setStatus(null);
-      setStatusError(error instanceof Error ? error.message : String(error));
-    } finally {
-      if (!signal?.aborted) setRefreshing(false);
-    }
-  }, [t]);
-  React.useEffect(() => {
-    const controller = new AbortController();
-    void loadStatus(controller.signal);
-    return () => controller.abort();
-  }, [loadStatus]);
-  const openDiff = React.useCallback(async (entry, signal) => {
-    setSelected(entry);
-    setDiff(null);
-    if (entry.kind === "ignored") return;
-    setDiffLoading(true);
-    try {
-      const next = await getJson(DIFF_ROUTE, { path: entry.path, staged: isStaged(entry) ? "1" : "0" }, signal);
-      if (!signal?.aborted) setDiff(next);
-    } catch (error) {
-      if (!signal?.aborted) setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
-    } finally {
-      if (!signal?.aborted) setDiffLoading(false);
-    }
-  }, []);
-  const entries = status?.entries ?? [];
-  const staged = entries.filter(isStaged);
-  const working = entries.filter((entry) => !isStaged(entry));
-  const branchLabel = status?.branch && status.branch !== "(detached)" ? status.branch : status?.branch || "\u2014";
-  return h(
-    "div",
-    { className: "dgt-root", "data-plugin": "dsh-git-tree" },
-    // top bar: repo identity, branch, ahead/behind, actions
-    h(
-      "header",
-      { className: "dgt-topbar" },
-      h(
-        "div",
-        { className: "dgt-repo" },
-        h("span", { className: "dgt-repo-name" }, status?.repoRoot ? lastSegment(status.repoRoot) : t("panel")),
-        h("span", { className: "dgt-repo-path", title: status?.cwd || status?.repoRoot || "" }, status?.repoRoot || status?.cwd || "\u2014")
-      ),
-      h(
-        "div",
-        { className: "dgt-refs" },
-        h(Chip, { tone: "muted" }, h("span", { className: "dgt-branch-glyph", "aria-hidden": "true" }, "\u2387"), " ", branchLabel),
-        typeof status?.ahead === "number" && status.ahead > 0 ? h(Chip, { tone: "ok" }, "\u2191" + String(status.ahead)) : null,
-        typeof status?.behind === "number" && status.behind > 0 ? h(Chip, { tone: "warn" }, "\u2193" + String(status.behind)) : null,
-        status?.upstream ? h("span", { className: "dgt-upstream" }, status.upstream) : null
-      ),
-      h(
-        "div",
-        { className: "dgt-actions" },
-        refreshing ? h(Spinner) : null,
-        h(
-          "button",
-          { type: "button", className: "dgt-button", onClick: () => void loadStatus(), disabled: refreshing, title: t("refresh") },
-          "\u27F3 " + t("refresh")
-        )
-      )
-    ),
-    statusError !== "" ? h(
-      "div",
-      { className: "dgt-banner", role: "status" },
-      h("strong", null, t("hostUnavailable")),
-      h("span", null, statusError)
-    ) : null,
-    // three-pane workspace: refs rail / change list / diff
-    h(
-      "div",
-      { className: "dgt-body" },
-      h(
-        "aside",
-        { className: "dgt-rail", "aria-label": t("refs") },
-        h("div", { className: "dgt-section-title" }, t("branches")),
-        h("div", { className: "dgt-placeholder" }, t("branchesPlaceholder")),
-        h("div", { className: "dgt-section-title" }, t("remotes")),
-        h("div", { className: "dgt-placeholder" }, t("remotesPlaceholder")),
-        h("div", { className: "dgt-section-title" }, t("tags")),
-        h("div", { className: "dgt-placeholder" }, t("tagsPlaceholder"))
-      ),
-      h(
-        "section",
-        { className: "dgt-list", "aria-label": t("changes") },
-        h(
-          "div",
-          { className: "dgt-list-head" },
-          h("span", null, t("changes")),
-          h("span", { className: "dgt-count" }, String(entries.length))
-        ),
-        status === null && statusError === "" ? h("div", { className: "dgt-placeholder" }, t("loading")) : entries.length === 0 ? h("div", { className: "dgt-placeholder" }, t("clean")) : h(
-          "div",
-          { className: "dgt-scroll" },
-          staged.length > 0 ? h("div", { className: "dgt-group" }, t("staged"), " \xB7 ", String(staged.length)) : null,
-          staged.map(
-            (entry) => h(FileRow, { key: "s:" + entry.path, entry, active: selected?.path === entry.path, onSelect: (picked) => void openDiff(picked) })
-          ),
-          working.length > 0 ? h("div", { className: "dgt-group" }, t("working"), " \xB7 ", String(working.length)) : null,
-          working.map(
-            (entry) => h(FileRow, { key: "w:" + entry.path, entry, active: selected?.path === entry.path, onSelect: (picked) => void openDiff(picked) })
-          )
-        )
-      ),
-      h(
-        "section",
-        { className: "dgt-diff", "aria-label": t("diff") },
-        h(
-          "div",
-          { className: "dgt-list-head" },
-          h("span", null, t("diff")),
-          h("span", { className: "dgt-mono" }, selected?.path ?? "")
-        ),
-        h(
-          "div",
-          { className: "dgt-diff-body" },
-          selected === null ? h("div", { className: "dgt-placeholder" }, t("diffPlaceholder")) : diffLoading ? h("div", { className: "dgt-placeholder" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-placeholder dgt-error" }, diff.error || t("diffFailed")) : diff && diff.text ? h("pre", { className: "dgt-premain" }, diff.text) : h("div", { className: "dgt-placeholder" }, selected.kind === "untracked" ? t("untrackedNoDiff") : t("noDiff"))
-        )
-      )
-    )
-  );
-}
-function lastSegment(path) {
-  const parts = String(path).split(/[\\/]+/).filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : path;
-}
-function isStaged(entry) {
-  return entry.kind === "changed" && entry.x !== "." && entry.x !== "?" && entry.y === ".";
-}
-function GitTreeIcon(props) {
-  const size = typeof props.size === "number" ? props.size : 16;
-  const active = props.active === true;
-  return h(
-    "svg",
-    {
-      width: size,
-      height: size,
-      viewBox: "0 0 16 16",
-      "aria-hidden": "true",
-      focusable: "false",
-      style: { display: "block", opacity: active ? 1 : 0.86 }
-    },
-    h("path", {
-      d: "M4 2.75v6.1a2.75 2.75 0 0 0 2.75 2.75h2.6",
-      fill: "none",
-      stroke: "currentColor",
-      strokeWidth: 1.4,
-      strokeLinecap: "round"
-    }),
-    h("circle", { cx: 4, cy: 2.6, r: 1.55, fill: "currentColor" }),
-    h("circle", { cx: 11.6, cy: 11.6, r: 1.55, fill: "none", stroke: "currentColor", strokeWidth: 1.4 }),
-    h("circle", { cx: 6.9, cy: 11.6, r: 1.55, fill: "currentColor" })
-  );
-}
+var EN = {
+  panel: "Git",
+  refresh: "Refresh",
+  refs: "References",
+  branches: "Local branches",
+  branchesPlaceholder: "Branch list (skeleton)",
+  remotes: "Remotes",
+  remotesPlaceholder: "Remote list (skeleton)",
+  tags: "Tags",
+  tagsPlaceholder: "Tag list (skeleton)",
+  changes: "Changes",
+  staged: "Staged",
+  working: "Working tree",
+  diff: "Diff",
+  diffPlaceholder: "Select a changed file to preview its diff.",
+  untrackedNoDiff: "Untracked file: no diff until it is added.",
+  noDiff: "No diff for this file.",
+  clean: "Working tree clean.",
+  loading: "Loading\u2026",
+  statusFailed: "git status failed.",
+  diffFailed: "git diff failed.",
+  hostUnavailable: "Host half not available"
+};
+var ZH = {
+  panel: "Git",
+  refresh: "\u5237\u65B0",
+  refs: "\u5F15\u7528",
+  branches: "\u672C\u5730\u5206\u652F",
+  branchesPlaceholder: "\u5206\u652F\u5217\u8868\uFF08\u9AA8\u67B6\uFF09",
+  remotes: "\u8FDC\u7A0B",
+  remotesPlaceholder: "\u8FDC\u7A0B\u5217\u8868\uFF08\u9AA8\u67B6\uFF09",
+  tags: "\u6807\u7B7E",
+  tagsPlaceholder: "\u6807\u7B7E\u5217\u8868\uFF08\u9AA8\u67B6\uFF09",
+  changes: "\u6539\u52A8",
+  staged: "\u5DF2\u6682\u5B58",
+  working: "\u5DE5\u4F5C\u533A",
+  diff: "\u5DEE\u5F02",
+  diffPlaceholder: "\u9009\u62E9\u5DE6\u4FA7\u6539\u52A8\u4EE5\u9884\u89C8\u5DEE\u5F02\u3002",
+  untrackedNoDiff: "\u672A\u8DDF\u8E2A\u6587\u4EF6\uFF1A\u52A0\u5165\u6682\u5B58\u524D\u6CA1\u6709\u5DEE\u5F02\u3002",
+  noDiff: "\u8BE5\u6587\u4EF6\u6CA1\u6709\u5DEE\u5F02\u3002",
+  clean: "\u5DE5\u4F5C\u533A\u5E72\u51C0\u3002",
+  loading: "\u52A0\u8F7D\u4E2D\u2026",
+  statusFailed: "git status \u6267\u884C\u5931\u8D25\u3002",
+  diffFailed: "git diff \u6267\u884C\u5931\u8D25\u3002",
+  hostUnavailable: "\u5BBF\u4E3B\u534A\u672A\u5C31\u7EEA"
+};
+
+// src/client/styles.ts
 var CSS = `
 .dgt-root{box-sizing:border-box;height:100%;min-height:0;display:flex;flex-direction:column;
   background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);
@@ -316,52 +153,303 @@ var CSS = `
 @keyframes dgt-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.dgt-spinner{animation:none}}
 `;
-var EN = {
-  panel: "Git",
-  refresh: "Refresh",
-  refs: "References",
-  branches: "Local branches",
-  branchesPlaceholder: "Branch list (skeleton)",
-  remotes: "Remotes",
-  remotesPlaceholder: "Remote list (skeleton)",
-  tags: "Tags",
-  tagsPlaceholder: "Tag list (skeleton)",
-  changes: "Changes",
-  staged: "Staged",
-  working: "Working tree",
-  diff: "Diff",
-  diffPlaceholder: "Select a changed file to preview its diff.",
-  untrackedNoDiff: "Untracked file: no diff until it is added.",
-  noDiff: "No diff for this file.",
-  clean: "Working tree clean.",
-  loading: "Loading\u2026",
-  statusFailed: "git status failed.",
-  diffFailed: "git diff failed.",
-  hostUnavailable: "Host half not available"
-};
-var ZH = {
-  panel: "Git",
-  refresh: "\u5237\u65B0",
-  refs: "\u5F15\u7528",
-  branches: "\u672C\u5730\u5206\u652F",
-  branchesPlaceholder: "\u5206\u652F\u5217\u8868\uFF08\u9AA8\u67B6\uFF09",
-  remotes: "\u8FDC\u7A0B",
-  remotesPlaceholder: "\u8FDC\u7A0B\u5217\u8868\uFF08\u9AA8\u67B6\uFF09",
-  tags: "\u6807\u7B7E",
-  tagsPlaceholder: "\u6807\u7B7E\u5217\u8868\uFF08\u9AA8\u67B6\uFF09",
-  changes: "\u6539\u52A8",
-  staged: "\u5DF2\u6682\u5B58",
-  working: "\u5DE5\u4F5C\u533A",
-  diff: "\u5DEE\u5F02",
-  diffPlaceholder: "\u9009\u62E9\u5DE6\u4FA7\u6539\u52A8\u4EE5\u9884\u89C8\u5DEE\u5F02\u3002",
-  untrackedNoDiff: "\u672A\u8DDF\u8E2A\u6587\u4EF6\uFF1A\u52A0\u5165\u6682\u5B58\u524D\u6CA1\u6709\u5DEE\u5F02\u3002",
-  noDiff: "\u8BE5\u6587\u4EF6\u6CA1\u6709\u5DEE\u5F02\u3002",
-  clean: "\u5DE5\u4F5C\u533A\u5E72\u51C0\u3002",
-  loading: "\u52A0\u8F7D\u4E2D\u2026",
-  statusFailed: "git status \u6267\u884C\u5931\u8D25\u3002",
-  diffFailed: "git diff \u6267\u884C\u5931\u8D25\u3002",
-  hostUnavailable: "\u5BBF\u4E3B\u534A\u672A\u5C31\u7EEA"
-};
+
+// src/client/routes.ts
+var STATUS_ROUTE = "api/git-tree/status";
+var DIFF_ROUTE = "api/git-tree/diff";
+function query(params) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value !== void 0 && value !== "") search.set(key, value);
+  const text = search.toString();
+  return text === "" ? "" : "?" + text;
+}
+async function getJson(route, params, signal) {
+  const response = await fetch(route + query(params), {
+    signal,
+    headers: { accept: "application/json" }
+  });
+  if (!response.ok) throw new Error("HTTP " + String(response.status));
+  return await response.json();
+}
+async function fetchStatus(signal) {
+  return getJson(STATUS_ROUTE, {}, signal);
+}
+async function fetchDiff(params, signal) {
+  return getJson(DIFF_ROUTE, params, signal);
+}
+
+// src/client/model.ts
+function lastSegment(path) {
+  const parts = String(path).split(/[\\/]+/).filter(Boolean);
+  return parts.length > 0 ? parts[parts.length - 1] : path;
+}
+function isStaged(entry) {
+  return entry.kind === "changed" && entry.x !== "." && entry.x !== "?" && entry.y === ".";
+}
+
+// src/client/components/atoms.tsx
+function Chip(props) {
+  return h("span", { className: "dgt-chip", "data-tone": props.tone ?? "muted" }, props.children);
+}
+function Spinner() {
+  return h("span", { className: "dgt-spinner", "aria-hidden": "true" });
+}
+
+// src/client/components/RefRail.tsx
+function RefRail(props) {
+  const t = props.t;
+  return h(
+    "aside",
+    { className: "dgt-rail", "aria-label": t("refs") },
+    h("div", { className: "dgt-section-title" }, t("branches")),
+    h("div", { className: "dgt-placeholder" }, t("branchesPlaceholder")),
+    h("div", { className: "dgt-section-title" }, t("remotes")),
+    h("div", { className: "dgt-placeholder" }, t("remotesPlaceholder")),
+    h("div", { className: "dgt-section-title" }, t("tags")),
+    h("div", { className: "dgt-placeholder" }, t("tagsPlaceholder"))
+  );
+}
+
+// src/client/components/FileRow.tsx
+function FileRow(props) {
+  const entry = props.entry;
+  const code = (entry.x + entry.y).trim() || "??";
+  return h(
+    "button",
+    {
+      type: "button",
+      className: "dgt-file",
+      "data-active": props.active || void 0,
+      "data-kind": entry.kind,
+      title: entry.path,
+      onClick: () => props.onSelect(entry)
+    },
+    h(
+      "span",
+      {
+        className: "dgt-file-code",
+        "data-status": entry.x === "?" ? "?" : entry.x === "A" ? "A" : entry.y === "M" || entry.x === "M" ? "M" : "D"
+      },
+      code
+    ),
+    h("span", { className: "dgt-file-path" }, entry.path)
+  );
+}
+
+// src/client/components/ChangeList.tsx
+function ChangeList(props) {
+  const { status, statusError, entries, staged, working, selected, t, onSelect } = props;
+  return h(
+    "section",
+    { className: "dgt-list", "aria-label": t("changes") },
+    h(
+      "div",
+      { className: "dgt-list-head" },
+      h("span", null, t("changes")),
+      h("span", { className: "dgt-count" }, String(entries.length))
+    ),
+    status === null && statusError === "" ? h("div", { className: "dgt-placeholder" }, t("loading")) : entries.length === 0 ? h("div", { className: "dgt-placeholder" }, t("clean")) : h(
+      "div",
+      { className: "dgt-scroll" },
+      staged.length > 0 ? h("div", { className: "dgt-group" }, t("staged"), " \xB7 ", String(staged.length)) : null,
+      staged.map(
+        (entry) => h(FileRow, {
+          key: "s:" + entry.path,
+          entry,
+          active: selected?.path === entry.path,
+          onSelect
+        })
+      ),
+      working.length > 0 ? h("div", { className: "dgt-group" }, t("working"), " \xB7 ", String(working.length)) : null,
+      working.map(
+        (entry) => h(FileRow, {
+          key: "w:" + entry.path,
+          entry,
+          active: selected?.path === entry.path,
+          onSelect
+        })
+      )
+    )
+  );
+}
+
+// src/client/components/DiffView.tsx
+function DiffView(props) {
+  const { selected, loading, diff, t } = props;
+  return h(
+    "section",
+    { className: "dgt-diff", "aria-label": t("diff") },
+    h(
+      "div",
+      { className: "dgt-list-head" },
+      h("span", null, t("diff")),
+      h("span", { className: "dgt-mono" }, selected?.path ?? "")
+    ),
+    h(
+      "div",
+      { className: "dgt-diff-body" },
+      selected === null ? h("div", { className: "dgt-placeholder" }, t("diffPlaceholder")) : loading ? h("div", { className: "dgt-placeholder" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-placeholder dgt-error" }, diff.error || t("diffFailed")) : diff && diff.text ? h("pre", { className: "dgt-premain" }, diff.text) : h(
+        "div",
+        { className: "dgt-placeholder" },
+        selected.kind === "untracked" ? t("untrackedNoDiff") : t("noDiff")
+      )
+    )
+  );
+}
+
+// src/client/components/Workspace.tsx
+function Workspace(props) {
+  const t = typeof props.t === "function" ? props.t : (key) => key;
+  const [status, setStatus] = React.useState(null);
+  const [statusError, setStatusError] = React.useState("");
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [selected, setSelected] = React.useState(null);
+  const [diff, setDiff] = React.useState(null);
+  const [diffLoading, setDiffLoading] = React.useState(false);
+  const loadStatus = React.useCallback(
+    async (signal) => {
+      setRefreshing(true);
+      try {
+        const next = await fetchStatus(signal);
+        if (signal?.aborted) return;
+        if (next.ok) {
+          setStatus(next);
+          setStatusError("");
+        } else {
+          setStatus(null);
+          setStatusError(next.error || t("statusFailed"));
+        }
+      } catch (error) {
+        if (signal?.aborted) return;
+        setStatus(null);
+        setStatusError(error instanceof Error ? error.message : String(error));
+      } finally {
+        if (!signal?.aborted) setRefreshing(false);
+      }
+    },
+    [t]
+  );
+  React.useEffect(() => {
+    const controller = new AbortController();
+    void loadStatus(controller.signal);
+    return () => controller.abort();
+  }, [loadStatus]);
+  const openDiff = React.useCallback(async (entry, signal) => {
+    setSelected(entry);
+    setDiff(null);
+    if (entry.kind === "ignored") return;
+    setDiffLoading(true);
+    try {
+      const next = await fetchDiff(
+        { path: entry.path, staged: isStaged(entry) ? "1" : "0" },
+        signal
+      );
+      if (!signal?.aborted) setDiff(next);
+    } catch (error) {
+      if (!signal?.aborted) setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      if (!signal?.aborted) setDiffLoading(false);
+    }
+  }, []);
+  const entries = status?.entries ?? [];
+  const staged = entries.filter(isStaged);
+  const working = entries.filter((entry) => !isStaged(entry));
+  const branchLabel = status?.branch && status.branch !== "(detached)" ? status.branch : status?.branch || "\u2014";
+  return h(
+    "div",
+    { className: "dgt-root", "data-plugin": "dsh-git-tree" },
+    // top bar: repo identity, branch, ahead/behind, actions
+    h(
+      "header",
+      { className: "dgt-topbar" },
+      h(
+        "div",
+        { className: "dgt-repo" },
+        h("span", { className: "dgt-repo-name" }, status?.repoRoot ? lastSegment(status.repoRoot) : t("panel")),
+        h(
+          "span",
+          { className: "dgt-repo-path", title: status?.cwd || status?.repoRoot || "" },
+          status?.repoRoot || status?.cwd || "\u2014"
+        )
+      ),
+      h(
+        "div",
+        { className: "dgt-refs" },
+        h(Chip, { tone: "muted" }, h("span", { className: "dgt-branch-glyph", "aria-hidden": "true" }, "\u2387"), " ", branchLabel),
+        typeof status?.ahead === "number" && status.ahead > 0 ? h(Chip, { tone: "ok" }, "\u2191" + String(status.ahead)) : null,
+        typeof status?.behind === "number" && status.behind > 0 ? h(Chip, { tone: "warn" }, "\u2193" + String(status.behind)) : null,
+        status?.upstream ? h("span", { className: "dgt-upstream" }, status.upstream) : null
+      ),
+      h(
+        "div",
+        { className: "dgt-actions" },
+        refreshing ? h(Spinner) : null,
+        h(
+          "button",
+          {
+            type: "button",
+            className: "dgt-button",
+            onClick: () => void loadStatus(),
+            disabled: refreshing,
+            title: t("refresh")
+          },
+          "\u27F3 " + t("refresh")
+        )
+      )
+    ),
+    statusError !== "" ? h(
+      "div",
+      { className: "dgt-banner", role: "status" },
+      h("strong", null, t("hostUnavailable")),
+      h("span", null, statusError)
+    ) : null,
+    // three-pane workspace: refs rail / change list / diff
+    h(
+      "div",
+      { className: "dgt-body" },
+      h(RefRail, { t }),
+      h(ChangeList, {
+        status,
+        statusError,
+        entries,
+        staged,
+        working,
+        selected,
+        t,
+        onSelect: (picked) => void openDiff(picked)
+      }),
+      h(DiffView, { selected, loading: diffLoading, diff, t })
+    )
+  );
+}
+
+// src/client/index.tsx
+var PANEL_ID = "git-tree";
+function GitTreeIcon(props) {
+  const size = typeof props.size === "number" ? props.size : 16;
+  const active = props.active === true;
+  return h(
+    "svg",
+    {
+      width: size,
+      height: size,
+      viewBox: "0 0 16 16",
+      "aria-hidden": "true",
+      focusable: "false",
+      style: { display: "block", opacity: active ? 1 : 0.86 }
+    },
+    h("path", {
+      d: "M4 2.75v6.1a2.75 2.75 0 0 0 2.75 2.75h2.6",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.4,
+      strokeLinecap: "round"
+    }),
+    h("circle", { cx: 4, cy: 2.6, r: 1.55, fill: "currentColor" }),
+    h("circle", { cx: 11.6, cy: 11.6, r: 1.55, fill: "none", stroke: "currentColor", strokeWidth: 1.4 }),
+    h("circle", { cx: 6.9, cy: 11.6, r: 1.55, fill: "currentColor" })
+  );
+}
 var inject = ["slots"];
 function apply(ctx) {
   ctx.effect(() => {
@@ -388,7 +476,7 @@ function apply(ctx) {
     "main",
     () => ctx.slots.register(
       { name: "main", key: PANEL_ID, locale: NS, inject: () => ({ t }) },
-      GitTreePanel
+      Workspace
     )
   );
 }
