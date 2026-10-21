@@ -12,6 +12,7 @@ import { RequestError } from '../src/host/errors.js'
 import { parsePorcelainV2, summariseEntries } from '../src/host/porcelain.js'
 import { parseUnifiedDiff } from '../src/host/diff.js'
 import { parseRefs } from '../src/host/refs.js'
+import { assignLanes, isSafeBranchName, parseHistoryLog } from '../src/host/history.js'
 
 const STATUS_FIXTURE =
   [
@@ -172,6 +173,42 @@ test('refs parser groups refs and marks the current branch', () => {
   assert.equal(parsed.branches[1].current, false)
   assert.equal(parsed.remotes.length, 1)
   assert.equal(parsed.tags.length, 1)
+})
+
+test('history parser reads fields, decorations and merges', () => {
+  const text =
+    [
+      ['c3', 'c2 c1', 'Ann', 'ann@example.com', '2026-10-20T10:00:00+08:00', "Merge topic", 'HEAD -> refs/heads/main, refs/remotes/origin/main'],
+      ['c2', 'c1', 'Bob', 'bob@example.com', '2026-10-19T10:00:00+08:00', 'fix', ''],
+      ['c1', '', 'Ann', 'ann@example.com', '2026-10-18T10:00:00+08:00', 'initial', 'tag: refs/tags/v1'],
+    ].map((row) => row.join('\u0000')).join('\u001e') + '\u001e'
+  const commits = parseHistoryLog(text)
+  assert.equal(commits.length, 3)
+  assert.deepEqual(commits[0].parents, ['c2', 'c1'])
+  assert.deepEqual(commits[0].refs, [{ name: 'main', kind: 'branch' }])
+  assert.deepEqual(commits[2].refs, [{ name: 'v1', kind: 'tag' }])
+})
+
+test('lane assignment continues the first parent and opens a lane for a merge', () => {
+  const commits = parseHistoryLog(
+    [
+      ['c3', 'c2 c1', 'A', 'a@x', '2026-10-20T00:00:00+08:00', 'merge', ''],
+      ['c2', 'c1', 'A', 'a@x', '2026-10-19T00:00:00+08:00', 'side', ''],
+      ['c1', '', 'A', 'a@x', '2026-10-18T00:00:00+08:00', 'base', ''],
+    ].map((row) => row.join('\u0000')).join('\u001e') + '\u001e',
+  )
+  const laneCount = assignLanes(commits)
+  assert.equal(commits[0].lane, 0)
+  assert.equal(commits[0].parentLanes[0], 0, 'first parent continues the lane')
+  assert.equal(commits[0].parentLanes[1], 1, 'merge parent opens a second lane')
+  assert.ok(laneCount >= 2)
+})
+
+test('branch names are validated before they can reach argv', () => {
+  for (const good of ['main', 'feature/x-1', 'release/2026.10']) assert.equal(isSafeBranchName(good), true, good)
+  for (const bad of ['-rf', '../x', 'a..b', 'a b', 'x.lock', '/lead', 'trail/', 'a@{1}', '']) {
+    assert.equal(isSafeBranchName(bad), false, bad)
+  }
 })
 
 test('git runner spawns argv directly, with the scrubbed git environment', async () => {

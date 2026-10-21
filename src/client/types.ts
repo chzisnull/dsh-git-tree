@@ -15,6 +15,38 @@ export interface ClientCtx {
   }
 }
 
+export interface HistoryRef {
+  name: string
+  kind: 'branch' | 'tag'
+}
+
+export interface HistoryCommit {
+  sha: string
+  parents: string[]
+  lane: number
+  parentLanes: number[]
+  author: string
+  authorEmail: string
+  date: string
+  subject: string
+  refs: HistoryRef[]
+}
+
+export interface HistoryPayload {
+  ok: boolean
+  commits?: HistoryCommit[]
+  laneCount?: number
+  hasMore?: boolean
+  scope?: string
+  error?: string
+  code?: string
+}
+
+export type HistoryScope = 'all' | 'current'
+
+/** The workspace view currently shown in the main column. */
+export type ViewKind = 'status' | 'history' | 'search'
+
 /** The side of the working copy an entry row belongs to. */
 export type EntrySide = 'staged' | 'unstaged' | 'conflicted'
 
