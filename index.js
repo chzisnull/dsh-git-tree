@@ -33,6 +33,7 @@
 import {
   handleCommit,
   handleDiff,
+  handleHistory,
   handleRefs,
   handleStage,
   handleStatus,
@@ -57,6 +58,7 @@ const ROUTES = [
   { path: '/api/git-tree/status', methods: ['GET'], handler: handleStatus },
   { path: '/api/git-tree/diff', methods: ['GET'], handler: handleDiff },
   { path: '/api/git-tree/refs', methods: ['GET'], handler: handleRefs },
+  { path: '/api/git-tree/history', methods: ['GET'], handler: handleHistory },
   { path: '/api/git-tree/stage', methods: ['POST'], handler: handleStage },
   { path: '/api/git-tree/unstage', methods: ['POST'], handler: handleUnstage },
   { path: '/api/git-tree/commit', methods: ['POST'], handler: handleCommit },

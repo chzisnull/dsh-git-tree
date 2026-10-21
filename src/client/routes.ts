@@ -2,13 +2,14 @@
 // host half. The browser uses the document-relative form so the request carries
 // the session cookie and passes the Connection fence.
 
-import type { DiffPayload, MutationPayload, RefsPayload, GitStatusPayload, WorkspacesPayload } from './types'
+import type { DiffPayload, HistoryPayload, MutationPayload, RefsPayload, GitStatusPayload, WorkspacesPayload } from './types'
 
 /** Authenticated exact Fetch routes served by the host half (document-relative). */
 const STATUS_ROUTE = 'api/git-tree/status'
 const WORKSPACES_ROUTE = 'api/git-tree/workspaces'
 const DIFF_ROUTE = 'api/git-tree/diff'
 const REFS_ROUTE = 'api/git-tree/refs'
+const HISTORY_ROUTE = 'api/git-tree/history'
 const STAGE_ROUTE = 'api/git-tree/stage'
 const UNSTAGE_ROUTE = 'api/git-tree/unstage'
 const COMMIT_ROUTE = 'api/git-tree/commit'
@@ -60,6 +61,13 @@ export function fetchDiff(
 
 export function fetchRefs(cwd?: string, signal?: AbortSignal): Promise<RefsPayload> {
   return getJson<RefsPayload>(REFS_ROUTE, { cwd }, signal)
+}
+
+export function fetchHistory(
+  params: Record<string, string | undefined>,
+  signal?: AbortSignal,
+): Promise<HistoryPayload> {
+  return getJson<HistoryPayload>(HISTORY_ROUTE, params, signal)
 }
 
 export function stagePaths(paths: string[], cwd?: string): Promise<MutationPayload> {

@@ -1,10 +1,9 @@
-// Reference rail: workspace views, then the real branch / remote / tag tree.
-// Rows are display-only here; switching views needs the history and search
-// slices, so those two are shown as unavailable rather than as dead links.
+// Reference rail: workspace view switcher, then the local branch / tag tree.
+// Remote refs are out of scope for this version and are not shown at all.
 
 import { h } from '../react'
-import type { GitStatusPayload, RefRecord, RefsPayload, Translate } from '../types'
-import { BranchIcon, RemoteIcon, TagIcon } from '../icons'
+import type { GitStatusPayload, RefRecord, RefsPayload, Translate, ViewKind } from '../types'
+import { BranchIcon, TagIcon } from '../icons'
 
 function Section(props: { title: string; count?: number; children?: any }): any {
   return h(
@@ -20,9 +19,9 @@ function Section(props: { title: string; count?: number; children?: any }): any 
   )
 }
 
-function RefRow(props: { record: RefRecord; kind: 'branch' | 'remote' | 'tag' }): any {
+function RefRow(props: { record: RefRecord; kind: 'branch' | 'tag' }): any {
   const ref = props.record
-  const Icon = props.kind === 'branch' ? BranchIcon : props.kind === 'remote' ? RemoteIcon : TagIcon
+  const Icon = props.kind === 'branch' ? BranchIcon : TagIcon
   return h(
     'div',
     {
@@ -36,10 +35,28 @@ function RefRow(props: { record: RefRecord; kind: 'branch' | 'remote' | 'tag' })
   )
 }
 
-export function RefRail(props: { status: GitStatusPayload | null; refs: RefsPayload | null; t: Translate }): any {
+function ViewRow(props: { label: string; active: boolean; onSelect: () => void }): any {
+  return h(
+    'button',
+    {
+      type: 'button',
+      className: 'dgt-rail-row dgt-rail-btn',
+      'data-active': props.active || undefined,
+      onClick: props.onSelect,
+    },
+    h('span', { className: 'dgt-rail-name' }, props.label),
+  )
+}
+
+export function RefRail(props: {
+  status: GitStatusPayload | null
+  refs: RefsPayload | null
+  view: ViewKind
+  t: Translate
+  onView: (view: ViewKind) => void
+}): any {
   const { refs, t } = props
   const branches = refs?.branches ?? []
-  const remotes = refs?.remotes ?? []
   const tags = refs?.tags ?? []
 
   return h(
@@ -48,26 +65,16 @@ export function RefRail(props: { status: GitStatusPayload | null; refs: RefsPayl
     h(
       Section,
       { title: t('workspace') },
-      h(
-        'div',
-        { className: 'dgt-rail-row', 'data-active': true },
-        h('span', { className: 'dgt-rail-name' }, t('fileStatus')),
-      ),
-      h('div', { className: 'dgt-rail-row', 'data-muted': true, title: t('readOnly') }, h('span', { className: 'dgt-rail-name' }, t('history'))),
-      h('div', { className: 'dgt-rail-row', 'data-muted': true, title: t('readOnly') }, h('span', { className: 'dgt-rail-name' }, t('search'))),
+      h(ViewRow, { label: t('fileStatus'), active: props.view === 'status', onSelect: () => props.onView('status') }),
+      h(ViewRow, { label: t('history'), active: props.view === 'history', onSelect: () => props.onView('history') }),
+      // Search arrives with its own slice; until then it is not rendered at all
+      // rather than shown as a dead row.
     ),
     h(
       Section,
       { title: t('branches'), count: branches.length },
       branches.length > 0
         ? branches.map((ref) => h(RefRow, { key: 'b:' + ref.name, record: ref, kind: 'branch' }))
-        : h('div', { className: 'dgt-rail-empty' }, '—'),
-    ),
-    h(
-      Section,
-      { title: t('remotes'), count: remotes.length },
-      remotes.length > 0
-        ? remotes.map((ref) => h(RefRow, { key: 'r:' + ref.name, record: ref, kind: 'remote' }))
         : h('div', { className: 'dgt-rail-empty' }, '—'),
     ),
     h(

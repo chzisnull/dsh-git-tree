@@ -44,6 +44,16 @@ var EN = {
   workspace: "Workspace",
   fileStatus: "File status",
   diff: "Diff",
+  historyColumn: "Graph",
+  commitColumn: "Commit",
+  authorColumn: "Author",
+  dateColumn: "Date",
+  allBranches: "All branches",
+  currentBranchOnly: "Current branch only",
+  loadMore: "Load more",
+  noCommits: "No commits yet.",
+  historyFailed: "Could not read the history.",
+  selectCommit: "Select a commit to see its detail.",
   itemsUnit: "items",
   commitMessageEmpty: "Write a message to commit.",
   commitShortcut: "\u2318\u21B5 to commit",
@@ -100,6 +110,16 @@ var ZH = {
   workspace: "\u5DE5\u4F5C\u533A",
   fileStatus: "\u6587\u4EF6\u72B6\u6001",
   diff: "\u5DEE\u5F02",
+  historyColumn: "\u56FE\u8868",
+  commitColumn: "\u63D0\u4EA4",
+  authorColumn: "\u4F5C\u8005",
+  dateColumn: "\u65E5\u671F",
+  allBranches: "\u6240\u6709\u5206\u652F",
+  currentBranchOnly: "\u4EC5\u5F53\u524D\u5206\u652F",
+  loadMore: "\u52A0\u8F7D\u66F4\u591A",
+  noCommits: "\u8FD8\u6CA1\u6709\u63D0\u4EA4\u3002",
+  historyFailed: "\u8BFB\u53D6\u5386\u53F2\u5931\u8D25\u3002",
+  selectCommit: "\u9009\u62E9\u4E00\u6761\u63D0\u4EA4\u67E5\u770B\u8BE6\u60C5\u3002",
   itemsUnit: "\u9879",
   commitMessageEmpty: "\u586B\u5199\u63D0\u4EA4\u4FE1\u606F\u540E\u53EF\u63D0\u4EA4\u3002",
   commitShortcut: "\u2318\u21B5 \u63D0\u4EA4",
@@ -157,7 +177,12 @@ var CSS = `
   --dgt-ok:color-mix(in srgb, var(--dsw-alias-state-success-primary) 55%, var(--dsw-alias-label-primary));
   --dgt-warn:color-mix(in srgb, var(--dsw-alias-state-warn-primary) 58%, var(--dsw-alias-label-primary));
   --dgt-err:color-mix(in srgb, var(--dsw-alias-state-error-primary) 70%, var(--dsw-alias-label-primary));
-  --dgt-meta:var(--dsw-alias-label-secondary);}
+  --dgt-meta:var(--dsw-alias-label-secondary);
+  --dgt-lane-0:var(--dsw-alias-brand-primary);
+  --dgt-lane-1:color-mix(in srgb, var(--dsw-alias-state-success-primary) 65%, var(--dsw-alias-label-primary));
+  --dgt-lane-2:color-mix(in srgb, var(--dsw-alias-state-warn-primary) 70%, var(--dsw-alias-label-primary));
+  --dgt-lane-3:color-mix(in srgb, var(--dsw-alias-state-error-primary) 70%, var(--dsw-alias-label-primary));
+  --dgt-lane-4:color-mix(in srgb, var(--dsw-alias-brand-primary) 45%, var(--dsw-alias-state-success-primary));}
 
 /* toolbar */
 .dgt-topbar{display:flex;align-items:center;gap:10px;flex:0 0 auto;height:44px;padding:0 10px;
@@ -239,6 +264,45 @@ var CSS = `
   border-right:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1);}
 .dgt-diff{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0;
   background:var(--dsw-alias-bg-base);}
+
+/* history view */
+.dgt-history{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0;
+  background:var(--dsw-alias-bg-base);}
+.dgt-htoolbar{display:flex;align-items:center;gap:8px;flex:0 0 auto;height:32px;padding:0 10px;
+  border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);}
+.dgt-seg{display:inline-flex;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);
+  overflow:hidden;background:var(--dsw-alias-bg-layer-1);}
+.dgt-seg-btn{appearance:none;border:0;height:22px;padding:0 10px;background:transparent;
+  color:var(--dsw-alias-label-secondary);font:inherit;font-size:11.5px;cursor:pointer;}
+.dgt-seg-btn:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-seg-btn[data-active]{background:var(--dsw-alias-interactive-bg-active);
+  color:var(--dsw-alias-label-primary);font-weight:500;}
+.dgt-hhead{display:grid;grid-template-columns:88px minmax(0,1fr) 90px 120px 150px;align-items:center;
+  flex:0 0 auto;height:26px;padding:0 10px;border-bottom:1px solid var(--dsw-alias-border-l2);
+  background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);
+  font-size:11px;font-weight:600;}
+.dgt-hscroll{flex:1 1 auto;min-height:0;overflow:auto;}
+.dgt-hlist{padding:2px 0 8px;}
+.dgt-hrow{display:grid;grid-template-columns:88px minmax(0,1fr) 90px 120px 150px;align-items:center;
+  height:24px;padding:0 10px;color:var(--dsw-alias-label-primary);font-size:12px;cursor:default;}
+.dgt-hrow:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-hrow[data-active]{background:var(--dsw-alias-interactive-bg-active);}
+.dgt-hrow:focus-visible{outline:2px solid var(--dsw-alias-brand-primary);outline-offset:-2px;}
+.dgt-hgraph{display:flex;align-items:center;overflow:visible;}
+.dgt-graph{display:block;overflow:visible;}
+.dgt-hsubject{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;}
+.dgt-hsubject-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-refchip{flex:0 0 auto;padding:0 6px;border-radius:999px;line-height:16px;font-size:10.5px;
+  color:var(--dsw-alias-brand-text);background:color-mix(in srgb, var(--dsw-alias-brand-primary) 12%, transparent);
+  border:1px solid color-mix(in srgb, var(--dsw-alias-brand-primary) 30%, var(--dsw-alias-border-l2));}
+.dgt-refchip[data-kind='tag']{color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-3);
+  border-color:var(--dsw-alias-border-l2);}
+.dgt-hsha{font-family:var(--ds-font-family-code);font-size:11px;color:var(--dgt-meta);}
+.dgt-hauthor,.dgt-hdate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--dsw-alias-label-secondary);font-size:11.5px;}
+.dgt-hmore{display:flex;justify-content:center;padding:10px;}
+.dgt-rail-btn{appearance:none;border:0;width:100%;background:transparent;text-align:left;
+  font:inherit;font-size:13px;cursor:pointer;}
 
 /* list */
 .dgt-list-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:0 0 auto;
@@ -364,6 +428,7 @@ var STATUS_ROUTE = "api/git-tree/status";
 var WORKSPACES_ROUTE = "api/git-tree/workspaces";
 var DIFF_ROUTE = "api/git-tree/diff";
 var REFS_ROUTE = "api/git-tree/refs";
+var HISTORY_ROUTE = "api/git-tree/history";
 var STAGE_ROUTE = "api/git-tree/stage";
 var UNSTAGE_ROUTE = "api/git-tree/unstage";
 var COMMIT_ROUTE = "api/git-tree/commit";
@@ -401,6 +466,9 @@ function fetchDiff(params, signal) {
 }
 function fetchRefs(cwd, signal) {
   return getJson(REFS_ROUTE, { cwd }, signal);
+}
+function fetchHistory(params, signal) {
+  return getJson(HISTORY_ROUTE, params, signal);
 }
 function stagePaths(paths, cwd) {
   return postJson(STAGE_ROUTE + query({ cwd }), { paths });
@@ -500,12 +568,6 @@ function TagIcon() {
       strokeLinejoin: "round"
     })
   );
-}
-function RemoteIcon() {
-  return svg([
-    h("rect", { x: 2.4, y: 4.4, width: 11.2, height: 7.2, rx: 1.4, fill: "none", stroke: "currentColor", strokeWidth: 1.2 }),
-    h("path", { d: "M5.4 8h5.2", fill: "none", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round" })
-  ]);
 }
 function MoreIcon() {
   return h(
@@ -628,7 +690,7 @@ function Section(props) {
 }
 function RefRow(props) {
   const ref = props.record;
-  const Icon = props.kind === "branch" ? BranchIcon : props.kind === "remote" ? RemoteIcon : TagIcon;
+  const Icon = props.kind === "branch" ? BranchIcon : TagIcon;
   return h(
     "div",
     {
@@ -641,10 +703,21 @@ function RefRow(props) {
     h("span", { className: "dgt-rail-name" }, ref.name)
   );
 }
+function ViewRow(props) {
+  return h(
+    "button",
+    {
+      type: "button",
+      className: "dgt-rail-row dgt-rail-btn",
+      "data-active": props.active || void 0,
+      onClick: props.onSelect
+    },
+    h("span", { className: "dgt-rail-name" }, props.label)
+  );
+}
 function RefRail(props) {
   const { refs, t } = props;
   const branches = refs?.branches ?? [];
-  const remotes = refs?.remotes ?? [];
   const tags = refs?.tags ?? [];
   return h(
     "aside",
@@ -652,23 +725,15 @@ function RefRail(props) {
     h(
       Section,
       { title: t("workspace") },
-      h(
-        "div",
-        { className: "dgt-rail-row", "data-active": true },
-        h("span", { className: "dgt-rail-name" }, t("fileStatus"))
-      ),
-      h("div", { className: "dgt-rail-row", "data-muted": true, title: t("readOnly") }, h("span", { className: "dgt-rail-name" }, t("history"))),
-      h("div", { className: "dgt-rail-row", "data-muted": true, title: t("readOnly") }, h("span", { className: "dgt-rail-name" }, t("search")))
+      h(ViewRow, { label: t("fileStatus"), active: props.view === "status", onSelect: () => props.onView("status") }),
+      h(ViewRow, { label: t("history"), active: props.view === "history", onSelect: () => props.onView("history") })
+      // Search arrives with its own slice; until then it is not rendered at all
+      // rather than shown as a dead row.
     ),
     h(
       Section,
       { title: t("branches"), count: branches.length },
       branches.length > 0 ? branches.map((ref) => h(RefRow, { key: "b:" + ref.name, record: ref, kind: "branch" })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
-    ),
-    h(
-      Section,
-      { title: t("remotes"), count: remotes.length },
-      remotes.length > 0 ? remotes.map((ref) => h(RefRow, { key: "r:" + ref.name, record: ref, kind: "remote" })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
     ),
     h(
       Section,
@@ -1043,6 +1108,152 @@ function StatusView(props) {
   );
 }
 
+// src/client/components/views/HistoryView.tsx
+var LANE_GAP = 14;
+var GRAPH_WIDTH = 88;
+var ROW_HEIGHT = 24;
+function laneX(lane) {
+  return 12 + lane * LANE_GAP;
+}
+function formatDate(value) {
+  const text = String(value || "");
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(text);
+  return match ? match[1] + "-" + match[2] + "-" + match[3] + " " + match[4] + ":" + match[5] : text;
+}
+function Graph(props) {
+  const commit = props.commit;
+  const y = ROW_HEIGHT / 2;
+  const x = laneX(commit.lane);
+  const edges = commit.parentLanes.map(
+    (parentLane, index) => h("line", {
+      key: "edge:" + String(index),
+      x1: x,
+      y1: y + 4,
+      x2: laneX(parentLane),
+      y2: ROW_HEIGHT,
+      stroke: "currentColor",
+      strokeWidth: 1.6
+    })
+  );
+  return h(
+    "svg",
+    {
+      className: "dgt-graph",
+      width: GRAPH_WIDTH,
+      height: ROW_HEIGHT,
+      "aria-hidden": "true",
+      focusable: "false",
+      style: { color: "var(--dgt-lane-" + String(commit.lane % 5) + ")" }
+    },
+    edges,
+    h("circle", { cx: x, cy: y, r: 4, fill: "currentColor" })
+  );
+}
+function HistoryView(props) {
+  const { commits, t } = props;
+  return h(
+    "div",
+    { className: "dgt-main" },
+    h(
+      "div",
+      { className: "dgt-history" },
+      h(
+        "div",
+        { className: "dgt-htoolbar" },
+        h(
+          "div",
+          { className: "dgt-seg", role: "group" },
+          h(
+            "button",
+            {
+              type: "button",
+              className: "dgt-seg-btn",
+              "data-active": props.scope === "all" || void 0,
+              onClick: () => props.onScope("all")
+            },
+            t("allBranches")
+          ),
+          h(
+            "button",
+            {
+              type: "button",
+              className: "dgt-seg-btn",
+              "data-active": props.scope === "current" || void 0,
+              onClick: () => props.onScope("current")
+            },
+            t("currentBranchOnly")
+          )
+        )
+      ),
+      h(
+        "div",
+        { className: "dgt-hhead", role: "row" },
+        h("span", null, t("historyColumn")),
+        h("span", null, t("diff")),
+        h("span", null, t("commitColumn")),
+        h("span", null, t("authorColumn")),
+        h("span", null, t("dateColumn"))
+      ),
+      h(
+        "div",
+        { className: "dgt-hscroll" },
+        props.loading && commits.length === 0 ? h("div", { className: "dgt-placeholder" }, t("loading")) : props.error !== "" ? h("div", { className: "dgt-placeholder dgt-error" }, props.error) : commits.length === 0 ? h("div", { className: "dgt-empty" }, t("noCommits")) : h(
+          "div",
+          { className: "dgt-hlist" },
+          commits.map(
+            (commit) => h(
+              "div",
+              {
+                key: commit.sha,
+                className: "dgt-hrow",
+                "data-active": commit.sha === props.selectedSha || void 0,
+                role: "button",
+                tabIndex: 0,
+                onClick: () => props.onSelect(commit),
+                onKeyDown: (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    props.onSelect(commit);
+                  }
+                }
+              },
+              h("span", { className: "dgt-hgraph" }, h(Graph, { commit })),
+              h(
+                "span",
+                { className: "dgt-hsubject", title: commit.subject },
+                h("span", { className: "dgt-hsubject-text" }, commit.subject),
+                commit.refs.map(
+                  (ref) => h(
+                    "span",
+                    {
+                      key: ref.kind + ":" + ref.name,
+                      className: "dgt-refchip",
+                      "data-kind": ref.kind
+                    },
+                    ref.name
+                  )
+                )
+              ),
+              h("span", { className: "dgt-hsha" }, commit.sha.slice(0, 8)),
+              h("span", { className: "dgt-hauthor", title: commit.author }, commit.author),
+              h("span", { className: "dgt-hdate" }, formatDate(commit.date))
+            )
+          ),
+          props.hasMore ? h(
+            "div",
+            { className: "dgt-hmore" },
+            h(
+              "button",
+              { type: "button", className: "dgt-button", onClick: props.onLoadMore, disabled: props.loading },
+              t("loadMore")
+            )
+          ) : null
+        )
+      )
+    )
+  );
+}
+
 // src/client/components/Workspace.tsx
 var POLL_MS = 2e3;
 var REPO_KEY = "dsh-git-tree/repository";
@@ -1060,7 +1271,14 @@ function Workspace(props) {
   const [refs, setRefs] = React.useState(null);
   const [workspaces, setWorkspaces] = React.useState([]);
   const [repoPath, setRepoPath] = React.useState("");
-  const [view] = React.useState("status");
+  const [view, setView] = React.useState("status");
+  const [historyCommits, setHistoryCommits] = React.useState([]);
+  const [historyLaneCount, setHistoryLaneCount] = React.useState(1);
+  const [historyHasMore, setHistoryHasMore] = React.useState(false);
+  const [historyLoading, setHistoryLoading] = React.useState(false);
+  const [historyError, setHistoryError] = React.useState("");
+  const [historyScope, setHistoryScope] = React.useState("all");
+  const [historySha, setHistorySha] = React.useState("");
   const [statusError, setStatusError] = React.useState("");
   const [selected, setSelected] = React.useState(null);
   const [diff, setDiff] = React.useState(null);
@@ -1124,6 +1342,40 @@ function Workspace(props) {
       setDiffLoading(false);
     }
   }, [repoPath]);
+  const loadHistory = React.useCallback(
+    async (reset) => {
+      setHistoryLoading(true);
+      setHistoryError("");
+      const skip = reset ? 0 : historyCommits.length;
+      try {
+        const next = await fetchHistory({
+          cwd: repoPath || void 0,
+          scope: historyScope,
+          limit: "200",
+          skip: String(skip)
+        });
+        if (!next.ok) {
+          setHistoryError(next.error || t("historyFailed"));
+          if (reset) setHistoryCommits([]);
+        } else {
+          const list = next.commits ?? [];
+          setHistoryCommits(reset ? list : [...historyCommits, ...list]);
+          setHistoryLaneCount(next.laneCount ?? 1);
+          setHistoryHasMore(next.hasMore === true);
+        }
+      } catch (error) {
+        setHistoryError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setHistoryLoading(false);
+      }
+    },
+    [historyCommits, historyScope, repoPath, t]
+  );
+  React.useEffect(() => {
+    if (view !== "history") return;
+    setHistorySha("");
+    void loadHistory(true);
+  }, [view, repoPath, historyScope]);
   React.useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -1240,6 +1492,9 @@ function Workspace(props) {
     setDiff(null);
     setActionError("");
     setMessage("");
+    setView("status");
+    setHistoryCommits([]);
+    setHistorySha("");
   }, []);
   const entries = status?.entries ?? [];
   const rows = splitEntries(entries);
@@ -1249,6 +1504,23 @@ function Workspace(props) {
   const truncated = status?.truncated === true;
   const renderView = () => {
     switch (view) {
+      case "history":
+        return h(HistoryView, {
+          commits: historyCommits,
+          laneCount: historyLaneCount,
+          hasMore: historyHasMore,
+          loading: historyLoading,
+          error: historyError,
+          scope: historyScope,
+          selectedSha: historySha,
+          t,
+          onScope: (scope) => {
+            setHistoryScope(scope);
+            setHistorySha("");
+          },
+          onSelect: (commit2) => setHistorySha(commit2.sha),
+          onLoadMore: () => void loadHistory(false)
+        });
       case "status":
       default:
         return h(StatusView, {
@@ -1294,7 +1566,7 @@ function Workspace(props) {
       h("span", { className: "dgt-banner-text" }, statusError)
     ) : null,
     truncated ? h("div", { className: "dgt-banner" }, h("span", { className: "dgt-banner-text" }, t("truncated"))) : null,
-    h("div", { className: "dgt-body" }, h(RefRail, { status, refs, t }), renderView()),
+    h("div", { className: "dgt-body" }, h(RefRail, { status, refs, view, t, onView: setView }), renderView()),
     toast ? h("div", { className: "dgt-toast", role: "status" }, toast) : null,
     notice ? h("div", { className: "dgt-toast", role: "status" }, notice) : null
   );
