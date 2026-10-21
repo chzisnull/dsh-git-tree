@@ -4,6 +4,7 @@
 
 import { h } from '../react'
 import type { GitStatusPayload, RefRecord, RefsPayload, Translate } from '../types'
+import { BranchIcon, RemoteIcon, TagIcon } from '../icons'
 
 function Section(props: { title: string; count?: number; children?: any }): any {
   return h(
@@ -19,8 +20,9 @@ function Section(props: { title: string; count?: number; children?: any }): any 
   )
 }
 
-function RefRow(props: { record: RefRecord }): any {
+function RefRow(props: { record: RefRecord; kind: 'branch' | 'remote' | 'tag' }): any {
   const ref = props.record
+  const Icon = props.kind === 'branch' ? BranchIcon : props.kind === 'remote' ? RemoteIcon : TagIcon
   return h(
     'div',
     {
@@ -28,6 +30,7 @@ function RefRow(props: { record: RefRecord }): any {
       'data-current': ref.current || undefined,
       title: ref.subject ? ref.name + ' — ' + ref.subject : ref.name,
     },
+    h('span', { className: 'dgt-rail-icon' }, h(Icon)),
     ref.current ? h('span', { className: 'dgt-rail-dot' }) : null,
     h('span', { className: 'dgt-rail-name' }, ref.name),
   )
@@ -57,21 +60,21 @@ export function RefRail(props: { status: GitStatusPayload | null; refs: RefsPayl
       Section,
       { title: t('branches'), count: branches.length },
       branches.length > 0
-        ? branches.map((ref) => h(RefRow, { key: 'b:' + ref.name, record: ref }))
+        ? branches.map((ref) => h(RefRow, { key: 'b:' + ref.name, record: ref, kind: 'branch' }))
         : h('div', { className: 'dgt-rail-empty' }, '—'),
     ),
     h(
       Section,
       { title: t('remotes'), count: remotes.length },
       remotes.length > 0
-        ? remotes.map((ref) => h(RefRow, { key: 'r:' + ref.name, record: ref }))
+        ? remotes.map((ref) => h(RefRow, { key: 'r:' + ref.name, record: ref, kind: 'remote' }))
         : h('div', { className: 'dgt-rail-empty' }, '—'),
     ),
     h(
       Section,
       { title: t('tags'), count: tags.length },
       tags.length > 0
-        ? tags.map((ref) => h(RefRow, { key: 't:' + ref.name, record: ref }))
+        ? tags.map((ref) => h(RefRow, { key: 't:' + ref.name, record: ref, kind: 'tag' }))
         : h('div', { className: 'dgt-rail-empty' }, '—'),
     ),
   )

@@ -41,6 +41,7 @@ var EN = {
   readOnly: "Read-only for now",
   workspace: "Workspace",
   fileStatus: "File status",
+  changes: "Changes",
   history: "History",
   search: "Search",
   branches: "Branches",
@@ -90,6 +91,7 @@ var ZH = {
   readOnly: "\u6682\u4E3A\u53EA\u8BFB",
   workspace: "\u5DE5\u4F5C\u533A",
   fileStatus: "\u6587\u4EF6\u72B6\u6001",
+  changes: "\u6539\u52A8",
   history: "\u5386\u53F2",
   search: "\u641C\u7D22",
   branches: "\u5206\u652F",
@@ -188,6 +190,8 @@ var CSS = `
   color:var(--dsw-alias-label-primary);}
 .dgt-rail-row[data-current='true']{color:var(--dsw-alias-label-primary);font-weight:500;}
 .dgt-rail-row[data-muted='true']{color:var(--dsw-alias-label-caption);}
+.dgt-rail-icon{display:inline-flex;align-items:center;color:var(--dsw-alias-label-tertiary);flex:0 0 auto;}
+.dgt-rail-row[data-current='true'] .dgt-rail-icon{color:var(--dsw-alias-brand-text);}
 .dgt-rail-dot{width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-brand-primary);flex:0 0 auto;}
 .dgt-rail-name{overflow:hidden;text-overflow:ellipsis;}
 .dgt-rail-empty{padding:4px 12px 6px 20px;color:var(--dsw-alias-label-caption);font-size:11px;}
@@ -437,6 +441,30 @@ function CommitIcon() {
     h("path", { d: "M8 1.4v2.4M8 12.2v2.4", fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round" })
   ]);
 }
+function BranchIcon() {
+  return svg([
+    h("path", { d: "M4.5 3v6.2a2.6 2.6 0 0 0 2.6 2.6h3.4", fill: "none", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round" }),
+    h("circle", { cx: 4.5, cy: 2.6, r: 1.25, fill: "currentColor" }),
+    h("circle", { cx: 11.6, cy: 11.8, r: 1.25, fill: "none", stroke: "currentColor", strokeWidth: 1.2 })
+  ]);
+}
+function TagIcon() {
+  return svg(
+    h("path", {
+      d: "M2.6 3.6h4.2l6.2 6.2a1.3 1.3 0 0 1 0 1.8l-1.6 1.6a1.3 1.3 0 0 1-1.8 0L3.4 7V3.6Z",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.2,
+      strokeLinejoin: "round"
+    })
+  );
+}
+function RemoteIcon() {
+  return svg([
+    h("rect", { x: 2.4, y: 4.4, width: 11.2, height: 7.2, rx: 1.4, fill: "none", stroke: "currentColor", strokeWidth: 1.2 }),
+    h("path", { d: "M5.4 8h5.2", fill: "none", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round" })
+  ]);
+}
 function MoreIcon() {
   return h(
     "svg",
@@ -523,6 +551,7 @@ function Section(props) {
 }
 function RefRow(props) {
   const ref = props.record;
+  const Icon = props.kind === "branch" ? BranchIcon : props.kind === "remote" ? RemoteIcon : TagIcon;
   return h(
     "div",
     {
@@ -530,6 +559,7 @@ function RefRow(props) {
       "data-current": ref.current || void 0,
       title: ref.subject ? ref.name + " \u2014 " + ref.subject : ref.name
     },
+    h("span", { className: "dgt-rail-icon" }, h(Icon)),
     ref.current ? h("span", { className: "dgt-rail-dot" }) : null,
     h("span", { className: "dgt-rail-name" }, ref.name)
   );
@@ -556,17 +586,17 @@ function RefRail(props) {
     h(
       Section,
       { title: t("branches"), count: branches.length },
-      branches.length > 0 ? branches.map((ref) => h(RefRow, { key: "b:" + ref.name, record: ref })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
+      branches.length > 0 ? branches.map((ref) => h(RefRow, { key: "b:" + ref.name, record: ref, kind: "branch" })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
     ),
     h(
       Section,
       { title: t("remotes"), count: remotes.length },
-      remotes.length > 0 ? remotes.map((ref) => h(RefRow, { key: "r:" + ref.name, record: ref })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
+      remotes.length > 0 ? remotes.map((ref) => h(RefRow, { key: "r:" + ref.name, record: ref, kind: "remote" })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
     ),
     h(
       Section,
       { title: t("tags"), count: tags.length },
-      tags.length > 0 ? tags.map((ref) => h(RefRow, { key: "t:" + ref.name, record: ref })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
+      tags.length > 0 ? tags.map((ref) => h(RefRow, { key: "t:" + ref.name, record: ref, kind: "tag" })) : h("div", { className: "dgt-rail-empty" }, "\u2014")
     )
   );
 }
@@ -697,7 +727,7 @@ function ChangeList(props) {
     h(
       "div",
       { className: "dgt-list-head" },
-      h("span", null, t("fileStatus")),
+      h("span", null, t("changes")),
       h("span", { className: "dgt-group-count" }, String(total))
     ),
     status === null && statusError === "" ? h("div", { className: "dgt-placeholder" }, t("loading")) : empty ? h(
@@ -806,9 +836,9 @@ function DiffView(props) {
     h(
       "div",
       { className: "dgt-diff-body" },
-      entry === null ? h("div", { className: "dgt-placeholder" }, t("noFileSelected")) : loading ? h("div", { className: "dgt-placeholder" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-placeholder" }, diff.error || t("diffFailed")) : diff && diff.binary ? h("div", { className: "dgt-placeholder" }, t("binaryFile")) : diff && diff.files && diff.files.length > 0 ? diff.files.map((file, index) => h(FileBlock, { key: "file:" + String(index), file, t })) : h(
+      entry === null ? h("div", { className: "dgt-empty" }, t("noFileSelected")) : loading ? h("div", { className: "dgt-empty" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-empty" }, diff.error || t("diffFailed")) : diff && diff.binary ? h("div", { className: "dgt-empty" }, t("binaryFile")) : diff && diff.files && diff.files.length > 0 ? diff.files.map((file, index) => h(FileBlock, { key: "file:" + String(index), file, t })) : h(
         "div",
-        { className: "dgt-placeholder" },
+        { className: "dgt-empty" },
         entry.kind === "untracked" ? t("untrackedNoDiff") : t("noDiff")
       )
     )

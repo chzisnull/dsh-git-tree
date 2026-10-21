@@ -61,7 +61,7 @@ export function ChangeList(props: {
     h(
       'div',
       { className: 'dgt-list-head' },
-      h('span', null, t('fileStatus')),
+      h('span', null, t('changes')),
       h('span', { className: 'dgt-group-count' }, String(total)),
     ),
     status === null && statusError === ''

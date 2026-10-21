@@ -59,6 +59,8 @@ export const CSS = `
   color:var(--dsw-alias-label-primary);}
 .dgt-rail-row[data-current='true']{color:var(--dsw-alias-label-primary);font-weight:500;}
 .dgt-rail-row[data-muted='true']{color:var(--dsw-alias-label-caption);}
+.dgt-rail-icon{display:inline-flex;align-items:center;color:var(--dsw-alias-label-tertiary);flex:0 0 auto;}
+.dgt-rail-row[data-current='true'] .dgt-rail-icon{color:var(--dsw-alias-brand-text);}
 .dgt-rail-dot{width:6px;height:6px;border-radius:50%;background:var(--dsw-alias-brand-primary);flex:0 0 auto;}
 .dgt-rail-name{overflow:hidden;text-overflow:ellipsis;}
 .dgt-rail-empty{padding:4px 12px 6px 20px;color:var(--dsw-alias-label-caption);font-size:11px;}

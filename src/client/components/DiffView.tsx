@@ -86,18 +86,18 @@ export function DiffView(props: {
       'div',
       { className: 'dgt-diff-body' },
       entry === null
-        ? h('div', { className: 'dgt-placeholder' }, t('noFileSelected'))
+        ? h('div', { className: 'dgt-empty' }, t('noFileSelected'))
         : loading
-          ? h('div', { className: 'dgt-placeholder' }, t('loading'))
+          ? h('div', { className: 'dgt-empty' }, t('loading'))
           : diff && diff.ok === false
-            ? h('div', { className: 'dgt-placeholder' }, diff.error || t('diffFailed'))
+            ? h('div', { className: 'dgt-empty' }, diff.error || t('diffFailed'))
             : diff && diff.binary
-              ? h('div', { className: 'dgt-placeholder' }, t('binaryFile'))
+              ? h('div', { className: 'dgt-empty' }, t('binaryFile'))
               : diff && diff.files && diff.files.length > 0
                 ? diff.files.map((file, index) => h(FileBlock, { key: 'file:' + String(index), file, t }))
                 : h(
                     'div',
-                    { className: 'dgt-placeholder' },
+                    { className: 'dgt-empty' },
                     entry.kind === 'untracked' ? t('untrackedNoDiff') : t('noDiff'),
                   ),
     ),
