@@ -1,20 +1,23 @@
-// Toolbar: repository switcher, branch and sync state, and the two actions the
-// panel really supports (refresh, focus the commit box). Sourcetree's other
-// toolbar actions are intentionally not shown as dead buttons.
+// Toolbar: repository switcher, branch and sync state, and the actions the
+// panel really supports (refresh, reveal in Finder, open a terminal, focus the
+// commit box). The two local open actions only exist on macOS; elsewhere they
+// are not rendered at all rather than shown as dead buttons.
 
 import { h, React } from '../react'
-import type { GitStatusPayload, Translate, WorkspaceRecord } from '../types'
+import type { GitStatusPayload, OpenTarget, Translate, WorkspaceRecord } from '../types'
 import { lastSegment } from '../model'
 import { Chip } from './atoms'
-import { CommitIcon, RefreshIcon } from '../icons'
+import { CommitIcon, FolderIcon, RefreshIcon, TerminalIcon } from '../icons'
 
 export function TopBar(props: {
   status: GitStatusPayload | null
   workspaces: WorkspaceRecord[]
   currentPath: string
   busy: boolean
+  opening: boolean
   t: Translate
   onRefresh: () => void
+  onOpen: (target: OpenTarget) => void
   onCommitFocus: () => void
   onSelectWorkspace: (path: string) => void
 }): any {
@@ -100,6 +103,36 @@ export function TopBar(props: {
         },
         h(RefreshIcon),
       ),
+      status?.platform === 'darwin'
+        ? h(
+            'button',
+            {
+              type: 'button',
+              className: 'dgt-iconbtn',
+              title: t('revealInFinder'),
+              'aria-label': t('revealInFinder'),
+              'aria-busy': props.opening || undefined,
+              disabled: props.opening,
+              onClick: () => props.onOpen('finder'),
+            },
+            h(FolderIcon),
+          )
+        : null,
+      status?.platform === 'darwin'
+        ? h(
+            'button',
+            {
+              type: 'button',
+              className: 'dgt-iconbtn',
+              title: t('openInTerminal'),
+              'aria-label': t('openInTerminal'),
+              'aria-busy': props.opening || undefined,
+              disabled: props.opening,
+              onClick: () => props.onOpen('terminal'),
+            },
+            h(TerminalIcon),
+          )
+        : null,
       h(
         'button',
         {

@@ -33,10 +33,18 @@ test('panel pairs sidebar.panellist with the main keyed slot under one id', () =
   assert.equal(source.match(/slots\.register\(/g)?.length, 2, 'exactly two slot registrations')
 })
 
-test('client calls the two host routes the plugin registers', () => {
+test('client calls the host routes the plugin registers', () => {
   assert.ok(source.includes('api/git-tree/status'))
   assert.ok(source.includes('api/git-tree/diff'))
+  assert.ok(source.includes('api/git-tree/open'), 'the local open action must call its route')
   assert.ok(source.includes('locale.register'), 'visible copy goes through the locale service')
+})
+
+test('local open buttons are gated to macOS and carry both copies', () => {
+  assert.match(source, /['"]darwin['"]/, 'the toolbar must gate the local actions on darwin')
+  for (const key of ['revealInFinder', 'openInTerminal', 'openFailed']) {
+    assert.ok(source.includes(key), 'missing locale copy: ' + key)
+  }
 })
 
 test('every colour is a --dsw-* theme token', () => {

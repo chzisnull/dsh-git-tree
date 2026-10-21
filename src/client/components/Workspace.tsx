@@ -3,8 +3,29 @@
 // the shared banners.
 
 import { h, React } from '../react'
-import type { EntrySide, GitFileEntry, GitStatusPayload, DiffPayload, HistoryCommit, HistoryScope, RefsPayload, Translate, WorkspaceRecord } from '../types'
-import { commitChanges, fetchDiff, fetchHistory, fetchRefs, fetchStatus, fetchWorkspaces, stagePaths, unstagePaths } from '../routes'
+import type {
+  EntrySide,
+  GitFileEntry,
+  GitStatusPayload,
+  DiffPayload,
+  HistoryCommit,
+  HistoryScope,
+  OpenTarget,
+  RefsPayload,
+  Translate,
+  WorkspaceRecord,
+} from '../types'
+import {
+  commitChanges,
+  fetchDiff,
+  fetchHistory,
+  fetchRefs,
+  fetchStatus,
+  fetchWorkspaces,
+  openLocal,
+  stagePaths,
+  unstagePaths,
+} from '../routes'
 import { rowKey, sideFor, splitEntries } from '../model'
 import { TopBar } from './TopBar'
 import { RefRail } from './RefRail'
@@ -48,6 +69,7 @@ export function Workspace(props: { t?: Translate }): any {
   const [diffLoading, setDiffLoading] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
   const [refreshing, setRefreshing] = React.useState(false)
+  const [opening, setOpening] = React.useState(false)
   const [actionError, setActionError] = React.useState('')
   const [message, setMessage] = React.useState('')
   const [toast, setToast] = React.useState('')
@@ -248,6 +270,21 @@ export function Workspace(props: { t?: Translate }): any {
     [showToast, t],
   )
 
+  const openLocalAction = React.useCallback(
+    async (target: OpenTarget) => {
+      setOpening(true)
+      try {
+        const result = await openLocal(target, repoPath || undefined)
+        if (!result.ok) throw new Error(result.error || t('openFailed'))
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error))
+      } finally {
+        setOpening(false)
+      }
+    },
+    [repoPath, showToast, t],
+  )
+
   const commit = React.useCallback(async () => {
     const staged = status?.counts?.staged ?? 0
     const conflicts = status?.counts?.conflicted ?? 0
@@ -345,8 +382,10 @@ export function Workspace(props: { t?: Translate }): any {
       workspaces,
       currentPath: repoPath || status?.repoRoot || status?.cwd || '',
       busy: refreshing || busy,
+      opening,
       t,
       onRefresh: () => void loadStatus(),
+      onOpen: (target: OpenTarget) => void openLocalAction(target),
       onSelectWorkspace: switchWorkspace,
       onCommitFocus: () => {
         if (commitInput.current && commitInput.current.focus) commitInput.current.focus()

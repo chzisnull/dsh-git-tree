@@ -89,6 +89,7 @@ function fakeContext({ handler = defaultResult, workspaceRoot = WORKSPACE, regis
     },
     subprocess: {
       async resolveExecutable(command) {
+        if (command === 'open') return '/usr/bin/open'
         if (command !== 'git') throw new Error('unexpected executable')
         return '/usr/local/bin/git'
       },
@@ -142,7 +143,7 @@ test('host plugin declares its name and hard service dependencies', () => {
   assert.deepEqual(inject, ['connection', 'subprocess'])
 })
 
-test('apply registers the six authenticated exact Fetch routes', () => {
+test('apply registers the nine authenticated exact Fetch routes', () => {
   const ctx = fakeContext()
   apply(ctx)
 
@@ -152,6 +153,7 @@ test('apply registers the six authenticated exact Fetch routes', () => {
       '/api/git-tree/commit',
       '/api/git-tree/diff',
       '/api/git-tree/history',
+      '/api/git-tree/open',
       '/api/git-tree/refs',
       '/api/git-tree/stage',
       '/api/git-tree/status',
@@ -162,7 +164,12 @@ test('apply registers the six authenticated exact Fetch routes', () => {
   for (const route of ctx.routes) {
     assert.equal(route.requestBody, 'buffered')
     assert.equal(route.kind, undefined, 'connection.fetch routes take no kind')
-    const expected = ['/api/git-tree/stage', '/api/git-tree/unstage', '/api/git-tree/commit'].includes(route.path)
+    const expected = [
+      '/api/git-tree/stage',
+      '/api/git-tree/unstage',
+      '/api/git-tree/commit',
+      '/api/git-tree/open',
+    ].includes(route.path)
       ? ['POST']
       : ['GET']
     assert.deepEqual(route.methods, expected, 'unexpected methods for ' + route.path)
@@ -226,6 +233,7 @@ test('status route reports the real change model: rename, conflict, two-sided, u
   const { body } = await call(ctx, '/api/git-tree/status')
 
   assert.equal(body.ok, true)
+  assert.equal(body.platform, process.platform, 'status must report the host platform')
   assert.equal(body.branch, 'main')
   assert.equal(body.upstream, 'origin/main')
   assert.equal(body.ahead, 2)
@@ -504,4 +512,100 @@ test('commit route maps git\'s nothing-to-commit to a 409', async () => {
   })
   assert.equal(response.status, 409)
   assert.equal(body.code, 'nothing-to-commit')
+})
+
+test('open route reveals the selected repository in Finder with a fixed argv', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { response, body } = await call(ctx, '/api/git-tree/open', {
+    method: 'POST',
+    body: { target: 'finder' },
+  })
+  assert.equal(response.status, 200)
+  assert.equal(body.ok, true)
+  assert.equal(body.target, 'finder')
+  assert.equal(body.cwd, WORKSPACE)
+
+  const openCall = ctx.spawns.find((spawn) => spawn.argv[0] === '/usr/bin/open')
+  assert.ok(openCall, 'Finder action must run open')
+  assert.deepEqual(openCall.argv, ['/usr/bin/open', WORKSPACE])
+  assert.equal(openCall.cwd, WORKSPACE)
+})
+
+test('open route opens Terminal in the selected repository with a fixed argv', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/open', {
+    method: 'POST',
+    body: { target: 'terminal' },
+  })
+  assert.equal(body.ok, true)
+  assert.equal(body.target, 'terminal')
+
+  const openCall = ctx.spawns.find((spawn) => spawn.argv[0] === '/usr/bin/open')
+  assert.deepEqual(openCall.argv, ['/usr/bin/open', '-a', 'Terminal', WORKSPACE])
+  assert.equal(openCall.cwd, WORKSPACE)
+})
+
+test('open route rejects an unknown target with 400 and runs nothing', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { response, body } = await call(ctx, '/api/git-tree/open', {
+    method: 'POST',
+    body: { target: 'explorer' },
+  })
+  assert.equal(response.status, 400)
+  assert.equal(body.ok, false)
+  assert.equal(body.code, 'unknown-target')
+  assert.equal(ctx.spawns.length, 0)
+})
+
+test('open route keeps the argv fixed and the cwd inside a registered workspace', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  // Extra body fields are ignored; the target must not contribute argv entries.
+  const { body } = await call(ctx, '/api/git-tree/open?cwd=' + encodeURIComponent('/tmp/other-repo'), {
+    method: 'POST',
+    body: { target: 'finder', argv: ['-a', 'Calculator'], path: '/etc/passwd' },
+  })
+  assert.equal(body.ok, true)
+  assert.equal(body.cwd, '/tmp/other-repo')
+  const openCall = ctx.spawns.find((spawn) => spawn.argv[0] === '/usr/bin/open')
+  assert.deepEqual(openCall.argv, ['/usr/bin/open', '/tmp/other-repo'])
+  assert.equal(openCall.cwd, '/tmp/other-repo')
+
+  const before = ctx.spawns.length
+  const outside = await call(ctx, '/api/git-tree/open?cwd=' + encodeURIComponent('/etc'), {
+    method: 'POST',
+    body: { target: 'finder' },
+  })
+  assert.equal(outside.body.ok, false)
+  assert.equal(outside.body.code, 'outside-workspace')
+  assert.equal(ctx.spawns.length, before, 'no process may run for a cwd outside the registry')
+
+  const injected = await call(ctx, '/api/git-tree/open', {
+    method: 'POST',
+    body: { target: 'finder; open -a Calculator' },
+  })
+  assert.equal(injected.response.status, 400)
+  assert.equal(injected.body.code, 'unknown-target')
+  assert.equal(ctx.spawns.length, before, 'an option-shaped target may not reach argv')
+})
+
+test('open route reports a failed open as ok:false instead of throwing', async () => {
+  const ctx = fakeContext({
+    handler: (argv) =>
+      argv[0] === '/usr/bin/open'
+        ? { exitCode: 1, stdout: '', stderr: 'Unable to find application named Terminal' }
+        : defaultResult(argv),
+  })
+  apply(ctx)
+  const { response, body } = await call(ctx, '/api/git-tree/open', {
+    method: 'POST',
+    body: { target: 'terminal' },
+  })
+  assert.equal(response.status, 200)
+  assert.equal(body.ok, false)
+  assert.equal(body.code, 'open-failed')
+  assert.match(body.error, /Terminal/)
 })

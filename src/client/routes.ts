@@ -2,7 +2,16 @@
 // host half. The browser uses the document-relative form so the request carries
 // the session cookie and passes the Connection fence.
 
-import type { DiffPayload, HistoryPayload, MutationPayload, RefsPayload, GitStatusPayload, WorkspacesPayload } from './types'
+import type {
+  DiffPayload,
+  HistoryPayload,
+  MutationPayload,
+  OpenPayload,
+  OpenTarget,
+  RefsPayload,
+  GitStatusPayload,
+  WorkspacesPayload,
+} from './types'
 
 /** Authenticated exact Fetch routes served by the host half (document-relative). */
 const STATUS_ROUTE = 'api/git-tree/status'
@@ -13,6 +22,7 @@ const HISTORY_ROUTE = 'api/git-tree/history'
 const STAGE_ROUTE = 'api/git-tree/stage'
 const UNSTAGE_ROUTE = 'api/git-tree/unstage'
 const COMMIT_ROUTE = 'api/git-tree/commit'
+const OPEN_ROUTE = 'api/git-tree/open'
 
 function query(params: Record<string, string | undefined>): string {
   const search = new URLSearchParams()
@@ -80,4 +90,8 @@ export function unstagePaths(paths: string[], cwd?: string): Promise<MutationPay
 
 export function commitChanges(message: string, cwd?: string): Promise<MutationPayload> {
   return postJson<MutationPayload>(COMMIT_ROUTE + query({ cwd }), { message })
+}
+
+export function openLocal(target: OpenTarget, cwd?: string): Promise<OpenPayload> {
+  return postJson<OpenPayload>(OPEN_ROUTE + query({ cwd }), { target })
 }

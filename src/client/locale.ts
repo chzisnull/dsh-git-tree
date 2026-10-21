@@ -7,6 +7,9 @@ export const NS = 'dsh-git-tree'
 export const EN: Record<string, string> = {
   panel: 'Git',
   refresh: 'Refresh',
+  revealInFinder: 'Reveal in Finder',
+  openInTerminal: 'Open in Terminal',
+  openFailed: 'Could not open the folder.',
   switchRepository: 'Switch repository',
   noRepositories: 'No registered repositories',
   refs: 'References',
@@ -75,6 +78,9 @@ export const EN: Record<string, string> = {
 export const ZH: Record<string, string> = {
   panel: 'Git',
   refresh: '刷新',
+  revealInFinder: '在 Finder 中显示',
+  openInTerminal: '在终端中打开',
+  openFailed: '无法打开该目录。',
   switchRepository: '切换仓库',
   noRepositories: '没有已注册的仓库',
   refs: '引用',

@@ -61,3 +61,23 @@ export function MoreIcon(): any {
     h('circle', { cx: 12.6, cy: 8, r: 1.15, fill: 'currentColor' }),
   )
 }
+
+export function FolderIcon(): any {
+  return svg(
+    h('path', {
+      d: 'M1.8 4.2a1.2 1.2 0 0 1 1.2-1.2h3l1.3 1.5h5.7a1.2 1.2 0 0 1 1.2 1.2v6.1a1.2 1.2 0 0 1-1.2 1.2H3a1.2 1.2 0 0 1-1.2-1.2V4.2Z',
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 1.2,
+      strokeLinejoin: 'round',
+    }),
+  )
+}
+
+export function TerminalIcon(): any {
+  return svg([
+    h('rect', { x: 1.9, y: 2.6, width: 12.2, height: 10.8, rx: 1.4, fill: 'none', stroke: 'currentColor', strokeWidth: 1.2 }),
+    h('path', { d: 'M4.4 6.2 6.6 8l-2.2 1.8', fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+    h('path', { d: 'M8.2 10.1h3.2', fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round' }),
+  ])
+}
