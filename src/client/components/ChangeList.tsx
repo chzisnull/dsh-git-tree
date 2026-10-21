@@ -1,12 +1,39 @@
-// Change list pane: conflict, staged and unstaged groups with counts, plus the
-// loading and empty states.
+// Change list pane, laid out like Sourcetree: a "待定的文件" header, then two
+// stacked regions — staged files and unstaged files — each with its own header,
+// count and scroll area. Conflicts get their own region above them.
 
 import { h } from '../react'
 import { FileRow } from './FileRow'
 import type { EntrySide, GitFileEntry, GitStatusPayload, Translate } from '../types'
 
-function Group(props: {
+function Rows(props: {
+  rows: GitFileEntry[]
+  side: EntrySide
+  activeKey: string
+  t: Translate
+  onSelect: (entry: GitFileEntry, side: EntrySide) => void
+  onToggle: (entry: GitFileEntry, side: EntrySide) => void
+  onCopyPath: (entry: GitFileEntry) => void
+  onContextMenu: (entry: GitFileEntry, side: EntrySide, event: any) => void
+}): any {
+  return props.rows.map((entry) =>
+    h(FileRow, {
+      key: props.side + ':' + entry.path,
+      entry,
+      side: props.side,
+      active: props.activeKey === props.side + '\u0000' + entry.path,
+      t: props.t,
+      onSelect: props.onSelect,
+      onToggle: props.onToggle,
+      onCopyPath: props.onCopyPath,
+      onContextMenu: props.onContextMenu,
+    }),
+  )
+}
+
+function Region(props: {
   label: string
+  count: number
   tone?: 'error'
   rows: GitFileEntry[]
   side: EntrySide
@@ -17,28 +44,30 @@ function Group(props: {
   onCopyPath: (entry: GitFileEntry) => void
   onContextMenu: (entry: GitFileEntry, side: EntrySide, event: any) => void
 }): any {
-  if (props.rows.length === 0) return null
   return h(
     'div',
-    { className: 'dgt-group-wrap' },
+    { className: 'dgt-region', 'data-kind': props.side },
     h(
       'div',
       { className: 'dgt-group', 'data-tone': props.tone },
       h('span', null, props.label),
-      h('span', { className: 'dgt-group-count' }, String(props.rows.length)),
+      h('span', { className: 'dgt-group-count' }, String(props.count)),
     ),
-    props.rows.map((entry) =>
-      h(FileRow, {
-        key: props.side + ':' + entry.path,
-        entry,
-        side: props.side,
-        active: props.activeKey === props.side + '\u0000' + entry.path,
-        t: props.t,
-        onSelect: props.onSelect,
-        onToggle: props.onToggle,
-        onCopyPath: props.onCopyPath,
-        onContextMenu: props.onContextMenu,
-      }),
+    h(
+      'div',
+      { className: 'dgt-region-scroll' },
+      props.count === 0
+        ? null
+        : h(Rows, {
+            rows: props.rows,
+            side: props.side,
+            activeKey: props.activeKey,
+            t: props.t,
+            onSelect: props.onSelect,
+            onToggle: props.onToggle,
+            onCopyPath: props.onCopyPath,
+            onContextMenu: props.onContextMenu,
+          }),
     ),
   )
 }
@@ -57,14 +86,23 @@ export function ChangeList(props: {
   const { status, statusError, rows, t } = props
   const total = (status?.entries ?? []).length
   const empty = rows.staged.length === 0 && rows.unstaged.length === 0 && rows.conflicted.length === 0
+  const shared = {
+    activeKey: props.selectedKey,
+    t,
+    onSelect: props.onSelect,
+    onToggle: props.onToggle,
+    onCopyPath: props.onCopyPath,
+    onContextMenu: props.onContextMenu,
+  }
 
   return h(
     'section',
-    { className: 'dgt-list', 'aria-label': t('fileStatus') },
+    { className: 'dgt-list', 'aria-label': t('pendingFiles') },
     h(
       'div',
       { className: 'dgt-list-head' },
-      h('span', null, t('changes')),
+      h('span', null, t('pendingFiles')),
+      h('span', { className: 'dgt-list-sort' }, t('sortByPath')),
       h('span', { className: 'dgt-group-count' }, String(total) + ' ' + t('itemsUnit')),
     ),
     status === null && statusError === ''
@@ -78,40 +116,30 @@ export function ChangeList(props: {
           )
         : h(
             'div',
-            { className: 'dgt-scroll' },
-            h(Group, {
-              label: t('conflicts'),
-              tone: 'error',
-              rows: rows.conflicted,
-              side: 'conflicted',
-              activeKey: props.selectedKey,
-              t,
-              onSelect: props.onSelect,
-              onToggle: props.onToggle,
-              onCopyPath: props.onCopyPath,
-              onContextMenu: props.onContextMenu,
-            }),
-            h(Group, {
+            { className: 'dgt-regions' },
+            rows.conflicted.length > 0
+              ? h(Region, {
+                  label: t('conflicts'),
+                  count: rows.conflicted.length,
+                  tone: 'error',
+                  rows: rows.conflicted,
+                  side: 'conflicted',
+                  ...shared,
+                })
+              : null,
+            h(Region, {
               label: t('stagedFiles'),
+              count: rows.staged.length,
               rows: rows.staged,
               side: 'staged',
-              activeKey: props.selectedKey,
-              t,
-              onSelect: props.onSelect,
-              onToggle: props.onToggle,
-              onCopyPath: props.onCopyPath,
-              onContextMenu: props.onContextMenu,
+              ...shared,
             }),
-            h(Group, {
+            h(Region, {
               label: t('unstagedFiles'),
+              count: rows.unstaged.length,
               rows: rows.unstaged,
               side: 'unstaged',
-              activeKey: props.selectedKey,
-              t,
-              onSelect: props.onSelect,
-              onToggle: props.onToggle,
-              onCopyPath: props.onCopyPath,
-              onContextMenu: props.onContextMenu,
+              ...shared,
             }),
           ),
   )

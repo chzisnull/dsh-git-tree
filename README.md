@@ -8,7 +8,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.4.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel. Remotes are out of scope on purpose.
+Version 0.4.1 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel. Remotes are out of scope on purpose.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Repository switcher** in the toolbar: pick any workspace registered in DSH; every route then runs against that repository.
@@ -27,7 +27,7 @@ Version 0.4.0 is the **local workbench slice**: file status, history, search and
 
 ## Status
 
-| Area | 0.4.0 |
+| Area | 0.4.1 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | repository switcher (DSH workspaces) | done |

@@ -89,6 +89,8 @@ var EN = {
   commitMessageEmpty: "Write a message to commit.",
   commitShortcut: "\u2318\u21B5 to commit",
   changes: "Changes",
+  pendingFiles: "Pending files",
+  sortByPath: "sorted by path",
   history: "History",
   search: "Search",
   searchPlaceholder: "Search commit messages",
@@ -205,6 +207,8 @@ var ZH = {
   commitMessageEmpty: "\u586B\u5199\u63D0\u4EA4\u4FE1\u606F\u540E\u53EF\u63D0\u4EA4\u3002",
   commitShortcut: "\u2318\u21B5 \u63D0\u4EA4",
   changes: "\u6539\u52A8",
+  pendingFiles: "\u5F85\u5B9A\u7684\u6587\u4EF6",
+  sortByPath: "\u5DF2\u4F9D\u7167\u8DEF\u5F84\u6392\u5E8F",
   history: "\u5386\u53F2",
   search: "\u641C\u7D22",
   searchPlaceholder: "\u641C\u7D22\u63D0\u4EA4\u4FE1\u606F",
@@ -476,6 +480,14 @@ var CSS = `
   background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);
   font-size:12px;font-weight:600;}
 .dgt-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding:0;}
+.dgt-regions{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+.dgt-region{display:flex;flex-direction:column;min-height:0;border-top:1px solid var(--dsw-alias-border-l1);}
+.dgt-region:first-child{border-top:0;}
+.dgt-region[data-kind='conflicted']{flex:0 1 auto;max-height:34%;}
+.dgt-region[data-kind='staged']{flex:1 1 40%;min-height:92px;}
+.dgt-region[data-kind='unstaged']{flex:1 1 60%;min-height:110px;}
+.dgt-region-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding:0;}
+.dgt-list-sort{margin-left:auto;margin-right:10px;color:var(--dsw-alias-label-tertiary);font-size:11px;font-weight:400;}
 .dgt-group{display:flex;align-items:center;justify-content:space-between;height:27px;padding:0 10px;
   background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l2);
   color:var(--dsw-alias-label-secondary);font-size:11.5px;font-weight:500;}
@@ -1279,23 +1291,38 @@ function FileRow(props) {
 }
 
 // src/client/components/ChangeList.tsx
-function Group(props) {
-  if (props.rows.length === 0) return null;
+function Rows(props) {
+  return props.rows.map(
+    (entry) => h(FileRow, {
+      key: props.side + ":" + entry.path,
+      entry,
+      side: props.side,
+      active: props.activeKey === props.side + "\0" + entry.path,
+      t: props.t,
+      onSelect: props.onSelect,
+      onToggle: props.onToggle,
+      onCopyPath: props.onCopyPath,
+      onContextMenu: props.onContextMenu
+    })
+  );
+}
+function Region(props) {
   return h(
     "div",
-    { className: "dgt-group-wrap" },
+    { className: "dgt-region", "data-kind": props.side },
     h(
       "div",
       { className: "dgt-group", "data-tone": props.tone },
       h("span", null, props.label),
-      h("span", { className: "dgt-group-count" }, String(props.rows.length))
+      h("span", { className: "dgt-group-count" }, String(props.count))
     ),
-    props.rows.map(
-      (entry) => h(FileRow, {
-        key: props.side + ":" + entry.path,
-        entry,
+    h(
+      "div",
+      { className: "dgt-region-scroll" },
+      props.count === 0 ? null : h(Rows, {
+        rows: props.rows,
         side: props.side,
-        active: props.activeKey === props.side + "\0" + entry.path,
+        activeKey: props.activeKey,
         t: props.t,
         onSelect: props.onSelect,
         onToggle: props.onToggle,
@@ -1309,13 +1336,22 @@ function ChangeList(props) {
   const { status, statusError, rows, t } = props;
   const total = (status?.entries ?? []).length;
   const empty = rows.staged.length === 0 && rows.unstaged.length === 0 && rows.conflicted.length === 0;
+  const shared = {
+    activeKey: props.selectedKey,
+    t,
+    onSelect: props.onSelect,
+    onToggle: props.onToggle,
+    onCopyPath: props.onCopyPath,
+    onContextMenu: props.onContextMenu
+  };
   return h(
     "section",
-    { className: "dgt-list", "aria-label": t("fileStatus") },
+    { className: "dgt-list", "aria-label": t("pendingFiles") },
     h(
       "div",
       { className: "dgt-list-head" },
-      h("span", null, t("changes")),
+      h("span", null, t("pendingFiles")),
+      h("span", { className: "dgt-list-sort" }, t("sortByPath")),
       h("span", { className: "dgt-group-count" }, String(total) + " " + t("itemsUnit"))
     ),
     status === null && statusError === "" ? h("div", { className: "dgt-placeholder" }, t("loading")) : empty ? h(
@@ -1325,40 +1361,28 @@ function ChangeList(props) {
       h("span", { className: "dgt-empty-hint" }, t("nothingHint"))
     ) : h(
       "div",
-      { className: "dgt-scroll" },
-      h(Group, {
+      { className: "dgt-regions" },
+      rows.conflicted.length > 0 ? h(Region, {
         label: t("conflicts"),
+        count: rows.conflicted.length,
         tone: "error",
         rows: rows.conflicted,
         side: "conflicted",
-        activeKey: props.selectedKey,
-        t,
-        onSelect: props.onSelect,
-        onToggle: props.onToggle,
-        onCopyPath: props.onCopyPath,
-        onContextMenu: props.onContextMenu
-      }),
-      h(Group, {
+        ...shared
+      }) : null,
+      h(Region, {
         label: t("stagedFiles"),
+        count: rows.staged.length,
         rows: rows.staged,
         side: "staged",
-        activeKey: props.selectedKey,
-        t,
-        onSelect: props.onSelect,
-        onToggle: props.onToggle,
-        onCopyPath: props.onCopyPath,
-        onContextMenu: props.onContextMenu
+        ...shared
       }),
-      h(Group, {
+      h(Region, {
         label: t("unstagedFiles"),
+        count: rows.unstaged.length,
         rows: rows.unstaged,
         side: "unstaged",
-        activeKey: props.selectedKey,
-        t,
-        onSelect: props.onSelect,
-        onToggle: props.onToggle,
-        onCopyPath: props.onCopyPath,
-        onContextMenu: props.onContextMenu
+        ...shared
       })
     )
   );

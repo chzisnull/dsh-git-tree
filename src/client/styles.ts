@@ -213,6 +213,14 @@ export const CSS = `
   background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);
   font-size:12px;font-weight:600;}
 .dgt-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding:0;}
+.dgt-regions{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+.dgt-region{display:flex;flex-direction:column;min-height:0;border-top:1px solid var(--dsw-alias-border-l1);}
+.dgt-region:first-child{border-top:0;}
+.dgt-region[data-kind='conflicted']{flex:0 1 auto;max-height:34%;}
+.dgt-region[data-kind='staged']{flex:1 1 40%;min-height:92px;}
+.dgt-region[data-kind='unstaged']{flex:1 1 60%;min-height:110px;}
+.dgt-region-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding:0;}
+.dgt-list-sort{margin-left:auto;margin-right:10px;color:var(--dsw-alias-label-tertiary);font-size:11px;font-weight:400;}
 .dgt-group{display:flex;align-items:center;justify-content:space-between;height:27px;padding:0 10px;
   background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l2);
   color:var(--dsw-alias-label-secondary);font-size:11.5px;font-weight:500;}
