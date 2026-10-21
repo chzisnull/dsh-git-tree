@@ -1,6 +1,6 @@
 // Host-half route contract: what the plugin registers and how it refuses
 // unsafe input. No git and no Harness needed — `apply()` is driven by a fake
-// context, and the handlers answer from a fake subprocess.
+// context, and the handlers answer from a fake subprocess routed by argv.
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -8,39 +8,81 @@ import { apply, inject, name } from '../index.js'
 
 const WORKSPACE = '/tmp/fake-workspace'
 
-const STATUS_FIXTURE = [
-  '# branch.oid 0123456789abcdef',
-  '# branch.head main',
-  '# branch.upstream origin/main',
-  '# branch.ab +2 -1',
-  '1 .M N... 100644 100644 100644 aaaaaaa bbbbbbb src/components/App.tsx',
-  '1 M. N... 100644 100644 100644 aaaaaaa bbbbbbb src/main.ts',
-  '? docs/new-note.md',
-].join('\0') + '\0'
+const STATUS_FIXTURE =
+  [
+    '# branch.oid 0123456789abcdef',
+    '# branch.head main',
+    '# branch.upstream origin/main',
+    '# branch.ab +2 -1',
+    '1 .M N... 100644 100644 100644 aaaaaaa bbbbbbb src/app.js',
+    '1 M. N... 100644 100644 100644 aaaaaaa bbbbbbb src/staged.js',
+    '1 MM N... 100644 100644 100644 aaaaaaa bbbbbbb src/two.js',
+    '2 R. N... 100644 100644 100644 aaaaaaa bbbbbbb R100 docs/name.txt',
+    'old/name.txt',
+    'u UU N... 100644 100644 100644 100644 aaaaaaa bbbbbbb ccccccc src/conflict.js',
+    '? docs/new-note.md',
+  ].join('\u0000') + '\u0000'
 
-function fakeContext(overrides = {}) {
+const DIFF_FIXTURE = [
+  'diff --git a/src/app.js b/src/app.js',
+  'index 1111111..2222222 100644',
+  '--- a/src/app.js',
+  '+++ b/src/app.js',
+  '@@ -1,3 +1,4 @@',
+  ' console.log("app")',
+  '-export const a = 1',
+  '+export const a = 2',
+  '+export const b = 3',
+  ' // tail',
+  '\\ No newline at end of file',
+  '',
+].join('\n')
+
+const REFS_FIXTURE = [
+  'refs/heads/main\u0000abc1234\u0000origin/main\u00001790000000\u0000Initial commit',
+  'refs/heads/topic\u0000def5678\u0000\u00001780000000\u0000Topic work',
+  'refs/remotes/origin/main\u0000abc1234\u0000\u00001790000000\u0000Initial commit',
+  'refs/tags/v0.1.0\u0000abc1234\u0000\u00001790000000\u0000Release',
+  '',
+].join('\n')
+
+function defaultResult(argv) {
+  const command = argv[1]
+  if (command === 'status') return { exitCode: 0, stdout: STATUS_FIXTURE, stderr: '' }
+  if (command === 'rev-parse') return { exitCode: 0, stdout: WORKSPACE + '\n', stderr: '' }
+  if (command === 'config') {
+    return { exitCode: 0, stdout: 'user.name Fixture Dev\nuser.email fixture@example.com\n', stderr: '' }
+  }
+  if (command === 'diff') return { exitCode: 0, stdout: DIFF_FIXTURE, stderr: '' }
+  if (command === 'for-each-ref') return { exitCode: 0, stdout: REFS_FIXTURE, stderr: '' }
+  if (command === 'symbolic-ref') return { exitCode: 0, stdout: 'main\n', stderr: '' }
+  if (command === 'ls-files') return { exitCode: 0, stdout: '', stderr: '' }
+  if (command === 'commit') return { exitCode: 0, stdout: '[main abc1234] message\n', stderr: '' }
+  return { exitCode: 0, stdout: '', stderr: '' }
+}
+
+function fakeContext({ handler = defaultResult } = {}) {
   const routes = []
   const spawns = []
   const services = {
     sandboxPolicy: { workspaceRoot: WORKSPACE },
     subprocess: {
-      async resolveExecutable(cmd) {
-        if (cmd !== 'git') throw new Error('unexpected executable')
+      async resolveExecutable(command) {
+        if (command !== 'git') throw new Error('unexpected executable')
         return '/usr/local/bin/git'
       },
       spawn({ argv, cwd }) {
         spawns.push({ argv, cwd })
-        const stdout = argv[1] === 'rev-parse' ? WORKSPACE + '\n' : STATUS_FIXTURE
+        const result = handler(argv)
         return {
-          done: Promise.resolve({ exitCode: 0, signal: null }),
+          done: Promise.resolve({ exitCode: result.exitCode ?? 0, signal: null }),
           collected: {
-            stdout: { readFrom: () => ({ text: stdout, lossy: false }) },
-            stderr: { readFrom: () => ({ text: '', lossy: false }) },
+            stdout: { readFrom: () => ({ text: result.stdout ?? '', lossy: false }) },
+            stderr: { readFrom: () => ({ text: result.stderr ?? '', lossy: false }) },
           },
         }
       },
     },
-    ...overrides,
   }
   return {
     routes,
@@ -50,8 +92,16 @@ function fakeContext(overrides = {}) {
   }
 }
 
-function request(path) {
-  return { url: 'https://dsh.internal' + path, signal: undefined }
+function request(path, { method = 'GET', body } = {}) {
+  return {
+    url: 'https://dsh.internal' + path,
+    method,
+    signal: undefined,
+    json: async () => {
+      if (body === undefined) throw new Error('no body')
+      return JSON.parse(JSON.stringify(body))
+    },
+  }
 }
 
 function routeFor(ctx, path) {
@@ -60,66 +110,127 @@ function routeFor(ctx, path) {
   return route
 }
 
+async function call(ctx, path, options) {
+  const route = routeFor(ctx, path.split('?')[0])
+  const response = await route.fetch(request(path, options))
+  return { response, body: await response.json() }
+}
+
 test('host plugin declares its name and hard service dependencies', () => {
   assert.equal(name, 'dsh-git-tree')
   assert.deepEqual(inject, ['connection', 'subprocess'])
 })
 
-test('apply registers two authenticated exact Fetch routes', () => {
+test('apply registers the six authenticated exact Fetch routes', () => {
   const ctx = fakeContext()
   apply(ctx)
-  assert.equal(ctx.routes.length, 2)
+
+  assert.deepEqual(
+    ctx.routes.map((route) => route.path).sort(),
+    [
+      '/api/git-tree/commit',
+      '/api/git-tree/diff',
+      '/api/git-tree/refs',
+      '/api/git-tree/stage',
+      '/api/git-tree/status',
+      '/api/git-tree/unstage',
+    ],
+  )
   for (const route of ctx.routes) {
-    assert.deepEqual(route.methods, ['GET'])
     assert.equal(route.requestBody, 'buffered')
     assert.equal(route.kind, undefined, 'connection.fetch routes take no kind')
+    const expected = ['/api/git-tree/stage', '/api/git-tree/unstage', '/api/git-tree/commit'].includes(route.path)
+      ? ['POST']
+      : ['GET']
+    assert.deepEqual(route.methods, expected, 'unexpected methods for ' + route.path)
   }
-  assert.deepEqual(ctx.routes.map((r) => r.path).sort(), ['/api/git-tree/diff', '/api/git-tree/status'])
 })
 
-test('status route parses porcelain v2 into branch and entries', async () => {
+test('status route reports the real change model: rename, conflict, two-sided, untracked', async () => {
   const ctx = fakeContext()
   apply(ctx)
-  const response = await routeFor(ctx, '/api/git-tree/status').fetch(request('/api/git-tree/status'))
-  const body = await response.json()
+  const { body } = await call(ctx, '/api/git-tree/status')
 
   assert.equal(body.ok, true)
   assert.equal(body.branch, 'main')
   assert.equal(body.upstream, 'origin/main')
   assert.equal(body.ahead, 2)
   assert.equal(body.behind, 1)
-  assert.equal(body.repoRoot, WORKSPACE)
-  assert.equal(body.entries.length, 3)
-  assert.deepEqual(body.entries[0], { path: 'src/components/App.tsx', x: '.', y: 'M', kind: 'changed' })
-  assert.deepEqual(body.entries[2], { path: 'docs/new-note.md', x: '?', y: '?', kind: 'untracked' })
+  assert.deepEqual(body.identity, { name: 'Fixture Dev', email: 'fixture@example.com' })
+
+  const byPath = Object.fromEntries(body.entries.map((entry) => [entry.path, entry]))
+  assert.equal(byPath['src/app.js'].unstaged, true)
+  assert.equal(byPath['src/app.js'].staged, false)
+  assert.equal(byPath['src/staged.js'].staged, true)
+  assert.equal(byPath['src/staged.js'].unstaged, false)
+  assert.equal(byPath['src/two.js'].staged, true, 'two-sided change keeps its index side')
+  assert.equal(byPath['src/two.js'].unstaged, true, 'two-sided change keeps its work-tree side')
+  assert.equal(byPath['docs/name.txt'].kind, 'renamed')
+  assert.equal(byPath['docs/name.txt'].origPath, 'old/name.txt')
+  assert.equal(byPath['src/conflict.js'].conflicted, true)
+  assert.equal(byPath['src/conflict.js'].x, 'U')
+  assert.equal(byPath['docs/new-note.md'].kind, 'untracked')
+  assert.equal(byPath['docs/new-note.md'].unstaged, true)
+
+  assert.deepEqual(body.counts, { staged: 3, unstaged: 3, conflicted: 1 })
+  assert.equal(body.truncated, false)
 
   const statusCall = ctx.spawns.find((call) => call.argv[1] === 'status')
   assert.ok(statusCall, 'status must be spawned')
   assert.ok(statusCall.argv.includes('--porcelain=v2'))
+  assert.ok(!statusCall.argv.includes('--no-renames'), 'renames must not be flattened')
   assert.equal(statusCall.cwd, WORKSPACE)
 })
 
-test('diff route puts a `--` separator before the path', async () => {
+test('diff route returns a structured diff and guards the path', async () => {
   const ctx = fakeContext()
   apply(ctx)
-  await routeFor(ctx, '/api/git-tree/diff').fetch(request('/api/git-tree/diff?path=src/main.ts'))
+  const { body } = await call(ctx, '/api/git-tree/diff?path=src/app.js')
+
+  assert.equal(body.ok, true)
+  assert.equal(body.side, 'unstaged')
+  assert.deepEqual(body.stats, { additions: 2, deletions: 1 })
+  assert.equal(body.files.length, 1)
+  const [file] = body.files
+  assert.equal(file.newPath, 'src/app.js')
+  assert.equal(file.hunks.length, 1)
+  const [hunk] = file.hunks
+  assert.equal(hunk.oldStart, 1)
+  assert.equal(hunk.newStart, 1)
+  assert.deepEqual(
+    hunk.lines.map((line) => [line.kind, line.oldNo, line.newNo]),
+    [
+      ['context', 1, 1],
+      ['del', 2, null],
+      ['add', null, 2],
+      ['add', null, 3],
+      ['context', 3, 4],
+      ['meta', null, null],
+    ],
+  )
+  assert.equal(hunk.lines[5].text, '\\ No newline at end of file')
+
   const diffCall = ctx.spawns.find((call) => call.argv[1] === 'diff')
-  assert.ok(diffCall, 'diff must be spawned')
   const dashDash = diffCall.argv.indexOf('--')
   assert.ok(dashDash > 0, 'diff argv must contain --')
-  assert.equal(diffCall.argv[dashDash + 1], 'src/main.ts')
-  assert.ok(diffCall.argv.includes('--no-color'))
-  assert.ok(!diffCall.argv.includes('--cached'), 'unstaged diff must not pass --cached')
+  assert.equal(diffCall.argv[dashDash + 1], 'src/app.js')
+  assert.ok(!diffCall.argv.includes('--cached'))
+})
+
+test('diff route asks for the index side when side=staged', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  await call(ctx, '/api/git-tree/diff?path=src/staged.js&side=staged')
+  const diffCall = ctx.spawns.find((call) => call.argv[1] === 'diff')
+  assert.ok(diffCall.argv.includes('--cached'))
 })
 
 test('diff route rejects traversal, absolute and option-shaped paths', async () => {
   const ctx = fakeContext()
   apply(ctx)
-  const route = routeFor(ctx, '/api/git-tree/diff')
   const cases = ['../etc/passwd', '/etc/passwd', '-rf', 'src/../../secret']
   for (const bad of cases) {
-    const response = await route.fetch(request('/api/git-tree/diff?path=' + encodeURIComponent(bad)))
-    const body = await response.json()
+    const { body } = await call(ctx, '/api/git-tree/diff?path=' + encodeURIComponent(bad))
     assert.equal(body.ok, false, 'must refuse ' + bad)
     assert.equal(body.code, 'bad-request', 'must classify ' + bad + ' as bad-request')
   }
@@ -129,20 +240,128 @@ test('diff route rejects traversal, absolute and option-shaped paths', async () 
 test('a cwd outside the workspace is refused', async () => {
   const ctx = fakeContext()
   apply(ctx)
-  const response = await routeFor(ctx, '/api/git-tree/status').fetch(
-    request('/api/git-tree/status?cwd=' + encodeURIComponent('/etc')),
-  )
-  const body = await response.json()
+  const { body } = await call(ctx, '/api/git-tree/status?cwd=' + encodeURIComponent('/etc'))
   assert.equal(body.ok, false)
   assert.equal(body.code, 'outside-workspace')
   assert.equal(ctx.spawns.length, 0)
 })
 
 test('missing subprocess degrades instead of throwing', async () => {
-  const ctx = fakeContext({ subprocess: undefined })
+  const ctx = fakeContext()
+  ctx.get = () => undefined
   apply(ctx)
-  const response = await routeFor(ctx, '/api/git-tree/status').fetch(request('/api/git-tree/status'))
-  const body = await response.json()
+  const { body } = await call(ctx, '/api/git-tree/status')
   assert.equal(body.ok, false)
   assert.equal(body.code, 'subprocess-unavailable')
+})
+
+test('refs route parses branches, remotes and tags and marks the current branch', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/refs')
+
+  assert.equal(body.ok, true)
+  assert.deepEqual(
+    body.branches.map((branch) => [branch.name, branch.current, branch.subject]),
+    [
+      ['main', true, 'Initial commit'],
+      ['topic', false, 'Topic work'],
+    ],
+  )
+  assert.equal(body.remotes[0].name, 'origin/main')
+  assert.equal(body.tags[0].name, 'v0.1.0')
+  const refsCall = ctx.spawns.find((call) => call.argv[1] === 'for-each-ref')
+  assert.ok(refsCall, 'refs must come from for-each-ref')
+})
+
+test('stage route passes paths after -- and refuses unsafe ones', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/stage', {
+    method: 'POST',
+    body: { paths: ['src/app.js', 'docs/new-note.md'] },
+  })
+  assert.equal(body.ok, true)
+  const callRecord = ctx.spawns.find((spawn) => spawn.argv[1] === 'add')
+  assert.ok(callRecord, 'stage must run git add')
+  const dashDash = callRecord.argv.indexOf('--')
+  assert.deepEqual(callRecord.argv.slice(dashDash + 1), ['src/app.js', 'docs/new-note.md'])
+
+  const before = ctx.spawns.length
+  const bad = await call(ctx, '/api/git-tree/stage', { method: 'POST', body: { paths: ['../escape'] } })
+  assert.equal(bad.body.ok, false)
+  assert.equal(ctx.spawns.length, before, 'no git process may run for a rejected path')
+})
+
+test('unstage route resets the index without touching the work tree', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/unstage', {
+    method: 'POST',
+    body: { paths: ['src/staged.js'] },
+  })
+  assert.equal(body.ok, true)
+  const callRecord = ctx.spawns.find((spawn) => spawn.argv[1] === 'reset')
+  assert.deepEqual(callRecord.argv.slice(1, 4), ['reset', '--quiet', 'HEAD'])
+  assert.deepEqual(callRecord.argv.slice(callRecord.argv.indexOf('--') + 1), ['src/staged.js'])
+})
+
+test('commit route refuses an empty message before calling git', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/commit', { method: 'POST', body: { message: '   ' } })
+  assert.equal(body.ok, false)
+  assert.equal(body.code, 'empty-message')
+  assert.equal(ctx.spawns.filter((spawn) => spawn.argv[1] === 'commit').length, 0)
+})
+
+test('commit route refuses while conflicts remain', async () => {
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'ls-files') return { exitCode: 0, stdout: '100644 aaaa 0\tsrc/conflict.js\u0000', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const { response, body } = await call(ctx, '/api/git-tree/commit', {
+    method: 'POST',
+    body: { message: 'try to commit' },
+  })
+  assert.equal(response.status, 409)
+  assert.equal(body.code, 'conflicts-present')
+  assert.equal(ctx.spawns.filter((spawn) => spawn.argv[1] === 'commit').length, 0)
+})
+
+test('commit route passes one -m argv and returns a receipt', async () => {
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'rev-parse') return { exitCode: 0, stdout: 'abcdef1234567890\n', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const message = 'fix: panel\n\nbody line'
+  const { body } = await call(ctx, '/api/git-tree/commit', { method: 'POST', body: { message } })
+  assert.equal(body.ok, true)
+  assert.equal(body.shortSha, 'abcdef1')
+  assert.equal(body.subject, 'fix: panel')
+
+  const callRecord = ctx.spawns.find((spawn) => spawn.argv[1] === 'commit')
+  assert.deepEqual(callRecord.argv.slice(1), ['commit', '-m', message])
+})
+
+test('commit route maps git\'s nothing-to-commit to a 409', async () => {
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'commit') return { exitCode: 1, stdout: '', stderr: 'nothing to commit, working tree clean' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const { response, body } = await call(ctx, '/api/git-tree/commit', {
+    method: 'POST',
+    body: { message: 'noop' },
+  })
+  assert.equal(response.status, 409)
+  assert.equal(body.code, 'nothing-to-commit')
 })

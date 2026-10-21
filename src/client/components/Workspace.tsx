@@ -1,31 +1,63 @@
-// The workspace panel: state, host calls and the three-pane layout
-// (references rail / change list / diff).
+// The workspace panel: state, host calls, polling and the Sourcetree-style
+// layout (toolbar / reference rail / change list / diff / commit box).
 
 import { h, React } from '../react'
-import type { DiffPayload, GitFileEntry, GitStatusPayload, Translate } from '../types'
-import { fetchDiff, fetchStatus } from '../routes'
-import { isStaged, lastSegment } from '../model'
-import { Chip, Spinner } from './atoms'
+import type { EntrySide, GitFileEntry, GitStatusPayload, DiffPayload, RefsPayload, Translate } from '../types'
+import { commitChanges, fetchDiff, fetchRefs, fetchStatus, stagePaths, unstagePaths } from '../routes'
+import { rowKey, sideFor, splitEntries } from '../model'
+import { TopBar } from './TopBar'
 import { RefRail } from './RefRail'
 import { ChangeList } from './ChangeList'
 import { DiffView } from './DiffView'
+import { CommitBox } from './CommitBox'
+
+const POLL_MS = 2000
+
+function findEntry(status: GitStatusPayload | null, path: string): GitFileEntry | null {
+  return (status?.entries ?? []).find((entry) => entry.path === path) ?? null
+}
+
+/** Pick the side a path should be selected under after a status refresh. */
+function sideOf(entry: GitFileEntry): EntrySide {
+  if (entry.conflicted) return 'conflicted'
+  if (entry.staged) return 'staged'
+  return 'unstaged'
+}
 
 export function Workspace(props: { t?: Translate }): any {
   const t: Translate = typeof props.t === 'function' ? props.t : (key: string) => key
 
   const [status, setStatus] = React.useState<GitStatusPayload | null>(null)
+  const [refs, setRefs] = React.useState<RefsPayload | null>(null)
   const [statusError, setStatusError] = React.useState('')
-  const [refreshing, setRefreshing] = React.useState(false)
-  const [selected, setSelected] = React.useState<GitFileEntry | null>(null)
+  const [selected, setSelected] = React.useState<{ path: string; side: EntrySide } | null>(null)
   const [diff, setDiff] = React.useState<DiffPayload | null>(null)
   const [diffLoading, setDiffLoading] = React.useState(false)
+  const [busy, setBusy] = React.useState(false)
+  const [refreshing, setRefreshing] = React.useState(false)
+  const [actionError, setActionError] = React.useState('')
+  const [message, setMessage] = React.useState('')
+  const [toast, setToast] = React.useState('')
+  const [notice, setNotice] = React.useState('')
+
+  const busyRef = React.useRef(false)
+  const commitInput = React.useRef<any>(null)
+  const toastTimer = React.useRef<any>(null)
+  React.useEffect(() => {
+    busyRef.current = busy
+  }, [busy])
+
+  const showToast = React.useCallback((text: string) => {
+    setToast(text)
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    toastTimer.current = setTimeout(() => setToast(''), 6000)
+  }, [])
 
   const loadStatus = React.useCallback(
-    async (signal?: AbortSignal) => {
-      setRefreshing(true)
+    async (options?: { silent?: boolean }) => {
+      if (!options?.silent) setRefreshing(true)
       try {
-        const next = await fetchStatus(signal)
-        if (signal?.aborted) return
+        const next = await fetchStatus()
         if (next.ok) {
           setStatus(next)
           setStatusError('')
@@ -34,121 +66,211 @@ export function Workspace(props: { t?: Translate }): any {
           setStatusError(next.error || t('statusFailed'))
         }
       } catch (error) {
-        if (signal?.aborted) return
-        // A missing host route means the host half is not active (or not built):
-        // render the shell instead of crashing the slot entry.
         setStatus(null)
         setStatusError(error instanceof Error ? error.message : String(error))
       } finally {
-        if (!signal?.aborted) setRefreshing(false)
+        if (!options?.silent) setRefreshing(false)
       }
     },
     [t],
   )
 
-  React.useEffect(() => {
-    const controller = new AbortController()
-    void loadStatus(controller.signal)
-    return () => controller.abort()
-  }, [loadStatus])
+  const loadRefs = React.useCallback(async () => {
+    try {
+      const next = await fetchRefs()
+      if (next.ok) setRefs(next)
+    } catch {
+      /* the rail degrades to empty groups */
+    }
+  }, [])
 
-  const openDiff = React.useCallback(async (entry: GitFileEntry, signal?: AbortSignal) => {
-    setSelected(entry)
+  const openDiff = React.useCallback(async (entry: GitFileEntry, side: EntrySide) => {
+    setSelected({ path: entry.path, side })
     setDiff(null)
     if (entry.kind === 'ignored') return
     setDiffLoading(true)
     try {
-      // A fully staged entry is previewed from the index (`git diff --cached`);
-      // everything else is previewed against the index (plain `git diff`).
-      const next = await fetchDiff(
-        { path: entry.path, staged: isStaged(entry) ? '1' : '0' },
-        signal,
-      )
-      if (!signal?.aborted) setDiff(next)
+      const next = await fetchDiff({ path: entry.path, side: sideFor(entry, side) })
+      setDiff(next)
     } catch (error) {
-      if (!signal?.aborted) setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) })
     } finally {
-      if (!signal?.aborted) setDiffLoading(false)
+      setDiffLoading(false)
     }
   }, [])
 
-  const entries = status?.entries ?? []
-  const staged = entries.filter(isStaged)
-  const working = entries.filter((entry) => !isStaged(entry))
+  React.useEffect(() => {
+    void loadStatus()
+    void loadRefs()
+  }, [loadStatus, loadRefs])
 
-  const branchLabel = status?.branch && status.branch !== '(detached)' ? status.branch : status?.branch || '—'
+  // Keep the selection honest when the working copy changes underneath it.
+  React.useEffect(() => {
+    if (selected === null) return
+    if (findEntry(status, selected.path) === null) {
+      setSelected(null)
+      setDiff(null)
+    }
+  }, [status, selected])
+
+  // Poll while the panel is on screen; pause when hidden or a write is running.
+  React.useEffect(() => {
+    const id = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      if (busyRef.current) return
+      void loadStatus({ silent: true })
+      void loadRefs()
+    }, POLL_MS)
+    const onFocus = () => {
+      void loadStatus({ silent: true })
+      void loadRefs()
+    }
+    const onVisible = () => {
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') onFocus()
+    }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [loadStatus, loadRefs])
+
+  const toggle = React.useCallback(
+    async (entry: GitFileEntry, side: EntrySide) => {
+      if (entry.conflicted || side === 'conflicted') {
+        setActionError(t('conflictsBlockCommit'))
+        return
+      }
+      setBusy(true)
+      setActionError('')
+      try {
+        const result = side === 'staged' ? await unstagePaths([entry.path]) : await stagePaths([entry.path])
+        if (!result.ok) throw new Error(result.error || (side === 'staged' ? t('unstageFailed') : t('stageFailed')))
+        const next = await fetchStatus()
+        if (next.ok) setStatus(next)
+        if (selected?.path === entry.path && next.ok) {
+          const updated = findEntry(next, entry.path)
+          if (updated) await openDiff(updated, sideOf(updated))
+        }
+      } catch (error) {
+        setActionError(error instanceof Error ? error.message : String(error))
+      } finally {
+        setBusy(false)
+      }
+    },
+    [openDiff, selected, t],
+  )
+
+  const copyPath = React.useCallback(
+    (entry: GitFileEntry) => {
+      try {
+        void navigator.clipboard?.writeText(entry.path)
+        showToast(t('copiedPath'))
+      } catch {
+        showToast(entry.path)
+      }
+    },
+    [showToast, t],
+  )
+
+  const commit = React.useCallback(async () => {
+    const staged = status?.counts?.staged ?? 0
+    const conflicts = status?.counts?.conflicted ?? 0
+    if (busyRef.current || staged === 0 || message.trim() === '' || conflicts > 0) return
+    setBusy(true)
+    setActionError('')
+    try {
+      const result = await commitChanges(message)
+      if (!result.ok) throw new Error(result.error || t('commitFailed'))
+      showToast([t('commitDone'), result.shortSha, result.subject].filter(Boolean).join(' · '))
+      setMessage('')
+      setSelected(null)
+      setDiff(null)
+      await loadStatus()
+      await loadRefs()
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setBusy(false)
+    }
+  }, [loadRefs, loadStatus, message, showToast, status, t])
+
+  const entries = status?.entries ?? []
+  const rows = splitEntries(entries)
+  const selectedKey = selected ? rowKey(selected.path, selected.side) : ''
+  const selectedEntry = selected ? findEntry(status, selected.path) : null
+  const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null
+  const truncated = status?.truncated === true
 
   return h(
     'div',
     { className: 'dgt-root', 'data-plugin': 'dsh-git-tree' },
-
-    // top bar: repo identity, branch, ahead/behind, actions
-    h(
-      'header',
-      { className: 'dgt-topbar' },
-      h(
-        'div',
-        { className: 'dgt-repo' },
-        h('span', { className: 'dgt-repo-name' }, status?.repoRoot ? lastSegment(status.repoRoot) : t('panel')),
-        h(
-          'span',
-          { className: 'dgt-repo-path', title: status?.cwd || status?.repoRoot || '' },
-          status?.repoRoot || status?.cwd || '—',
-        ),
-      ),
-      h(
-        'div',
-        { className: 'dgt-refs' },
-        h(Chip, { tone: 'muted' }, h('span', { className: 'dgt-branch-glyph', 'aria-hidden': 'true' }, '⎇'), ' ', branchLabel),
-        typeof status?.ahead === 'number' && status.ahead > 0 ? h(Chip, { tone: 'ok' }, '↑' + String(status.ahead)) : null,
-        typeof status?.behind === 'number' && status.behind > 0
-          ? h(Chip, { tone: 'warn' }, '↓' + String(status.behind))
-          : null,
-        status?.upstream ? h('span', { className: 'dgt-upstream' }, status.upstream) : null,
-      ),
-      h(
-        'div',
-        { className: 'dgt-actions' },
-        refreshing ? h(Spinner) : null,
-        h(
-          'button',
-          {
-            type: 'button',
-            className: 'dgt-button',
-            onClick: () => void loadStatus(),
-            disabled: refreshing,
-            title: t('refresh'),
-          },
-          '⟳ ' + t('refresh'),
-        ),
-      ),
-    ),
+    h(TopBar, {
+      status,
+      busy: refreshing || busy,
+      t,
+      onRefresh: () => void loadStatus(),
+      onCommitFocus: () => {
+        if (commitInput.current && commitInput.current.focus) commitInput.current.focus()
+      },
+    }),
 
     statusError !== ''
       ? h(
           'div',
-          { className: 'dgt-banner', role: 'status' },
-          h('strong', null, t('hostUnavailable')),
-          h('span', null, statusError),
+          { className: 'dgt-banner', 'data-tone': 'error' },
+          h('span', { className: 'dgt-banner-text' }, statusError),
         )
       : null,
+    truncated ? h('div', { className: 'dgt-banner' }, h('span', { className: 'dgt-banner-text' }, t('truncated'))) : null,
 
-    // three-pane workspace: refs rail / change list / diff
     h(
       'div',
       { className: 'dgt-body' },
-      h(RefRail, { t }),
-      h(ChangeList, {
-        status,
-        statusError,
-        entries,
-        staged,
-        working,
-        selected,
-        t,
-        onSelect: (picked: GitFileEntry) => void openDiff(picked),
-      }),
-      h(DiffView, { selected, loading: diffLoading, diff, t }),
+      h(RefRail, { status, refs, t }),
+      h(
+        'div',
+        { className: 'dgt-main' },
+        h(
+          'div',
+          { className: 'dgt-panes' },
+          h(ChangeList, {
+            status,
+            statusError,
+            rows,
+            selectedKey,
+            t,
+            onSelect: (entry: GitFileEntry, side: EntrySide) => void openDiff(entry, side),
+            onToggle: (entry: GitFileEntry, side: EntrySide) => void toggle(entry, side),
+            onCopyPath: copyPath,
+          }),
+          h(DiffView, {
+            selected: diffSelection,
+            diff,
+            loading: diffLoading,
+            t,
+            onToggleFile: () => {
+              if (diffSelection) void toggle(diffSelection.entry, diffSelection.side)
+            },
+          }),
+        ),
+        h(CommitBox, {
+          status,
+          message,
+          busy,
+          hint: actionError,
+          hintTone: actionError ? 'error' : 'muted',
+          t,
+          inputRef: commitInput,
+          onMessage: setMessage,
+          onCommit: () => void commit(),
+        }),
+      ),
     ),
+
+    toast ? h('div', { className: 'dgt-toast', role: 'status' }, toast) : null,
+    notice ? h('div', { className: 'dgt-toast', role: 'status' }, notice) : null,
   )
 }

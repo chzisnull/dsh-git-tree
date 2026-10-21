@@ -1,0 +1,63 @@
+// Small toolbar and row glyphs. Inline SVG so the panel ships no image assets
+// and inherits `currentColor` from the theme.
+
+import { h } from './react'
+
+function svg(children: any, extra?: Record<string, unknown>): any {
+  return h(
+    'svg',
+    { width: 14, height: 14, viewBox: '0 0 16 16', 'aria-hidden': 'true', focusable: 'false', ...extra },
+    children,
+  )
+}
+
+export function RefreshIcon(): any {
+  return svg([
+    h('path', { d: 'M13 8a5 5 0 1 1-1.6-3.7', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round' }),
+    h('path', { d: 'M13 2.4V5h-2.6', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+  ])
+}
+
+export function CommitIcon(): any {
+  return svg([
+    h('circle', { cx: 8, cy: 8, r: 4.2, fill: 'none', stroke: 'currentColor', strokeWidth: 1.3 }),
+    h('path', { d: 'M8 1.4v2.4M8 12.2v2.4', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round' }),
+  ])
+}
+
+export function BranchIcon(): any {
+  return svg([
+    h('path', { d: 'M4.5 3v6.2a2.6 2.6 0 0 0 2.6 2.6h3.4', fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round' }),
+    h('circle', { cx: 4.5, cy: 2.6, r: 1.25, fill: 'currentColor' }),
+    h('circle', { cx: 11.6, cy: 11.8, r: 1.25, fill: 'none', stroke: 'currentColor', strokeWidth: 1.2 }),
+  ])
+}
+
+export function TagIcon(): any {
+  return svg(
+    h('path', {
+      d: 'M2.6 3.6h4.2l6.2 6.2a1.3 1.3 0 0 1 0 1.8l-1.6 1.6a1.3 1.3 0 0 1-1.8 0L3.4 7V3.6Z',
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 1.2,
+      strokeLinejoin: 'round',
+    }),
+  )
+}
+
+export function RemoteIcon(): any {
+  return svg([
+    h('rect', { x: 2.4, y: 4.4, width: 11.2, height: 7.2, rx: 1.4, fill: 'none', stroke: 'currentColor', strokeWidth: 1.2 }),
+    h('path', { d: 'M5.4 8h5.2', fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round' }),
+  ])
+}
+
+export function MoreIcon(): any {
+  return h(
+    'svg',
+    { width: 13, height: 13, viewBox: '0 0 16 16', 'aria-hidden': 'true', focusable: 'false' },
+    h('circle', { cx: 3.4, cy: 8, r: 1.15, fill: 'currentColor' }),
+    h('circle', { cx: 8, cy: 8, r: 1.15, fill: 'currentColor' }),
+    h('circle', { cx: 12.6, cy: 8, r: 1.15, fill: 'currentColor' }),
+  )
+}

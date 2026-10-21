@@ -1,40 +1,105 @@
-// Diff pane: header with the selected path, body driven by the loaded diff.
+// Diff pane: a file header with stats and a file-level action, then hunks
+// rendered line by line (gutters, whole-row tint, hunk headers). No syntax
+// highlighting, matching Sourcetree: which lines changed beats which token is
+// a keyword.
 
 import { h } from '../react'
-import type { DiffPayload, GitFileEntry, Translate } from '../types'
+import type { DiffFile, DiffLine, DiffPayload, EntrySide, GitFileEntry, Translate } from '../types'
+
+function Line(props: { line: DiffLine }): any {
+  const line = props.line
+  const marker = line.kind === 'add' ? '+' : line.kind === 'del' ? '-' : line.kind === 'meta' ? '' : ' '
+  return h(
+    'div',
+    { className: 'dgt-line', 'data-kind': line.kind },
+    h('span', { className: 'dgt-gutter' }, line.oldNo === null ? '' : String(line.oldNo)),
+    h('span', { className: 'dgt-gutter' }, line.newNo === null ? '' : String(line.newNo)),
+    h('span', { className: 'dgt-marker' }, marker),
+    h('span', { className: 'dgt-text' }, line.text),
+  )
+}
+
+function FileBlock(props: { file: DiffFile; t: Translate }): any {
+  const file = props.file
+  if (file.binary) {
+    return h('div', { className: 'dgt-placeholder' }, props.t('binaryFile'))
+  }
+  return h(
+    'div',
+    { className: 'dgt-file-block' },
+    file.status !== 'modified'
+      ? h(
+          'div',
+          { className: 'dgt-hunk-head' },
+          h('span', null, file.status),
+          h('span', null, (file.oldPath ?? '') + ' → ' + (file.newPath ?? '')),
+        )
+      : null,
+    file.hunks.map((hunk, hunkIndex) =>
+      h(
+        'div',
+        { className: 'dgt-hunk', key: 'hunk:' + String(hunkIndex) },
+        h('div', { className: 'dgt-hunk-head' }, h('span', null, hunk.header)),
+        hunk.lines.map((line, lineIndex) => h(Line, { key: 'l:' + String(lineIndex), line })),
+      ),
+    ),
+  )
+}
 
 export function DiffView(props: {
-  selected: GitFileEntry | null
-  loading: boolean
+  selected: { entry: GitFileEntry; side: EntrySide } | null
   diff: DiffPayload | null
+  loading: boolean
   t: Translate
+  onToggleFile: () => void
 }): any {
-  const { selected, loading, diff, t } = props
+  const { selected, diff, loading, t } = props
+  const entry = selected?.entry ?? null
+  const side = selected?.side ?? 'unstaged'
+  const stats = diff?.stats
+  const canAct = entry !== null && !entry.conflicted
+  const actionLabel = side === 'staged' ? t('unstageFile') : t('stageFile')
+
   return h(
     'section',
-    { className: 'dgt-diff', 'aria-label': t('diff') },
+    { className: 'dgt-diff', 'aria-label': t('code') },
     h(
       'div',
-      { className: 'dgt-list-head' },
-      h('span', null, t('diff')),
-      h('span', { className: 'dgt-mono' }, selected?.path ?? ''),
+      { className: 'dgt-diff-head' },
+      h('span', { className: 'dgt-diff-path' }, entry?.path ?? t('fileStatus')),
+      entry?.origPath
+        ? h('span', { className: 'dgt-diff-orig' }, t('renameFrom') + ' ' + entry.origPath)
+        : null,
+      stats && (stats.additions > 0 || stats.deletions > 0)
+        ? h(
+            'span',
+            { className: 'dgt-stats' },
+            h('span', { className: 'dgt-stat-add' }, '+' + String(stats.additions)),
+            h('span', { className: 'dgt-stat-del' }, '−' + String(stats.deletions)),
+          )
+        : null,
+      canAct
+        ? h('button', { type: 'button', className: 'dgt-diff-action', onClick: props.onToggleFile }, actionLabel)
+        : null,
     ),
     h(
       'div',
       { className: 'dgt-diff-body' },
-      selected === null
-        ? h('div', { className: 'dgt-placeholder' }, t('diffPlaceholder'))
+      entry === null
+        ? h('div', { className: 'dgt-placeholder' }, t('noFileSelected'))
         : loading
           ? h('div', { className: 'dgt-placeholder' }, t('loading'))
           : diff && diff.ok === false
-            ? h('div', { className: 'dgt-placeholder dgt-error' }, diff.error || t('diffFailed'))
-            : diff && diff.text
-              ? h('pre', { className: 'dgt-premain' }, diff.text)
-              : h(
-                  'div',
-                  { className: 'dgt-placeholder' },
-                  selected.kind === 'untracked' ? t('untrackedNoDiff') : t('noDiff'),
-                ),
+            ? h('div', { className: 'dgt-placeholder' }, diff.error || t('diffFailed'))
+            : diff && diff.binary
+              ? h('div', { className: 'dgt-placeholder' }, t('binaryFile'))
+              : diff && diff.files && diff.files.length > 0
+                ? diff.files.map((file, index) => h(FileBlock, { key: 'file:' + String(index), file, t }))
+                : h(
+                    'div',
+                    { className: 'dgt-placeholder' },
+                    entry.kind === 'untracked' ? t('untrackedNoDiff') : t('noDiff'),
+                  ),
     ),
   )
 }

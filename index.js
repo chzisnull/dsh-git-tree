@@ -3,8 +3,8 @@
  *
  * This file is assembly only: it names the plugin, declares its hard services
  * and registers the authenticated Fetch routes. The git runner, path guards,
- * porcelain parser and route handlers live in `src/host/` so they can be unit
- * tested without a DSH context.
+ * parsers and route handlers live in `src/host/` so they can be unit tested
+ * without a DSH context.
  *
  * Channel contract (verified against shipped DSH plugins):
  *   - routes are registered through `ctx.connection.fetch.register({ path,
@@ -21,8 +21,8 @@
  *     user's repository), GIT_CONFIG_COUNT=0 (ignore ambient indexed config);
  *   - bounded output, bounded run time, `--` before user-supplied paths, and a
  *     cwd that must stay inside the workspace root;
- *   - read-only commands only (`status`, `rev-parse`, `diff`); no mutation is
- *     implemented here on purpose.
+ *   - the write surface is file-level stage / unstage / commit only. No
+ *     reset --hard, no push, no amend, no discard route exists on purpose.
  *
  * Config: a host plugin may export a schemastery `Config` and the Loader
  * validates the row's `config` against it (workbench does this). This skeleton
@@ -30,7 +30,14 @@
  * see README.md for the four-line pattern to add one later.
  */
 
-import { handleDiff, handleStatus } from './src/host/handlers.js'
+import {
+  handleCommit,
+  handleDiff,
+  handleRefs,
+  handleStage,
+  handleStatus,
+  handleUnstage,
+} from './src/host/handlers.js'
 import { guard } from './src/host/http.js'
 
 /** Stable Cordis plugin name (not strictly required; matches the patch row id). */
@@ -43,26 +50,28 @@ export const name = 'dsh-git-tree'
  */
 export const inject = ['connection', 'subprocess']
 
-/** Exact Fetch route paths. `/api/<name>.<verb>` is the shape shipped plugins use. */
-const STATUS_PATH = '/api/git-tree/status'
-const DIFF_PATH = '/api/git-tree/diff'
+/** Exact Fetch route paths. */
+const ROUTES = [
+  { path: '/api/git-tree/status', methods: ['GET'], handler: handleStatus },
+  { path: '/api/git-tree/diff', methods: ['GET'], handler: handleDiff },
+  { path: '/api/git-tree/refs', methods: ['GET'], handler: handleRefs },
+  { path: '/api/git-tree/stage', methods: ['POST'], handler: handleStage },
+  { path: '/api/git-tree/unstage', methods: ['POST'], handler: handleUnstage },
+  { path: '/api/git-tree/commit', methods: ['POST'], handler: handleCommit },
+]
 
 /**
- * Register the two routes. Each registration is owned by this plugin's fiber:
+ * Register the routes. Each registration is owned by this plugin's fiber:
  * `ctx.connection.fetch.register` wraps it in an effect, so unloading the row
  * (or disabling the bundle) removes the routes with no extra cleanup here.
  */
 export function apply(ctx) {
-  ctx.connection.fetch.register({
-    path: STATUS_PATH,
-    methods: ['GET'],
-    requestBody: 'buffered',
-    fetch: guard((request) => handleStatus(ctx, request)),
-  })
-  ctx.connection.fetch.register({
-    path: DIFF_PATH,
-    methods: ['GET'],
-    requestBody: 'buffered',
-    fetch: guard((request) => handleDiff(ctx, request)),
-  })
+  for (const route of ROUTES) {
+    ctx.connection.fetch.register({
+      path: route.path,
+      methods: route.methods,
+      requestBody: 'buffered',
+      fetch: guard((request) => route.handler(ctx, request)),
+    })
+  }
 }

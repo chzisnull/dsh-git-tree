@@ -1,26 +1,53 @@
 // Unit contract for the extracted host modules.
 //
-// Ticket #2 requires the git runner and the porcelain parser to be importable
-// in plain Node, without a DSH context. These tests pin that seam and the two
-// behaviors the route tests do not inspect directly: the exact child-process
-// shape handed to `ctx.subprocess` and the parser's record vocabulary.
+// These tests pin the seam ticket #2 created (host modules importable in plain
+// Node, no DSH context) plus the parsers' record vocabulary: porcelain v2 with
+// renames/conflicts/two-sided changes, and the structured diff the panel renders.
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execGit, git } from '../src/host/git.js'
-import { parsePorcelainV2 } from '../src/host/porcelain.js'
+import { parsePorcelainV2, summariseEntries } from '../src/host/porcelain.js'
+import { parseUnifiedDiff } from '../src/host/diff.js'
+import { parseRefs } from '../src/host/refs.js'
 
-const STATUS_FIXTURE = [
-  '# branch.oid 0123456789abcdef',
-  '# branch.head main',
-  '# branch.upstream origin/main',
-  '# branch.ab +2 -1',
-  '1 .M N... 100644 100644 100644 aaaaaaa bbbbbbb src/components/App.tsx',
-  '1 M. N... 100644 100644 100644 aaaaaaa bbbbbbb src/main.ts',
-  '2 R. N... 100644 100644 100644 aaaaaaa bbbbbbb R100 docs/new name.md',
-  '? docs/untracked.md',
-  '! scratch/ignored.log',
-].join('\0') + '\0'
+const STATUS_FIXTURE =
+  [
+    '# branch.oid 0123456789abcdef',
+    '# branch.head main',
+    '# branch.upstream origin/main',
+    '# branch.ab +2 -1',
+    '1 .M N... 100644 100644 100644 aaaaaaa bbbbbbb src/app.js',
+    '1 M. N... 100644 100644 100644 aaaaaaa bbbbbbb src/staged.js',
+    '1 MM N... 100644 100644 100644 aaaaaaa bbbbbbb src/two.js',
+    '2 R. N... 100644 100644 100644 aaaaaaa bbbbbbb R100 docs/new name.md',
+    'old/name.md',
+    'u UU N... 100644 100644 100644 100644 aaaaaaa bbbbbbb ccccccc src/conflict.js',
+    '? docs/untracked.md',
+    '! scratch/ignored.log',
+  ].join('\u0000') + '\u0000'
+
+const DIFF_FIXTURE = [
+  'diff --git a/src/app.js b/src/app.js',
+  'index 1111111..2222222 100644',
+  '--- a/src/app.js',
+  '+++ b/src/app.js',
+  '@@ -1,3 +1,4 @@ function main()',
+  ' console.log("app")',
+  '-export const a = 1',
+  '+export const a = 2',
+  '+export const b = 3',
+  ' // tail',
+  '\\ No newline at end of file',
+  'diff --git a/old.md b/new.md',
+  'similarity index 100%',
+  'rename from old.md',
+  'rename to new.md',
+  'diff --git a/img.png b/img.png',
+  'index 1111111..2222222 100644',
+  'Binary files a/img.png and b/img.png differ',
+  '',
+].join('\n')
 
 function fakeSubprocess({ exitCode = 0, stdout = '', stderr = '' } = {}) {
   const spawns = []
@@ -43,7 +70,7 @@ function fakeSubprocess({ exitCode = 0, stdout = '', stderr = '' } = {}) {
   }
 }
 
-test('porcelain parser understands v2 records in plain Node', () => {
+test('porcelain parser understands every v2 record in plain Node', () => {
   const parsed = parsePorcelainV2(STATUS_FIXTURE)
 
   assert.equal(parsed.oid, '0123456789abcdef')
@@ -52,23 +79,97 @@ test('porcelain parser understands v2 records in plain Node', () => {
   assert.equal(parsed.ahead, 2)
   assert.equal(parsed.behind, 1)
   assert.equal(parsed.truncated, false)
-  assert.deepEqual(parsed.entries, [
-    { path: 'src/components/App.tsx', x: '.', y: 'M', kind: 'changed' },
-    { path: 'src/main.ts', x: 'M', y: '.', kind: 'changed' },
-    { path: 'docs/new name.md', x: 'R', y: '.', kind: 'renamed' },
-    { path: 'docs/untracked.md', x: '?', y: '?', kind: 'untracked' },
-    { path: 'scratch/ignored.log', x: '!', y: '!', kind: 'ignored' },
-  ])
+
+  const byPath = Object.fromEntries(parsed.entries.map((entry) => [entry.path, entry]))
+  assert.deepEqual(byPath['src/app.js'], {
+    path: 'src/app.js',
+    x: '.',
+    y: 'M',
+    kind: 'changed',
+    staged: false,
+    unstaged: true,
+    conflicted: false,
+  })
+  assert.equal(byPath['src/two.js'].staged, true)
+  assert.equal(byPath['src/two.js'].unstaged, true)
+  assert.equal(byPath['docs/new name.md'].kind, 'renamed')
+  assert.equal(byPath['docs/new name.md'].origPath, 'old/name.md')
+  assert.equal(byPath['src/conflict.js'].kind, 'conflicted')
+  assert.equal(byPath['src/conflict.js'].conflicted, true)
+  assert.equal(byPath['docs/untracked.md'].kind, 'untracked')
+  assert.equal(byPath['scratch/ignored.log'].kind, 'ignored')
+
+  assert.deepEqual(summariseEntries(parsed.entries), { staged: 3, unstaged: 3, conflicted: 1 })
 })
 
 test('porcelain parser caps the entry list and reports truncation', () => {
   const records = []
   for (let index = 0; index < 5005; index += 1) records.push('? file-' + String(index) + '.txt')
-  const parsed = parsePorcelainV2(records.join('\0') + '\0')
+  const parsed = parsePorcelainV2(records.join('\u0000') + '\u0000')
 
   assert.equal(parsed.entries.length, 5000)
   assert.equal(parsed.truncated, true)
   assert.equal(parsed.entries[4999].path, 'file-4999.txt')
+})
+
+test('diff parser keeps line numbers, hunk headers, rename and binary markers', () => {
+  const parsed = parseUnifiedDiff(DIFF_FIXTURE)
+
+  assert.deepEqual(parsed.stats, { additions: 2, deletions: 1 })
+  assert.equal(parsed.files.length, 3)
+
+  const [modified, renamed, binary] = parsed.files
+  assert.equal(modified.newPath, 'src/app.js')
+  assert.equal(modified.hunks[0].heading, 'function main()')
+  assert.deepEqual(
+    modified.hunks[0].lines.map((line) => [line.kind, line.oldNo, line.newNo]),
+    [
+      ['context', 1, 1],
+      ['del', 2, null],
+      ['add', null, 2],
+      ['add', null, 3],
+      ['context', 3, 4],
+      ['meta', null, null],
+    ],
+  )
+
+  assert.equal(renamed.status, 'renamed')
+  assert.equal(renamed.oldPath, 'old.md')
+  assert.equal(renamed.newPath, 'new.md')
+
+  assert.equal(binary.binary, true)
+  assert.equal(parsed.binary, false, 'a mixed diff is not all-binary')
+})
+
+test('diff parser reports a fully binary diff', () => {
+  const parsed = parseUnifiedDiff(
+    [
+      'diff --git a/img.png b/img.png',
+      'index 1111111..2222222 100644',
+      'Binary files a/img.png and b/img.png differ',
+      '',
+    ].join('\n'),
+  )
+  assert.equal(parsed.binary, true)
+  assert.equal(parsed.files[0].status, 'modified')
+})
+
+test('refs parser groups refs and marks the current branch', () => {
+  const parsed = parseRefs(
+    [
+      'refs/heads/topic\u0000def5678\u0000\u00001780000000\u0000Topic work',
+      'refs/heads/main\u0000abc1234\u0000origin/main\u00001790000000\u0000Initial commit',
+      'refs/remotes/origin/main\u0000abc1234\u0000\u00001790000000\u0000Initial commit',
+      'refs/tags/v0.1.0\u0000abc1234\u0000\u00001790000000\u0000Release',
+    ].join('\n'),
+    'main',
+  )
+  assert.deepEqual(parsed.branches.map((branch) => branch.name), ['main', 'topic'])
+  assert.equal(parsed.branches[0].current, true)
+  assert.equal(parsed.branches[0].upstream, 'origin/main')
+  assert.equal(parsed.branches[1].current, false)
+  assert.equal(parsed.remotes.length, 1)
+  assert.equal(parsed.tags.length, 1)
 })
 
 test('git runner spawns argv directly, with the scrubbed git environment', async () => {
