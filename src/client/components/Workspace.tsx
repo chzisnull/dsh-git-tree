@@ -18,6 +18,7 @@ import type {
   WorkspaceRecord,
 } from '../types'
 import {
+  checkoutBranch,
   commitChanges,
   fetchCommitInfo,
   fetchDiff,

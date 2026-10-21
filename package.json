@@ -40,7 +40,7 @@
   "scripts": {
     "build": "node build.mjs",
     "check": "node --check index.js && node --check client.js",
-    "test": "node --test test/manifest.test.mjs test/routes.test.mjs test/ui-contract.test.mjs test/host-modules.test.mjs test/client-boot.test.mjs"
+    "test": "node --test test/manifest.test.mjs test/routes.test.mjs test/ui-contract.test.mjs test/host-modules.test.mjs test/client-boot.test.mjs test/client-imports.test.mjs"
   },
   "dsh": {
     "bundle": {
