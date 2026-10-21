@@ -139,7 +139,7 @@ export const CSS = `
   font-size:11px;font-weight:600;}
 .dgt-hscroll{flex:1 1 auto;min-height:0;overflow:auto;}
 .dgt-hlist{padding:2px 0 8px;}
-.dgt-hrow{display:grid;grid-template-columns:88px minmax(0,1fr) 132px 84px 108px 138px;align-items:center;
+.dgt-hrow{box-sizing:border-box;display:grid;grid-template-columns:88px minmax(0,1fr) 132px 84px 108px 138px;align-items:center;
   height:24px;padding:0 10px;color:var(--dsw-alias-label-primary);font-size:12px;cursor:default;}
 .dgt-hrow:hover{background:var(--dsw-alias-interactive-bg-hover);}
 .dgt-hrow[data-active]{background:color-mix(in srgb, var(--dgt-accent) 15%, var(--dsw-alias-bg-layer-1));
@@ -240,7 +240,7 @@ export const CSS = `
   color:var(--dsw-alias-label-secondary);font-size:11.5px;font-weight:500;}
 .dgt-group[data-tone='error']{color:var(--dsw-alias-state-error-primary);}
 .dgt-group-count{color:var(--dgt-meta);font-size:11.5px;font-variant-numeric:tabular-nums;font-weight:400;}
-.dgt-row{position:relative;display:flex;align-items:center;gap:6px;width:100%;height:27px;
+.dgt-row{position:relative;box-sizing:border-box;display:flex;align-items:center;gap:6px;width:100%;height:27px;
   padding:0 10px;border:0;background:transparent;color:var(--dsw-alias-label-primary);
   font:inherit;font-size:13px;text-align:left;cursor:default;}
 .dgt-row:hover{background:var(--dsw-alias-interactive-bg-hover);}
@@ -258,7 +258,7 @@ export const CSS = `
 .dgt-badge[data-tone='warn']{background:color-mix(in srgb, var(--dsw-alias-state-warn-primary) 20%, var(--dsw-alias-bg-layer-1));color:var(--dgt-warn);}
 .dgt-badge[data-tone='error']{background:color-mix(in srgb, var(--dsw-alias-state-error-primary) 16%, var(--dsw-alias-bg-layer-1));color:var(--dgt-err);}
 .dgt-badge[data-tone='accent']{background:color-mix(in srgb, var(--dgt-accent) 16%, var(--dsw-alias-bg-layer-1));color:var(--dgt-accent-strong);}
-.dgt-rowact{appearance:none;flex:0 0 auto;margin-left:auto;padding:1px 6px;border:0;border-radius:4px;
+.dgt-rowact{appearance:none;flex:0 0 auto;margin-left:auto;white-space:nowrap;padding:1px 8px;border:0;border-radius:4px;
   background:transparent;color:var(--dgt-accent-strong);font:inherit;font-size:11.5px;cursor:pointer;opacity:0;}
 .dgt-row:hover .dgt-rowact,.dgt-row:focus-within .dgt-rowact{opacity:1;}
 .dgt-rowact:hover{background:var(--dsw-alias-interactive-bg-hover);}

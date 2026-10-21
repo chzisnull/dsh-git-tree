@@ -25,7 +25,7 @@ export function FileRow(props: {
   const tone = statusTone(letter)
   const { dir, name } = splitPath(entry.path)
   const conflict = side === 'conflicted' || entry.conflicted
-  const actionLabel = side === 'staged' ? t('unstageFile') : t('stageFile')
+  const actionLabel = side === 'staged' ? t('unstageShort') : t('stageShort')
   const title = entry.origPath ? entry.path + ' — ' + t('renameFrom') + ' ' + entry.origPath : entry.path
 
   const openMenu = (event: any) => {
@@ -61,7 +61,7 @@ export function FileRow(props: {
       className: 'dgt-check',
       checked: side === 'staged',
       disabled: conflict,
-      'aria-label': actionLabel,
+      'aria-label': side === 'staged' ? t('unstageFile') : t('stageFile'),
       title: conflict ? t('conflictsBlockCommit') : actionLabel,
       onClick: (event: any) => event.stopPropagation(),
       onChange: () => props.onToggle(entry, side),
