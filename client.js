@@ -999,6 +999,50 @@ function CommitBox(props) {
   );
 }
 
+// src/client/components/views/StatusView.tsx
+function StatusView(props) {
+  const { t } = props;
+  return h(
+    "div",
+    { className: "dgt-main" },
+    h(
+      "div",
+      { className: "dgt-panes" },
+      h(ChangeList, {
+        status: props.status,
+        statusError: props.statusError,
+        rows: props.rows,
+        selectedKey: props.selectedKey,
+        t,
+        onSelect: props.onSelect,
+        onToggle: props.onToggle,
+        onCopyPath: props.onCopyPath
+      }),
+      h(DiffView, {
+        selected: props.diffSelection,
+        diff: props.diff,
+        loading: props.diffLoading,
+        hasChanges: props.entries.length > 0,
+        t,
+        onToggleFile: () => {
+          if (props.diffSelection) props.onToggle(props.diffSelection.entry, props.diffSelection.side);
+        }
+      })
+    ),
+    h(CommitBox, {
+      status: props.status,
+      message: props.message,
+      busy: props.busy,
+      hint: props.actionError,
+      hintTone: props.actionError ? "error" : "muted",
+      t,
+      inputRef: props.commitInputRef,
+      onMessage: props.onMessage,
+      onCommit: props.onCommit
+    })
+  );
+}
+
 // src/client/components/Workspace.tsx
 var POLL_MS = 2e3;
 var REPO_KEY = "dsh-git-tree/repository";
@@ -1016,6 +1060,7 @@ function Workspace(props) {
   const [refs, setRefs] = React.useState(null);
   const [workspaces, setWorkspaces] = React.useState([]);
   const [repoPath, setRepoPath] = React.useState("");
+  const [view] = React.useState("status");
   const [statusError, setStatusError] = React.useState("");
   const [selected, setSelected] = React.useState(null);
   const [diff, setDiff] = React.useState(null);
@@ -1202,6 +1247,32 @@ function Workspace(props) {
   const selectedEntry = selected ? findEntry(status, selected.path) : null;
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null;
   const truncated = status?.truncated === true;
+  const renderView = () => {
+    switch (view) {
+      case "status":
+      default:
+        return h(StatusView, {
+          status,
+          statusError,
+          rows,
+          entries,
+          selectedKey,
+          diffSelection,
+          diff,
+          diffLoading,
+          message,
+          busy,
+          actionError,
+          t,
+          commitInputRef: commitInput,
+          onSelect: (entry, side) => void openDiff(entry, side),
+          onToggle: (entry, side) => void toggle(entry, side),
+          onCopyPath: copyPath,
+          onMessage: setMessage,
+          onCommit: () => void commit()
+        });
+    }
+  };
   return h(
     "div",
     { className: "dgt-root", "data-plugin": "dsh-git-tree" },
@@ -1223,50 +1294,7 @@ function Workspace(props) {
       h("span", { className: "dgt-banner-text" }, statusError)
     ) : null,
     truncated ? h("div", { className: "dgt-banner" }, h("span", { className: "dgt-banner-text" }, t("truncated"))) : null,
-    h(
-      "div",
-      { className: "dgt-body" },
-      h(RefRail, { status, refs, t }),
-      h(
-        "div",
-        { className: "dgt-main" },
-        h(
-          "div",
-          { className: "dgt-panes" },
-          h(ChangeList, {
-            status,
-            statusError,
-            rows,
-            selectedKey,
-            t,
-            onSelect: (entry, side) => void openDiff(entry, side),
-            onToggle: (entry, side) => void toggle(entry, side),
-            onCopyPath: copyPath
-          }),
-          h(DiffView, {
-            selected: diffSelection,
-            diff,
-            loading: diffLoading,
-            hasChanges: entries.length > 0,
-            t,
-            onToggleFile: () => {
-              if (diffSelection) void toggle(diffSelection.entry, diffSelection.side);
-            }
-          })
-        ),
-        h(CommitBox, {
-          status,
-          message,
-          busy,
-          hint: actionError,
-          hintTone: actionError ? "error" : "muted",
-          t,
-          inputRef: commitInput,
-          onMessage: setMessage,
-          onCommit: () => void commit()
-        })
-      )
-    ),
+    h("div", { className: "dgt-body" }, h(RefRail, { status, refs, t }), renderView()),
     toast ? h("div", { className: "dgt-toast", role: "status" }, toast) : null,
     notice ? h("div", { className: "dgt-toast", role: "status" }, notice) : null
   );

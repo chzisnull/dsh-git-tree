@@ -15,6 +15,9 @@ export interface ClientCtx {
   }
 }
 
+/** The workspace view currently shown in the main column. */
+export type ViewKind = 'status' | 'history' | 'search'
+
 /** The side of the working copy an entry row belongs to. */
 export type EntrySide = 'staged' | 'unstaged' | 'conflicted'
 
