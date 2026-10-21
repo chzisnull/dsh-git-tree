@@ -20,6 +20,9 @@ import type {
 import {
   checkoutBranch,
   commitChanges,
+  createBranch,
+  deleteBranch,
+  renameBranch,
   fetchCommitInfo,
   fetchDiff,
   fetchHistory,
@@ -35,6 +38,7 @@ import { TopBar } from './TopBar'
 import { RefRail } from './RefRail'
 import { StatusView } from './views/StatusView'
 import { HistoryView } from './views/HistoryView'
+import { ConfirmDialog, PromptDialog } from './Dialogs'
 import type { ViewKind } from '../types'
 
 const POLL_MS = 2000
@@ -73,6 +77,10 @@ export function Workspace(props: { t?: Translate }): any {
   const [commitFile, setCommitFile] = React.useState('')
   const [commitFileDiff, setCommitFileDiff] = React.useState<DiffPayload | null>(null)
   const [commitFileDiffLoading, setCommitFileDiffLoading] = React.useState(false)
+
+  const [dialog, setDialog] = React.useState<{ kind: 'create' | 'rename' | 'delete'; branch?: string } | null>(null)
+  const [dialogBusy, setDialogBusy] = React.useState(false)
+  const [dialogError, setDialogError] = React.useState('')
   const [statusError, setStatusError] = React.useState('')
   const [selected, setSelected] = React.useState<{ path: string; side: EntrySide } | null>(null)
   const [diff, setDiff] = React.useState<DiffPayload | null>(null)
@@ -262,6 +270,74 @@ export function Workspace(props: { t?: Translate }): any {
     },
     [showToast, t],
   )
+
+  const closeDialog = React.useCallback(() => {
+    setDialog(null)
+    setDialogError('')
+    setDialogBusy(false)
+  }, [])
+
+  const afterBranchChange = React.useCallback(
+    async (message: string) => {
+      showToast(message)
+      closeDialog()
+      await loadRefs()
+      await loadStatus()
+    },
+    [closeDialog, loadRefs, loadStatus, showToast],
+  )
+
+  const submitCreate = React.useCallback(
+    async (name: string) => {
+      setDialogBusy(true)
+      setDialogError('')
+      try {
+        const result = await createBranch(name, repoPath || undefined)
+        if (!result.ok) throw new Error(result.error || t('branchActionFailed'))
+        await afterBranchChange(t('branchCreated') + ' · ' + name)
+      } catch (error) {
+        setDialogError(error instanceof Error ? error.message : String(error))
+      } finally {
+        setDialogBusy(false)
+      }
+    },
+    [afterBranchChange, repoPath, t],
+  )
+
+  const submitRename = React.useCallback(
+    async (to: string) => {
+      const from = dialog?.branch ?? ''
+      setDialogBusy(true)
+      setDialogError('')
+      try {
+        const result = await renameBranch(from, to, repoPath || undefined)
+        if (!result.ok) throw new Error(result.error || t('branchActionFailed'))
+        if (historyScope === 'branch:' + from) setHistoryScope('all')
+        await afterBranchChange(t('branchRenamed') + ' · ' + to)
+      } catch (error) {
+        setDialogError(error instanceof Error ? error.message : String(error))
+      } finally {
+        setDialogBusy(false)
+      }
+    },
+    [afterBranchChange, dialog, historyScope, repoPath, t],
+  )
+
+  const submitDelete = React.useCallback(async () => {
+    const name = dialog?.branch ?? ''
+    setDialogBusy(true)
+    setDialogError('')
+    try {
+      const result = await deleteBranch(name, repoPath || undefined)
+      if (!result.ok) throw new Error(result.error || t('branchActionFailed'))
+      if (historyScope === 'branch:' + name) setHistoryScope('all')
+      await afterBranchChange(t('branchDeleted') + ' · ' + name)
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setDialogBusy(false)
+    }
+  }, [afterBranchChange, dialog, historyScope, repoPath, t])
 
   // Reload whenever the view, repository or branch scope changes.
   React.useEffect(() => {
@@ -521,8 +597,58 @@ export function Workspace(props: { t?: Translate }): any {
           onOpenRef: openRef,
           onCheckout: (name: string) => void checkout(name),
           onCopyRef: copyRef,
+          onCreate: () => {
+            setDialogError('')
+            setDialog({ kind: 'create' })
+          },
+          onRename: (name: string) => {
+            setDialogError('')
+            setDialog({ kind: 'rename', branch: name })
+          },
+          onDelete: (name: string) => {
+            setDialogError('')
+            setDialog({ kind: 'delete', branch: name })
+          },
         }), renderView()),
 
+    dialog?.kind === 'create'
+      ? h(PromptDialog, {
+          title: t('newBranch'),
+          label: t('branchName'),
+          initial: '',
+          submitLabel: t('createBranchAction'),
+          busy: dialogBusy,
+          error: dialogError,
+          t,
+          onCancel: closeDialog,
+          onSubmit: (value: string) => void submitCreate(value),
+        })
+      : null,
+    dialog?.kind === 'rename'
+      ? h(PromptDialog, {
+          title: t('renameBranch'),
+          label: t('branchName'),
+          initial: dialog.branch ?? '',
+          submitLabel: t('renameBranchAction'),
+          busy: dialogBusy,
+          error: dialogError,
+          t,
+          onCancel: closeDialog,
+          onSubmit: (value: string) => void submitRename(value),
+        })
+      : null,
+    dialog?.kind === 'delete'
+      ? h(ConfirmDialog, {
+          title: t('deleteBranch'),
+          body: (dialog.branch ?? '') + ' — ' + t('deleteBranchConfirm'),
+          submitLabel: t('delete'),
+          busy: dialogBusy,
+          error: dialogError,
+          t,
+          onCancel: closeDialog,
+          onConfirm: () => void submitDelete(),
+        })
+      : null,
     toast ? h('div', { className: 'dgt-toast', role: 'status' }, toast) : null,
     notice ? h('div', { className: 'dgt-toast', role: 'status' }, notice) : null,
   )

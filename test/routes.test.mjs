@@ -155,13 +155,16 @@ test('host plugin declares its name and hard service dependencies', () => {
   assert.deepEqual(inject, ['connection', 'subprocess'])
 })
 
-test('apply registers the ten authenticated exact Fetch routes', () => {
+test('apply registers the twelve authenticated exact Fetch routes', () => {
   const ctx = fakeContext()
   apply(ctx)
 
   assert.deepEqual(
     ctx.routes.map((route) => route.path).sort(),
     [
+      '/api/git-tree/branch/create',
+      '/api/git-tree/branch/delete',
+      '/api/git-tree/branch/rename',
       '/api/git-tree/checkout',
       '/api/git-tree/commit',
       '/api/git-tree/commit-info',
@@ -184,6 +187,9 @@ test('apply registers the ten authenticated exact Fetch routes', () => {
       '/api/git-tree/commit',
       '/api/git-tree/checkout',
       '/api/git-tree/open',
+      '/api/git-tree/branch/create',
+      '/api/git-tree/branch/rename',
+      '/api/git-tree/branch/delete',
     ].includes(route.path)
       ? ['POST']
       : ['GET']
@@ -523,6 +529,92 @@ test('history can be scoped to a tag', async () => {
   assert.equal(body.ok, true)
   const logCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'log')
   assert.ok(logCall.argv.includes('refs/tags/v0.2-demo'))
+})
+
+test('branch create validates the name, refuses duplicates and uses HEAD by default', async () => {
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'rev-parse' && argv.includes('--verify')) return { exitCode: 128, stdout: '', stderr: 'not found' }
+      if (argv[1] === 'branch') return { exitCode: 0, stdout: '', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/branch/create', { method: 'POST', body: { name: 'topic/new' } })
+  assert.equal(body.ok, true)
+  const callRecord = ctx.spawns.find((spawn) => spawn.argv[1] === 'branch')
+  assert.deepEqual(callRecord.argv.slice(1), ['branch', 'topic/new', 'HEAD'])
+
+  const bad = await call(ctx, '/api/git-tree/branch/create', { method: 'POST', body: { name: '../x' } })
+  assert.equal(bad.body.code, 'invalid-branch-name')
+  assert.equal(ctx.spawns.filter((spawn) => spawn.argv[1] === 'branch').length, 1, 'invalid name must not reach git')
+})
+
+test('branch create refuses an existing branch', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { response, body } = await call(ctx, '/api/git-tree/branch/create', {
+    method: 'POST',
+    body: { name: 'existing' },
+  })
+  assert.equal(response.status, 409)
+  assert.equal(body.code, 'branch-exists')
+})
+
+test('branch rename refuses an existing target and runs a fixed argv', async () => {
+  const free = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'rev-parse' && argv.includes('--verify') && argv.includes('refs/heads/target')) {
+        return { exitCode: 128, stdout: '', stderr: 'not found' }
+      }
+      if (argv[1] === 'branch') return { exitCode: 0, stdout: '', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(free)
+  const renamed = await call(free, '/api/git-tree/branch/rename', {
+    method: 'POST',
+    body: { from: 'old', to: 'target' },
+  })
+  assert.equal(renamed.body.ok, true)
+  const callRecord = free.spawns.find((spawn) => spawn.argv[1] === 'branch')
+  assert.deepEqual(callRecord.argv.slice(1), ['branch', '-m', 'old', 'target'])
+
+  const ctx = fakeContext()
+  apply(ctx)
+  const { response, body } = await call(ctx, '/api/git-tree/branch/rename', {
+    method: 'POST',
+    body: { from: 'old', to: 'existing' },
+  })
+  assert.equal(response.status, 409)
+  assert.equal(body.code, 'branch-exists')
+})
+
+test('branch delete refuses the current branch and unmerged branches', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const current = await call(ctx, '/api/git-tree/branch/delete', {
+    method: 'POST',
+    body: { name: 'main' },
+  })
+  assert.equal(current.response.status, 409)
+  assert.equal(current.body.code, 'current-branch')
+  assert.equal(ctx.spawns.filter((spawn) => spawn.argv[1] === 'branch').length, 0)
+
+  const unmerged = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'symbolic-ref') return { exitCode: 0, stdout: 'main\n', stderr: '' }
+      if (argv[1] === 'branch') return { exitCode: 1, stdout: '', stderr: 'error: the branch is not fully merged' }
+      return defaultResult(argv)
+    },
+  })
+  apply(unmerged)
+  const refused = await call(unmerged, '/api/git-tree/branch/delete', {
+    method: 'POST',
+    body: { name: 'topic' },
+  })
+  assert.equal(refused.response.status, 409)
+  assert.equal(refused.body.code, 'branch-not-merged')
 })
 
 test('refs route parses branches, remotes and tags and marks the current branch', async () => {

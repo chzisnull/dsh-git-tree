@@ -31,6 +31,9 @@
  */
 
 import {
+  handleBranchCreate,
+  handleBranchDelete,
+  handleBranchRename,
   handleCheckout,
   handleCommit,
   handleCommitInfo,
@@ -64,6 +67,9 @@ const ROUTES = [
   { path: '/api/git-tree/history', methods: ['GET'], handler: handleHistory },
   { path: '/api/git-tree/commit-info', methods: ['GET'], handler: handleCommitInfo },
   { path: '/api/git-tree/checkout', methods: ['POST'], handler: handleCheckout },
+  { path: '/api/git-tree/branch/create', methods: ['POST'], handler: handleBranchCreate },
+  { path: '/api/git-tree/branch/rename', methods: ['POST'], handler: handleBranchRename },
+  { path: '/api/git-tree/branch/delete', methods: ['POST'], handler: handleBranchDelete },
   { path: '/api/git-tree/stage', methods: ['POST'], handler: handleStage },
   { path: '/api/git-tree/unstage', methods: ['POST'], handler: handleUnstage },
   { path: '/api/git-tree/commit', methods: ['POST'], handler: handleCommit },

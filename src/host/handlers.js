@@ -279,6 +279,94 @@ export async function handleCheckout(ctx, request) {
   return json({ ok: true, branch })
 }
 
+/** The checked-out branch, or '' when HEAD is detached. */
+async function currentBranchOf(subprocess, cwd) {
+  try {
+    return (await git(subprocess, ['symbolic-ref', '--short', '-q', 'HEAD'], cwd, { maxBytes: 8 * 1024 })).trim()
+  } catch {
+    return ''
+  }
+}
+
+export async function handleBranchCreate(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const name = body.name
+  if (!isSafeBranchName(name)) throw new RequestError('无效的分支名', 400, 'invalid-branch-name')
+  const start = body.start === undefined || body.start === '' ? 'HEAD' : String(body.start)
+  if (start !== 'HEAD' && !isSafeBranchName(start) && !isSafeCommitSha(start)) {
+    throw new RequestError('无效的分支起点', 400, 'invalid-start-point')
+  }
+  const subprocess = subprocessOf(ctx)
+
+  try {
+    await git(subprocess, ['rev-parse', '--verify', 'refs/heads/' + name], cwd, { maxBytes: 8 * 1024 })
+    throw new RequestError('分支已存在', 409, 'branch-exists')
+  } catch (error) {
+    if (error instanceof RequestError) throw error
+    /* the branch does not exist, which is what we want */
+  }
+
+  await git(subprocess, ['branch', name, start], cwd, { maxBytes: 256 * 1024 })
+  return json({ ok: true, name, start })
+}
+
+export async function handleBranchRename(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const from = body.from
+  const to = body.to
+  if (!isSafeBranchName(from) || !isSafeBranchName(to)) {
+    throw new RequestError('无效的分支名', 400, 'invalid-branch-name')
+  }
+  const subprocess = subprocessOf(ctx)
+
+  try {
+    await git(subprocess, ['rev-parse', '--verify', 'refs/heads/' + from], cwd, { maxBytes: 8 * 1024 })
+  } catch {
+    throw new RequestError('分支不存在', 404, 'unknown-branch')
+  }
+  try {
+    await git(subprocess, ['rev-parse', '--verify', 'refs/heads/' + to], cwd, { maxBytes: 8 * 1024 })
+    throw new RequestError('目标分支已存在', 409, 'branch-exists')
+  } catch (error) {
+    if (error instanceof RequestError) throw error
+    /* target is free */
+  }
+
+  await git(subprocess, ['branch', '-m', from, to], cwd, { maxBytes: 256 * 1024 })
+  return json({ ok: true, from, to })
+}
+
+export async function handleBranchDelete(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const name = body.name
+  if (!isSafeBranchName(name)) throw new RequestError('无效的分支名', 400, 'invalid-branch-name')
+  const subprocess = subprocessOf(ctx)
+
+  const current = await currentBranchOf(subprocess, cwd)
+  if (current !== '' && current === name) {
+    throw new RequestError('不能删除当前分支', 409, 'current-branch')
+  }
+  try {
+    await git(subprocess, ['rev-parse', '--verify', 'refs/heads/' + name], cwd, { maxBytes: 8 * 1024 })
+  } catch {
+    throw new RequestError('分支不存在', 404, 'unknown-branch')
+  }
+
+  try {
+    await git(subprocess, ['branch', '-d', name], cwd, { maxBytes: 256 * 1024 })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    if (/not fully merged/i.test(detail)) {
+      throw new RequestError('分支尚未合并，先合并再删除', 409, 'branch-not-merged')
+    }
+    throw error
+  }
+  return json({ ok: true, name })
+}
+
 export async function handleRefs(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
   const subprocess = subprocessOf(ctx)
