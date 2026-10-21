@@ -7,6 +7,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execGit, git } from '../src/host/git.js'
+import { openArgv } from '../src/host/open.js'
+import { RequestError } from '../src/host/errors.js'
 import { parsePorcelainV2, summariseEntries } from '../src/host/porcelain.js'
 import { parseUnifiedDiff } from '../src/host/diff.js'
 import { parseRefs } from '../src/host/refs.js'
@@ -201,4 +203,25 @@ test('git helper rejects a failed command with git stderr as the message', async
     () => git(subprocess, ['status'], '/tmp/workspace'),
     (error) => error.code === 'git-failed' && error.message === 'fatal: not a git repository',
   )
+})
+
+test('open argv is fixed per target and refuses unknown targets or non-macOS hosts', () => {
+  assert.deepEqual(openArgv('finder', '/tmp/workspace', 'darwin'), ['/tmp/workspace'])
+  assert.deepEqual(openArgv('terminal', '/tmp/workspace', 'darwin'), ['-a', 'Terminal', '/tmp/workspace'])
+
+  for (const target of ['explorer', '', '-a', 'finder; rm -rf /']) {
+    assert.throws(
+      () => openArgv(target, '/tmp/workspace', 'darwin'),
+      (error) => error instanceof RequestError && error.code === 'unknown-target',
+      'must refuse target ' + JSON.stringify(target),
+    )
+  }
+
+  for (const platform of ['linux', 'win32', 'freebsd']) {
+    assert.throws(
+      () => openArgv('finder', '/tmp/workspace', platform),
+      (error) => error instanceof RequestError && error.code === 'unsupported-platform',
+      'must refuse ' + platform,
+    )
+  }
 })

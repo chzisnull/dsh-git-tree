@@ -9,12 +9,13 @@
  * The write surface is deliberately small: no reset --hard, no push, no amend.
  */
 
-import { MAX_DIFF_BYTES, MAX_REFS_BYTES, MAX_STATUS_BYTES, git, subprocessOf } from './git.js'
+import { MAX_DIFF_BYTES, MAX_REFS_BYTES, MAX_STATUS_BYTES, git, runProcess, subprocessOf } from './git.js'
 import { parseUnifiedDiff } from './diff.js'
 import { parsePorcelainV2, summariseEntries } from './porcelain.js'
 import { REF_ARGS, parseRefs } from './refs.js'
+import { openArgv } from './open.js'
 import { resolveCwd, safeRepoPath, workspaceRootOf } from './paths.js'
-import { RequestError } from './errors.js'
+import { GitError, RequestError } from './errors.js'
 import { json } from './http.js'
 
 const MAX_WRITE_PATHS = 500
@@ -100,6 +101,7 @@ export async function handleStatus(ctx, request) {
     ok: true,
     cwd,
     repoRoot,
+    platform: process.platform,
     branch: parsed.branch,
     oid: parsed.oid,
     upstream: parsed.upstream,
@@ -238,4 +240,31 @@ export async function handleCommit(ctx, request) {
     shortSha: sha.slice(0, 7),
     subject: message.split('\n')[0] ?? '',
   })
+}
+
+// ── local action routes ────────────────────────────────────────────────────
+
+/**
+ * Open the selected repository in Finder or a new Terminal window.
+ *
+ * `open` runs with a fixed argv and the already-resolved workspace as cwd; the
+ * target string never reaches argv itself. Non-macOS hosts refuse the action
+ * even though the client hides the buttons there.
+ */
+export async function handleOpen(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const target = typeof body.target === 'string' ? body.target : ''
+  const argv = openArgv(target, cwd)
+  const subprocess = subprocessOf(ctx)
+
+  const result = await runProcess(subprocess, 'open', argv, cwd, {
+    label: 'open',
+    maxBytes: 64 * 1024,
+    signal: request.signal,
+  })
+  if (result.code !== 0) {
+    throw new GitError(result.err || 'open 退出码 ' + String(result.code), 'open-failed')
+  }
+  return json({ ok: true, target, cwd })
 }

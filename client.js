@@ -37,6 +37,9 @@ var NS = "dsh-git-tree";
 var EN = {
   panel: "Git",
   refresh: "Refresh",
+  revealInFinder: "Reveal in Finder",
+  openInTerminal: "Open in Terminal",
+  openFailed: "Could not open the folder.",
   switchRepository: "Switch repository",
   noRepositories: "No registered repositories",
   refs: "References",
@@ -93,6 +96,9 @@ var EN = {
 var ZH = {
   panel: "Git",
   refresh: "\u5237\u65B0",
+  revealInFinder: "\u5728 Finder \u4E2D\u663E\u793A",
+  openInTerminal: "\u5728\u7EC8\u7AEF\u4E2D\u6253\u5F00",
+  openFailed: "\u65E0\u6CD5\u6253\u5F00\u8BE5\u76EE\u5F55\u3002",
   switchRepository: "\u5207\u6362\u4ED3\u5E93",
   noRepositories: "\u6CA1\u6709\u5DF2\u6CE8\u518C\u7684\u4ED3\u5E93",
   refs: "\u5F15\u7528",
@@ -367,6 +373,7 @@ var REFS_ROUTE = "api/git-tree/refs";
 var STAGE_ROUTE = "api/git-tree/stage";
 var UNSTAGE_ROUTE = "api/git-tree/unstage";
 var COMMIT_ROUTE = "api/git-tree/commit";
+var OPEN_ROUTE = "api/git-tree/open";
 function query(params) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) if (value !== void 0 && value !== "") search.set(key, value);
@@ -410,6 +417,9 @@ function unstagePaths(paths, cwd) {
 }
 function commitChanges(message, cwd) {
   return postJson(COMMIT_ROUTE + query({ cwd }), { message });
+}
+function openLocal(target, cwd) {
+  return postJson(OPEN_ROUTE + query({ cwd }), { target });
 }
 
 // src/client/model.ts
@@ -516,6 +526,24 @@ function MoreIcon() {
     h("circle", { cx: 12.6, cy: 8, r: 1.15, fill: "currentColor" })
   );
 }
+function FolderIcon() {
+  return svg(
+    h("path", {
+      d: "M1.8 4.2a1.2 1.2 0 0 1 1.2-1.2h3l1.3 1.5h5.7a1.2 1.2 0 0 1 1.2 1.2v6.1a1.2 1.2 0 0 1-1.2 1.2H3a1.2 1.2 0 0 1-1.2-1.2V4.2Z",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.2,
+      strokeLinejoin: "round"
+    })
+  );
+}
+function TerminalIcon() {
+  return svg([
+    h("rect", { x: 1.9, y: 2.6, width: 12.2, height: 10.8, rx: 1.4, fill: "none", stroke: "currentColor", strokeWidth: 1.2 }),
+    h("path", { d: "M4.4 6.2 6.6 8l-2.2 1.8", fill: "none", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round", strokeLinejoin: "round" }),
+    h("path", { d: "M8.2 10.1h3.2", fill: "none", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round" })
+  ]);
+}
 
 // src/client/components/TopBar.tsx
 function TopBar(props) {
@@ -596,6 +624,32 @@ function TopBar(props) {
         },
         h(RefreshIcon)
       ),
+      status?.platform === "darwin" ? h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-iconbtn",
+          title: t("revealInFinder"),
+          "aria-label": t("revealInFinder"),
+          "aria-busy": props.opening || void 0,
+          disabled: props.opening,
+          onClick: () => props.onOpen("finder")
+        },
+        h(FolderIcon)
+      ) : null,
+      status?.platform === "darwin" ? h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-iconbtn",
+          title: t("openInTerminal"),
+          "aria-label": t("openInTerminal"),
+          "aria-busy": props.opening || void 0,
+          disabled: props.opening,
+          onClick: () => props.onOpen("terminal")
+        },
+        h(TerminalIcon)
+      ) : null,
       h(
         "button",
         {
@@ -1022,6 +1076,7 @@ function Workspace(props) {
   const [diffLoading, setDiffLoading] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [opening, setOpening] = React.useState(false);
   const [actionError, setActionError] = React.useState("");
   const [message, setMessage] = React.useState("");
   const [toast, setToast] = React.useState("");
@@ -1164,6 +1219,20 @@ function Workspace(props) {
     },
     [showToast, t]
   );
+  const openLocalAction = React.useCallback(
+    async (target) => {
+      setOpening(true);
+      try {
+        const result = await openLocal(target, repoPath || void 0);
+        if (!result.ok) throw new Error(result.error || t("openFailed"));
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error));
+      } finally {
+        setOpening(false);
+      }
+    },
+    [repoPath, showToast, t]
+  );
   const commit = React.useCallback(async () => {
     const staged = status?.counts?.staged ?? 0;
     const conflicts = status?.counts?.conflicted ?? 0;
@@ -1210,8 +1279,10 @@ function Workspace(props) {
       workspaces,
       currentPath: repoPath || status?.repoRoot || status?.cwd || "",
       busy: refreshing || busy,
+      opening,
       t,
       onRefresh: () => void loadStatus(),
+      onOpen: (target) => void openLocalAction(target),
       onSelectWorkspace: switchWorkspace,
       onCommitFocus: () => {
         if (commitInput.current && commitInput.current.focus) commitInput.current.focus();

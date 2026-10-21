@@ -44,6 +44,8 @@ export interface GitStatusPayload {
   ok: boolean
   cwd?: string
   repoRoot?: string
+  /** Host platform (`process.platform`); the local open actions need darwin. */
+  platform?: string
   branch?: string
   oid?: string
   upstream?: string
@@ -125,6 +127,16 @@ export interface WorkspacesPayload {
   ok: boolean
   current?: string
   workspaces?: WorkspaceRecord[]
+  error?: string
+  code?: string
+}
+
+export type OpenTarget = 'finder' | 'terminal'
+
+export interface OpenPayload {
+  ok: boolean
+  target?: OpenTarget
+  cwd?: string
   error?: string
   code?: string
 }
