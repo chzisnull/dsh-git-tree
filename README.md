@@ -8,7 +8,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.2.0 is the **working slice**: it reads your working copy, stages and unstages files, and commits — inside the panel, without leaving DSH.
+Version 0.3.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel. Remotes are out of scope on purpose.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Repository switcher** in the toolbar: pick any workspace registered in DSH; every route then runs against that repository.
@@ -16,12 +16,17 @@ Version 0.2.0 is the **working slice**: it reads your working copy, stages and u
 - **Sourcetree's change model**: conflict, staged and unstaged groups with counts; renames keep their original path; a file changed on both sides appears in both groups (driven by `git status --porcelain=v2 --branch -z`).
 - **Structured diff**: parsed on the host into files → hunks → lines, rendered with dual line numbers, hunk headers, whole-row tints and `+N −M`.
 - **Stage / unstage / commit**: per-row checkbox, hover menu, file-level action in the diff header, a commit box with author, branch, staged count and ⌘↵ — plus a `--`-guarded, conflict-checked host route for each write.
+- **History view**: commits newest-first with a lane graph, description / short SHA / author / date columns, an "all branches / current branch only" switch and paged loading (200 per page).
+- **Commit detail**: select a commit to see its message, author, date, parents, refs and changed files; pick a file for its in-commit diff; follow a parent link to jump.
+- **Search view**: find commits by message, author or file path; results reuse the history list and detail.
+- **Branches**: click a branch to browse its history, double-click to check out; create, rename and delete local branches from the rail. Checkout refuses a dirty working copy instead of stashing your changes.
+- **Local actions**: reveal the repository in Finder or open it in Terminal (macOS).
 - **Live**: the panel polls status every 2s while visible and refetches immediately after a write.
 - **Small write surface by construction**: file-level stage, unstage and commit only. No `reset --hard`, no push, no amend, no discard route exists.
 
 ## Status
 
-| Area | 0.2.0 |
+| Area | 0.3.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | repository switcher (DSH workspaces) | done |
@@ -29,9 +34,16 @@ Version 0.2.0 is the **working slice**: it reads your working copy, stages and u
 | conflict / staged / unstaged groups | done |
 | structured per-file diff | done |
 | stage / unstage / commit | done |
+| history view (lanes, paging, filters) | done |
+| commit detail + in-commit diff | done |
+| search (message / author / path) | done |
+| branch navigation + checkout | done |
+| branch create / rename / delete | done |
+| Finder / Terminal | done |
 | auto refresh | done |
-| history graph | not yet |
 | right-sidebar tab (compact mode) | not yet |
+| remotes (fetch / pull / push, remote branches) | out of scope |
+| merge / rebase / stash / conflict UI | out of scope |
 | large-repo virtualisation | not planned |
 | agent-shared operations | not yet |
 
@@ -54,13 +66,18 @@ Two consequences worth knowing:
 | Client | `client.js` (built from `src/client/index.tsx`) | registers the sidebar launcher into `sidebar.panellist` and the panel into `main`, both under the id `git-tree` |
 
 ```
-GET  /api/git-tree/workspaces          → registered DSH workspaces
-GET  /api/git-tree/status?cwd=…        → branch, upstream, ahead/behind, entries[], counts
-GET  /api/git-tree/diff?path=…&side=…  → files → hunks → lines, stats
-GET  /api/git-tree/refs?cwd=…          → branches, remotes, tags
-POST /api/git-tree/stage               → { paths[] }
-POST /api/git-tree/unstage             → { paths[] }
-POST /api/git-tree/commit              → { message } → { sha, shortSha, subject }
+GET  /api/git-tree/workspaces              → registered DSH workspaces
+GET  /api/git-tree/status?cwd=…            → branch, upstream, ahead/behind, entries[], counts
+GET  /api/git-tree/diff?path=…&side=…      → files → hunks → lines, stats (or commit=<sha>)
+GET  /api/git-tree/refs?cwd=…              → local branches, tags
+GET  /api/git-tree/history?scope=…         → commits with lanes, paging, filters
+GET  /api/git-tree/commit-info?sha=…       → metadata, parents, refs, changed files
+POST /api/git-tree/stage                   → { paths[] }
+POST /api/git-tree/unstage                 → { paths[] }
+POST /api/git-tree/commit                  → { message } → { sha, shortSha, subject }
+POST /api/git-tree/checkout                → { branch } → refuses a dirty work tree
+POST /api/git-tree/branch/create|rename|delete
+POST /api/git-tree/open                    → { target: 'finder' | 'terminal' }
 ```
 
 Git runs without a shell, with `GIT_TERMINAL_PROMPT=0` (never blocks on credentials), `GIT_OPTIONAL_LOCKS=0` (never takes optional locks in your repo), `GIT_CONFIG_COUNT=0` and bounded output and time. A path that is absolute, contains `..`, or starts with `-` is refused before it reaches `argv`, and a `cwd` outside the workspace is refused with 403.
@@ -94,7 +111,7 @@ Restart DSH after installing: the host half is mounted at app startup. Nothing i
 ```sh
 node build.mjs     # src/client/index.tsx → client.js (committed artifact)
 npm run check      # node --check on both halves
-npm test           # 40 assertions: manifest, host routes, parsers, client boot
+npm test           # 66 assertions: manifest, host routes, parsers, client boot, import guard
 ```
 
 `build.mjs` resolves esbuild from this package's `node_modules`, then from an installed `dsh-workbench`; if neither is present it stops with the exact command to fix that (`npm i -D esbuild`).
@@ -106,6 +123,7 @@ The test suite needs no DSH, no git and no browser:
 - `test/host-modules.test.mjs` — parsers as pure functions: porcelain v2 (rename/conflict/two-sided), unified diff, refs.
 - `test/ui-contract.test.mjs` — the built bundle: module-loader wrapper, exactly two slot registrations under one id, routes called, theme tokens only, no `document.body`.
 - `test/client-boot.test.mjs` — evaluates the built bundle in Node, materialises the plugin and calls `apply()` against a Cordis-like context that throws on undeclared services.
+- `test/client-imports.test.mjs` — a narrow static guard: every route helper the shell uses must be imported (esbuild does not catch free identifiers).
 
 ## Design mockups
 
