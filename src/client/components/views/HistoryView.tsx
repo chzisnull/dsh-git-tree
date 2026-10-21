@@ -101,7 +101,7 @@ export function HistoryView(props: {
         'div',
         { className: 'dgt-hhead', role: 'row' },
         h('span', null, t('historyColumn')),
-        h('span', null, t('diff')),
+        h('span', null, t('description')),
         h('span', null, t('commitColumn')),
         h('span', null, t('authorColumn')),
         h('span', null, t('dateColumn')),
