@@ -107,6 +107,13 @@ export const CSS = `
   background:var(--dsw-alias-bg-base);}
 .dgt-htoolbar{display:flex;align-items:center;gap:8px;flex:0 0 auto;height:32px;padding:0 10px;
   border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);}
+.dgt-searchbar{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0;}
+.dgt-search-input{flex:1 1 auto;min-width:80px;height:24px;padding:0 8px;border:1px solid var(--dsw-alias-border-l2);
+  border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);
+  font:inherit;font-size:12px;}
+.dgt-search-input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);}
+.dgt-search-input::placeholder{color:var(--dsw-alias-label-caption);}
+.dgt-search-narrow{flex:0 1 150px;}
 .dgt-seg{display:inline-flex;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);
   overflow:hidden;background:var(--dsw-alias-bg-layer-1);}
 .dgt-seg-btn{appearance:none;border:0;height:22px;padding:0 10px;background:transparent;

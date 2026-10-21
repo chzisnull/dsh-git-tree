@@ -88,6 +88,10 @@ var EN = {
   changes: "Changes",
   history: "History",
   search: "Search",
+  searchPlaceholder: "Search commit messages",
+  searchAuthorPlaceholder: "Author",
+  searchPathPlaceholder: "File path",
+  searchEmptyPrompt: "Type a message, author or path to search commits.",
   branches: "Branches",
   remotes: "Remotes",
   tags: "Tags",
@@ -182,6 +186,10 @@ var ZH = {
   changes: "\u6539\u52A8",
   history: "\u5386\u53F2",
   search: "\u641C\u7D22",
+  searchPlaceholder: "\u641C\u7D22\u63D0\u4EA4\u4FE1\u606F",
+  searchAuthorPlaceholder: "\u4F5C\u8005",
+  searchPathPlaceholder: "\u6587\u4EF6\u8DEF\u5F84",
+  searchEmptyPrompt: "\u8F93\u5165\u63D0\u4EA4\u4FE1\u606F\u3001\u4F5C\u8005\u6216\u6587\u4EF6\u8DEF\u5F84\u6765\u641C\u7D22\u63D0\u4EA4\u3002",
   branches: "\u5206\u652F",
   remotes: "\u8FDC\u7A0B",
   tags: "\u6807\u7B7E",
@@ -326,6 +334,13 @@ var CSS = `
   background:var(--dsw-alias-bg-base);}
 .dgt-htoolbar{display:flex;align-items:center;gap:8px;flex:0 0 auto;height:32px;padding:0 10px;
   border-bottom:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);}
+.dgt-searchbar{display:flex;align-items:center;gap:6px;flex:1 1 auto;min-width:0;}
+.dgt-search-input{flex:1 1 auto;min-width:80px;height:24px;padding:0 8px;border:1px solid var(--dsw-alias-border-l2);
+  border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);
+  font:inherit;font-size:12px;}
+.dgt-search-input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);}
+.dgt-search-input::placeholder{color:var(--dsw-alias-label-caption);}
+.dgt-search-narrow{flex:0 1 150px;}
 .dgt-seg{display:inline-flex;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);
   overflow:hidden;background:var(--dsw-alias-bg-layer-1);}
 .dgt-seg-btn{appearance:none;border:0;height:22px;padding:0 10px;background:transparent;
@@ -1004,7 +1019,8 @@ function RefRail(props) {
       Section,
       { title: t("workspace") },
       h(ViewRow, { label: t("fileStatus"), active: props.view === "status", onSelect: () => props.onView("status") }),
-      h(ViewRow, { label: t("history"), active: props.view === "history", onSelect: () => props.onView("history") })
+      h(ViewRow, { label: t("history"), active: props.view === "history", onSelect: () => props.onView("history") }),
+      h(ViewRow, { label: t("search"), active: props.view === "search", onSelect: () => props.onView("search") })
     ),
     h(
       Section,
@@ -1547,6 +1563,34 @@ function HistoryView(props) {
       h(
         "div",
         { className: "dgt-htoolbar" },
+        props.mode === "search" ? h(
+          "div",
+          { className: "dgt-searchbar" },
+          h("input", {
+            className: "dgt-search-input",
+            value: props.query,
+            placeholder: t("searchPlaceholder"),
+            "aria-label": t("searchPlaceholder"),
+            spellCheck: false,
+            onChange: (event) => props.onQuery(event.target.value)
+          }),
+          h("input", {
+            className: "dgt-search-input dgt-search-narrow",
+            value: props.author,
+            placeholder: t("searchAuthorPlaceholder"),
+            "aria-label": t("searchAuthorPlaceholder"),
+            spellCheck: false,
+            onChange: (event) => props.onAuthor(event.target.value)
+          }),
+          h("input", {
+            className: "dgt-search-input dgt-search-narrow",
+            value: props.path,
+            placeholder: t("searchPathPlaceholder"),
+            "aria-label": t("searchPathPlaceholder"),
+            spellCheck: false,
+            onChange: (event) => props.onPath(event.target.value)
+          })
+        ) : null,
         h(
           "div",
           { className: "dgt-seg", role: "group" },
@@ -1600,7 +1644,11 @@ function HistoryView(props) {
       h(
         "div",
         { className: "dgt-hscroll" },
-        props.loading && commits.length === 0 ? h("div", { className: "dgt-placeholder" }, t("loading")) : props.error !== "" ? h("div", { className: "dgt-placeholder dgt-error" }, props.error) : commits.length === 0 ? h("div", { className: "dgt-empty" }, t("noCommits")) : h(
+        props.loading && commits.length === 0 ? h("div", { className: "dgt-placeholder" }, t("loading")) : props.error !== "" ? h("div", { className: "dgt-placeholder dgt-error" }, props.error) : commits.length === 0 ? h(
+          "div",
+          { className: "dgt-empty" },
+          props.mode === "search" && props.query.trim() === "" && props.author.trim() === "" && props.path.trim() === "" ? t("searchEmptyPrompt") : t("noCommits")
+        ) : h(
           "div",
           { className: "dgt-hlist" },
           commits.map(
@@ -1761,6 +1809,12 @@ function Workspace(props) {
   const [historyError, setHistoryError] = React.useState("");
   const [historyScope, setHistoryScope] = React.useState("all");
   const [historySha, setHistorySha] = React.useState("");
+  const [searchQuery, setSearchQuery] = React.useState("");
+  const [searchAuthor, setSearchAuthor] = React.useState("");
+  const [searchPath, setSearchPath] = React.useState("");
+  const [appliedQuery, setAppliedQuery] = React.useState("");
+  const [appliedAuthor, setAppliedAuthor] = React.useState("");
+  const [appliedPath, setAppliedPath] = React.useState("");
   const [commitDetail, setCommitDetail] = React.useState(null);
   const [commitDetailLoading, setCommitDetailLoading] = React.useState(false);
   const [commitDetailError, setCommitDetailError] = React.useState("");
@@ -1839,12 +1893,16 @@ function Workspace(props) {
       setHistoryLoading(true);
       setHistoryError("");
       const skip = reset ? 0 : historyCommits.length;
+      const filtering = view === "search";
       try {
         const next = await fetchHistory({
           cwd: repoPath || void 0,
           scope: historyScope,
           limit: "200",
-          skip: String(skip)
+          skip: String(skip),
+          ...filtering && appliedQuery !== "" ? { query: appliedQuery } : {},
+          ...filtering && appliedAuthor !== "" ? { author: appliedAuthor } : {},
+          ...filtering && appliedPath !== "" ? { path: appliedPath } : {}
         });
         if (!next.ok) {
           setHistoryError(next.error || t("historyFailed"));
@@ -1861,7 +1919,7 @@ function Workspace(props) {
         setHistoryLoading(false);
       }
     },
-    [historyCommits, historyScope, repoPath, t]
+    [appliedAuthor, appliedPath, appliedQuery, historyCommits, historyScope, repoPath, t, view]
   );
   const loadCommitDetail = React.useCallback(
     async (sha) => {
@@ -2009,10 +2067,25 @@ function Workspace(props) {
     }
   }, [afterBranchChange, dialog, historyScope, repoPath, t]);
   React.useEffect(() => {
-    if (view !== "history") return;
+    if (view !== "search") return;
+    const id = setTimeout(() => {
+      setAppliedQuery(searchQuery.trim());
+      setAppliedAuthor(searchAuthor.trim());
+      setAppliedPath(searchPath.trim());
+    }, 350);
+    return () => clearTimeout(id);
+  }, [view, searchQuery, searchAuthor, searchPath]);
+  React.useEffect(() => {
+    if (view !== "history" && view !== "search") return;
     setHistorySha("");
+    if (view === "search" && appliedQuery === "" && appliedAuthor === "" && appliedPath === "") {
+      setHistoryCommits([]);
+      setHistoryError("");
+      setHistoryLoading(false);
+      return;
+    }
     void loadHistory(true);
-  }, [view, repoPath, historyScope]);
+  }, [view, repoPath, historyScope, appliedQuery, appliedAuthor, appliedPath]);
   React.useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -2156,7 +2229,15 @@ function Workspace(props) {
   const renderView = () => {
     switch (view) {
       case "history":
+      case "search":
         return h(HistoryView, {
+          mode: view === "search" ? "search" : "history",
+          query: searchQuery,
+          author: searchAuthor,
+          path: searchPath,
+          onQuery: setSearchQuery,
+          onAuthor: setSearchAuthor,
+          onPath: setSearchPath,
           commits: historyCommits,
           laneCount: historyLaneCount,
           hasMore: historyHasMore,

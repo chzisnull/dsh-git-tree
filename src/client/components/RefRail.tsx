@@ -175,6 +175,7 @@ export function RefRail(props: {
       { title: t('workspace') },
       h(ViewRow, { label: t('fileStatus'), active: props.view === 'status', onSelect: () => props.onView('status') }),
       h(ViewRow, { label: t('history'), active: props.view === 'history', onSelect: () => props.onView('history') }),
+      h(ViewRow, { label: t('search'), active: props.view === 'search', onSelect: () => props.onView('search') }),
     ),
     h(
       Section,
