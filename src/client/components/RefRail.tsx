@@ -1,9 +1,10 @@
 // Reference rail: workspace view switcher, then the local branch / tag tree.
-// Remote refs are out of scope for this version and are not shown at all.
+// A branch opens its history on click, checks out on double click or from its
+// menu. Remote refs are out of scope and are not rendered at all.
 
-import { h } from '../react'
+import { h, React } from '../react'
 import type { GitStatusPayload, RefRecord, RefsPayload, Translate, ViewKind } from '../types'
-import { BranchIcon, TagIcon } from '../icons'
+import { BranchIcon, MoreIcon, TagIcon } from '../icons'
 
 function Section(props: { title: string; count?: number; children?: any }): any {
   return h(
@@ -19,19 +20,84 @@ function Section(props: { title: string; count?: number; children?: any }): any 
   )
 }
 
-function RefRow(props: { record: RefRecord; kind: 'branch' | 'tag' }): any {
+function RefRow(props: {
+  record: RefRecord
+  kind: 'branch' | 'tag'
+  t: Translate
+  onOpen: (record: RefRecord, kind: 'branch' | 'tag') => void
+  onCheckout: (name: string) => void
+  onCopy: (name: string) => void
+}): any {
+  const [menuOpen, setMenuOpen] = React.useState(false)
   const ref = props.record
   const Icon = props.kind === 'branch' ? BranchIcon : TagIcon
   return h(
     'div',
     {
-      className: 'dgt-rail-row',
+      className: 'dgt-rail-row dgt-rail-ref',
       'data-current': ref.current || undefined,
+      'data-menu': menuOpen || undefined,
+      role: 'button',
+      tabIndex: 0,
       title: ref.subject ? ref.name + ' — ' + ref.subject : ref.name,
+      onClick: () => props.onOpen(ref, props.kind),
+      onDoubleClick: () => {
+        if (props.kind === 'branch') props.onCheckout(ref.name)
+      },
+      onKeyDown: (event: any) => {
+        if (event.key === 'Enter') {
+          event.preventDefault()
+          props.onOpen(ref, props.kind)
+        }
+      },
     },
     h('span', { className: 'dgt-rail-icon' }, h(Icon)),
     ref.current ? h('span', { className: 'dgt-rail-dot' }) : null,
     h('span', { className: 'dgt-rail-name' }, ref.name),
+    h(
+      'button',
+      {
+        type: 'button',
+        className: 'dgt-rail-more',
+        title: props.t('fileActions'),
+        'aria-label': props.t('fileActions'),
+        onClick: (event: any) => {
+          event.stopPropagation()
+          setMenuOpen(!menuOpen)
+        },
+      },
+      h(MoreIcon),
+    ),
+    menuOpen
+      ? h(
+          'div',
+          { className: 'dgt-menu', onClick: (event: any) => event.stopPropagation() },
+          props.kind === 'branch'
+            ? h(
+                'button',
+                {
+                  type: 'button',
+                  onClick: () => {
+                    setMenuOpen(false)
+                    props.onCheckout(ref.name)
+                  },
+                },
+                props.t('checkout'),
+              )
+            : null,
+          h(
+            'button',
+            {
+              type: 'button',
+              onClick: () => {
+                setMenuOpen(false)
+                props.onCopy(ref.name)
+              },
+            },
+            props.t('copyRefName'),
+          ),
+        )
+      : null,
   )
 }
 
@@ -54,6 +120,9 @@ export function RefRail(props: {
   view: ViewKind
   t: Translate
   onView: (view: ViewKind) => void
+  onOpenRef: (record: RefRecord, kind: 'branch' | 'tag') => void
+  onCheckout: (name: string) => void
+  onCopyRef: (name: string) => void
 }): any {
   const { refs, t } = props
   const branches = refs?.branches ?? []
@@ -67,21 +136,39 @@ export function RefRail(props: {
       { title: t('workspace') },
       h(ViewRow, { label: t('fileStatus'), active: props.view === 'status', onSelect: () => props.onView('status') }),
       h(ViewRow, { label: t('history'), active: props.view === 'history', onSelect: () => props.onView('history') }),
-      // Search arrives with its own slice; until then it is not rendered at all
-      // rather than shown as a dead row.
     ),
     h(
       Section,
       { title: t('branches'), count: branches.length },
       branches.length > 0
-        ? branches.map((ref) => h(RefRow, { key: 'b:' + ref.name, record: ref, kind: 'branch' }))
+        ? branches.map((ref) =>
+            h(RefRow, {
+              key: 'b:' + ref.name,
+              record: ref,
+              kind: 'branch',
+              t,
+              onOpen: props.onOpenRef,
+              onCheckout: props.onCheckout,
+              onCopy: props.onCopyRef,
+            }),
+          )
         : h('div', { className: 'dgt-rail-empty' }, '—'),
     ),
     h(
       Section,
       { title: t('tags'), count: tags.length },
       tags.length > 0
-        ? tags.map((ref) => h(RefRow, { key: 't:' + ref.name, record: ref, kind: 'tag' }))
+        ? tags.map((ref) =>
+            h(RefRow, {
+              key: 't:' + ref.name,
+              record: ref,
+              kind: 'tag',
+              t,
+              onOpen: props.onOpenRef,
+              onCheckout: props.onCheckout,
+              onCopy: props.onCopyRef,
+            }),
+          )
         : h('div', { className: 'dgt-rail-empty' }, '—'),
     ),
   )

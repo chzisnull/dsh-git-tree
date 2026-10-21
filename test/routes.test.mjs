@@ -155,13 +155,14 @@ test('host plugin declares its name and hard service dependencies', () => {
   assert.deepEqual(inject, ['connection', 'subprocess'])
 })
 
-test('apply registers the nine authenticated exact Fetch routes', () => {
+test('apply registers the ten authenticated exact Fetch routes', () => {
   const ctx = fakeContext()
   apply(ctx)
 
   assert.deepEqual(
     ctx.routes.map((route) => route.path).sort(),
     [
+      '/api/git-tree/checkout',
       '/api/git-tree/commit',
       '/api/git-tree/commit-info',
       '/api/git-tree/diff',
@@ -181,6 +182,7 @@ test('apply registers the nine authenticated exact Fetch routes', () => {
       '/api/git-tree/stage',
       '/api/git-tree/unstage',
       '/api/git-tree/commit',
+      '/api/git-tree/checkout',
       '/api/git-tree/open',
     ].includes(route.path)
       ? ['POST']
@@ -463,6 +465,64 @@ test('diff route reads one file out of a commit when commit is given', async () 
   const bad = await call(ctx, '/api/git-tree/diff?commit=' + encodeURIComponent('../x') + '&path=src/app.js')
   assert.equal(bad.body.ok, false)
   assert.equal(bad.body.code, 'invalid-sha')
+})
+
+test('checkout refuses a dirty working copy without running checkout', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { response, body } = await call(ctx, '/api/git-tree/checkout', {
+    method: 'POST',
+    body: { branch: 'feature/lanes' },
+  })
+  assert.equal(response.status, 409)
+  assert.equal(body.code, 'dirty-worktree')
+  assert.equal(ctx.spawns.filter((spawn) => spawn.argv[1] === 'checkout').length, 0)
+})
+
+test('checkout switches on a clean working copy with a fixed argv', async () => {
+  const clean =
+    '# branch.oid abc\u0000# branch.head main\u0000? scratch.md\u0000'
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'status') return { exitCode: 0, stdout: clean, stderr: '' }
+      if (argv[1] === 'checkout') return { exitCode: 0, stdout: '', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/checkout', {
+    method: 'POST',
+    body: { branch: 'feature/lanes' },
+  })
+  assert.equal(body.ok, true)
+  assert.equal(body.branch, 'feature/lanes')
+  const checkoutCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'checkout')
+  assert.deepEqual(checkoutCall.argv.slice(1), ['checkout', '--quiet', 'feature/lanes'])
+})
+
+test('checkout reports an unknown branch as a 404', async () => {
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'rev-parse') return { exitCode: 128, stdout: '', stderr: 'fatal: needed a single revision' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const { response, body } = await call(ctx, '/api/git-tree/checkout', {
+    method: 'POST',
+    body: { branch: 'nope' },
+  })
+  assert.equal(response.status, 404)
+  assert.equal(body.code, 'unknown-branch')
+})
+
+test('history can be scoped to a tag', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/history?scope=tag:v0.2-demo')
+  assert.equal(body.ok, true)
+  const logCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'log')
+  assert.ok(logCall.argv.includes('refs/tags/v0.2-demo'))
 })
 
 test('refs route parses branches, remotes and tags and marks the current branch', async () => {

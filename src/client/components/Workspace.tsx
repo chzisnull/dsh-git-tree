@@ -13,6 +13,7 @@ import type {
   HistoryScope,
   OpenTarget,
   RefsPayload,
+  RefRecord,
   Translate,
   WorkspaceRecord,
 } from '../types'
@@ -219,6 +220,48 @@ export function Workspace(props: { t?: Translate }): any {
     [historySha, repoPath],
   )
 
+  const openRef = React.useCallback((record: RefRecord, kind: 'branch' | 'tag') => {
+    setHistoryScope((kind === 'branch' ? 'branch:' : 'tag:') + record.name)
+    setHistorySha('')
+    setView('history')
+  }, [])
+
+  const checkout = React.useCallback(
+    async (name: string) => {
+      setBusy(true)
+      setActionError('')
+      try {
+        const result = await checkoutBranch(name, repoPath || undefined)
+        if (!result.ok) throw new Error(result.error || t('checkOutFailed'))
+        showToast(t('checkedOut') + ' · ' + name)
+        setSelected(null)
+        setDiff(null)
+        setHistorySha('')
+        await loadStatus()
+        await loadRefs()
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        setActionError(message)
+        showToast(message)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [loadRefs, loadStatus, repoPath, showToast, t],
+  )
+
+  const copyRef = React.useCallback(
+    (name: string) => {
+      try {
+        void navigator.clipboard?.writeText(name)
+        showToast(t('copiedPath'))
+      } catch {
+        showToast(name)
+      }
+    },
+    [showToast, t],
+  )
+
   // Reload whenever the view, repository or branch scope changes.
   React.useEffect(() => {
     if (view !== 'history') return
@@ -407,6 +450,10 @@ export function Workspace(props: { t?: Translate }): any {
             setHistoryScope(scope)
             setHistorySha('')
           },
+          onClearScope: () => {
+            setHistoryScope('all')
+            setHistorySha('')
+          },
           onSelect: (commit: HistoryCommit) => setHistorySha(commit.sha),
           onSelectFile: (path: string) => void openCommitFile(path),
           onParent: (sha: string) => setHistorySha(sha),
@@ -464,7 +511,16 @@ export function Workspace(props: { t?: Translate }): any {
       : null,
     truncated ? h('div', { className: 'dgt-banner' }, h('span', { className: 'dgt-banner-text' }, t('truncated'))) : null,
 
-    h('div', { className: 'dgt-body' }, h(RefRail, { status, refs, view, t, onView: setView }), renderView()),
+    h('div', { className: 'dgt-body' }, h(RefRail, {
+          status,
+          refs,
+          view,
+          t,
+          onView: setView,
+          onOpenRef: openRef,
+          onCheckout: (name: string) => void checkout(name),
+          onCopyRef: copyRef,
+        }), renderView()),
 
     toast ? h('div', { className: 'dgt-toast', role: 'status' }, toast) : null,
     notice ? h('div', { className: 'dgt-toast', role: 'status' }, notice) : null,

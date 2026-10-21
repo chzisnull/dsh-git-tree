@@ -42,7 +42,8 @@ export interface HistoryPayload {
   code?: string
 }
 
-export type HistoryScope = 'all' | 'current'
+/** `all`, `current`, `branch:<name>` or `tag:<name>`. */
+export type HistoryScope = string
 
 export interface CommitFile {
   path: string
