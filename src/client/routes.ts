@@ -21,6 +21,9 @@ const REFS_ROUTE = 'api/git-tree/refs'
 const HISTORY_ROUTE = 'api/git-tree/history'
 const COMMIT_INFO_ROUTE = 'api/git-tree/commit-info'
 const CHECKOUT_ROUTE = 'api/git-tree/checkout'
+const BRANCH_CREATE_ROUTE = 'api/git-tree/branch/create'
+const BRANCH_RENAME_ROUTE = 'api/git-tree/branch/rename'
+const BRANCH_DELETE_ROUTE = 'api/git-tree/branch/delete'
 const STAGE_ROUTE = 'api/git-tree/stage'
 const UNSTAGE_ROUTE = 'api/git-tree/unstage'
 const COMMIT_ROUTE = 'api/git-tree/commit'
@@ -91,6 +94,18 @@ export function fetchHistory(
 
 export function checkoutBranch(branch: string, cwd?: string): Promise<MutationPayload> {
   return postJson<MutationPayload>(CHECKOUT_ROUTE + query({ cwd }), { branch })
+}
+
+export function createBranch(name: string, cwd?: string, start?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(BRANCH_CREATE_ROUTE + query({ cwd }), { name, start })
+}
+
+export function renameBranch(from: string, to: string, cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(BRANCH_RENAME_ROUTE + query({ cwd }), { from, to })
+}
+
+export function deleteBranch(name: string, cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(BRANCH_DELETE_ROUTE + query({ cwd }), { name })
 }
 
 export function stagePaths(paths: string[], cwd?: string): Promise<MutationPayload> {

@@ -6,7 +6,7 @@ import { h, React } from '../react'
 import type { GitStatusPayload, RefRecord, RefsPayload, Translate, ViewKind } from '../types'
 import { BranchIcon, MoreIcon, TagIcon } from '../icons'
 
-function Section(props: { title: string; count?: number; children?: any }): any {
+function Section(props: { title: string; count?: number; action?: any; children?: any }): any {
   return h(
     'div',
     { className: 'dgt-rail-section' },
@@ -14,7 +14,12 @@ function Section(props: { title: string; count?: number; children?: any }): any 
       'div',
       { className: 'dgt-rail-title' },
       h('span', null, props.title),
-      typeof props.count === 'number' && props.count > 0 ? h('span', null, String(props.count)) : null,
+      h(
+        'span',
+        { className: 'dgt-rail-title-right' },
+        typeof props.count === 'number' && props.count > 0 ? h('span', null, String(props.count)) : null,
+        props.action ?? null,
+      ),
     ),
     props.children,
   )
@@ -27,6 +32,8 @@ function RefRow(props: {
   onOpen: (record: RefRecord, kind: 'branch' | 'tag') => void
   onCheckout: (name: string) => void
   onCopy: (name: string) => void
+  onRename: (name: string) => void
+  onDelete: (name: string) => void
 }): any {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const ref = props.record
@@ -85,6 +92,35 @@ function RefRow(props: {
                 props.t('checkout'),
               )
             : null,
+          props.kind === 'branch'
+            ? h(
+                'button',
+                {
+                  type: 'button',
+                  onClick: () => {
+                    setMenuOpen(false)
+                    props.onRename(ref.name)
+                  },
+                },
+                props.t('renameBranch'),
+              )
+            : null,
+          props.kind === 'branch'
+            ? h(
+                'button',
+                {
+                  type: 'button',
+                  disabled: ref.current,
+                  title: ref.current ? props.t('currentBranchCannotDelete') : undefined,
+                  onClick: () => {
+                    if (ref.current) return
+                    setMenuOpen(false)
+                    props.onDelete(ref.name)
+                  },
+                },
+                props.t('deleteBranch'),
+              )
+            : null,
           h(
             'button',
             {
@@ -123,6 +159,9 @@ export function RefRail(props: {
   onOpenRef: (record: RefRecord, kind: 'branch' | 'tag') => void
   onCheckout: (name: string) => void
   onCopyRef: (name: string) => void
+  onCreate: () => void
+  onRename: (name: string) => void
+  onDelete: (name: string) => void
 }): any {
   const { refs, t } = props
   const branches = refs?.branches ?? []
@@ -139,7 +178,21 @@ export function RefRail(props: {
     ),
     h(
       Section,
-      { title: t('branches'), count: branches.length },
+      {
+        title: t('branches'),
+        count: branches.length,
+        action: h(
+          'button',
+          {
+            type: 'button',
+            className: 'dgt-rail-add',
+            title: t('newBranch'),
+            'aria-label': t('newBranch'),
+            onClick: props.onCreate,
+          },
+          '+',
+        ),
+      },
       branches.length > 0
         ? branches.map((ref) =>
             h(RefRow, {
@@ -150,6 +203,8 @@ export function RefRail(props: {
               onOpen: props.onOpenRef,
               onCheckout: props.onCheckout,
               onCopy: props.onCopyRef,
+              onRename: props.onRename,
+              onDelete: props.onDelete,
             }),
           )
         : h('div', { className: 'dgt-rail-empty' }, '—'),

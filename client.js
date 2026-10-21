@@ -68,6 +68,20 @@ var EN = {
   checkOutFailed: "Check out failed",
   dirtyWorktree: "Commit or stash your changes before switching branches.",
   showAllBranches: "All branches",
+  newBranch: "New branch",
+  renameBranch: "Rename branch",
+  deleteBranch: "Delete branch",
+  branchName: "Branch name",
+  createBranchAction: "Create",
+  renameBranchAction: "Rename",
+  cancel: "Cancel",
+  delete: "Delete",
+  deleteBranchConfirm: "Delete this branch? This cannot be undone.",
+  currentBranchCannotDelete: "The current branch cannot be deleted.",
+  branchCreated: "Branch created",
+  branchRenamed: "Branch renamed",
+  branchDeleted: "Branch deleted",
+  branchActionFailed: "Branch operation failed",
   itemsUnit: "items",
   commitMessageEmpty: "Write a message to commit.",
   commitShortcut: "\u2318\u21B5 to commit",
@@ -148,6 +162,20 @@ var ZH = {
   checkOutFailed: "\u68C0\u51FA\u5931\u8D25",
   dirtyWorktree: "\u6709\u672A\u63D0\u4EA4\u6539\u52A8\uFF0C\u5148\u63D0\u4EA4\u6216\u8D2E\u85CF\u518D\u5207\u6362\u5206\u652F\u3002",
   showAllBranches: "\u6240\u6709\u5206\u652F",
+  newBranch: "\u65B0\u5EFA\u5206\u652F",
+  renameBranch: "\u91CD\u547D\u540D\u5206\u652F",
+  deleteBranch: "\u5220\u9664\u5206\u652F",
+  branchName: "\u5206\u652F\u540D",
+  createBranchAction: "\u521B\u5EFA",
+  renameBranchAction: "\u91CD\u547D\u540D",
+  cancel: "\u53D6\u6D88",
+  delete: "\u5220\u9664",
+  deleteBranchConfirm: "\u786E\u5B9A\u5220\u9664\u8FD9\u4E2A\u5206\u652F\uFF1F\u8BE5\u64CD\u4F5C\u4E0D\u53EF\u64A4\u9500\u3002",
+  currentBranchCannotDelete: "\u4E0D\u80FD\u5220\u9664\u5F53\u524D\u5206\u652F\u3002",
+  branchCreated: "\u5206\u652F\u5DF2\u521B\u5EFA",
+  branchRenamed: "\u5206\u652F\u5DF2\u91CD\u547D\u540D",
+  branchDeleted: "\u5206\u652F\u5DF2\u5220\u9664",
+  branchActionFailed: "\u5206\u652F\u64CD\u4F5C\u5931\u8D25",
   itemsUnit: "\u9879",
   commitMessageEmpty: "\u586B\u5199\u63D0\u4EA4\u4FE1\u606F\u540E\u53EF\u63D0\u4EA4\u3002",
   commitShortcut: "\u2318\u21B5 \u63D0\u4EA4",
@@ -366,6 +394,11 @@ var CSS = `
 .dgt-detail-diff{flex:1 1 auto;min-width:0;overflow:auto;background:var(--dsw-alias-bg-base);}
 .dgt-rail-btn{appearance:none;border:0;width:100%;background:transparent;text-align:left;
   font:inherit;font-size:13px;cursor:pointer;}
+.dgt-rail-title-right{display:inline-flex;align-items:center;gap:6px;}
+.dgt-rail-add{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;
+  padding:0;border:0;border-radius:var(--dsw-radius-xs);background:transparent;
+  color:var(--dsw-alias-label-tertiary);font:inherit;font-size:14px;line-height:1;cursor:pointer;}
+.dgt-rail-add:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary);}
 .dgt-rail-ref{position:relative;cursor:pointer;}
 .dgt-rail-ref:hover{background:var(--dsw-alias-interactive-bg-hover);}
 .dgt-rail-ref[data-menu='true']{background:var(--dsw-alias-interactive-bg-hover);}
@@ -495,6 +528,21 @@ var CSS = `
   color:var(--dsw-alias-label-primary-inverted);font:inherit;font-size:12px;font-weight:500;cursor:pointer;}
 .dgt-primary:hover:not(:disabled){opacity:.92;}
 .dgt-primary:disabled{background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-caption);cursor:default;}
+.dgt-overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;
+  background:var(--dsw-alias-bg-mask-1);}
+.dgt-dialog{width:340px;max-width:88vw;display:flex;flex-direction:column;gap:8px;padding:14px;
+  border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);
+  background:var(--dsw-alias-bg-layer-3);box-shadow:0 12px 32px var(--dsw-alias-bg-mask-1);}
+.dgt-dialog-title{font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary);}
+.dgt-dialog-label{font-size:11.5px;color:var(--dsw-alias-label-secondary);}
+.dgt-dialog-body{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary);}
+.dgt-dialog-input{height:28px;padding:0 8px;border:1px solid var(--dsw-alias-border-l2);
+  border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-base);
+  color:var(--dsw-alias-label-primary);font:inherit;font-size:12.5px;}
+.dgt-dialog-input:focus{outline:none;border-color:var(--dsw-alias-brand-primary);}
+.dgt-dialog-error{font-size:11.5px;color:var(--dgt-err);}
+.dgt-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px;}
+.dgt-danger{background:var(--dsw-alias-state-error-primary);color:var(--dsw-alias-label-primary-inverted);}
 .dgt-toast{position:absolute;right:14px;bottom:118px;z-index:6;max-width:60%;
   padding:6px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);
   background:var(--dsw-alias-bg-layer-3);color:var(--dsw-alias-label-primary);font-size:12px;
@@ -509,6 +557,9 @@ var REFS_ROUTE = "api/git-tree/refs";
 var HISTORY_ROUTE = "api/git-tree/history";
 var COMMIT_INFO_ROUTE = "api/git-tree/commit-info";
 var CHECKOUT_ROUTE = "api/git-tree/checkout";
+var BRANCH_CREATE_ROUTE = "api/git-tree/branch/create";
+var BRANCH_RENAME_ROUTE = "api/git-tree/branch/rename";
+var BRANCH_DELETE_ROUTE = "api/git-tree/branch/delete";
 var STAGE_ROUTE = "api/git-tree/stage";
 var UNSTAGE_ROUTE = "api/git-tree/unstage";
 var COMMIT_ROUTE = "api/git-tree/commit";
@@ -556,6 +607,15 @@ function fetchHistory(params, signal) {
 }
 function checkoutBranch(branch, cwd) {
   return postJson(CHECKOUT_ROUTE + query({ cwd }), { branch });
+}
+function createBranch(name, cwd, start) {
+  return postJson(BRANCH_CREATE_ROUTE + query({ cwd }), { name, start });
+}
+function renameBranch(from, to, cwd) {
+  return postJson(BRANCH_RENAME_ROUTE + query({ cwd }), { from, to });
+}
+function deleteBranch(name, cwd) {
+  return postJson(BRANCH_DELETE_ROUTE + query({ cwd }), { name });
 }
 function stagePaths(paths, cwd) {
   return postJson(STAGE_ROUTE + query({ cwd }), { paths });
@@ -817,7 +877,12 @@ function Section(props) {
       "div",
       { className: "dgt-rail-title" },
       h("span", null, props.title),
-      typeof props.count === "number" && props.count > 0 ? h("span", null, String(props.count)) : null
+      h(
+        "span",
+        { className: "dgt-rail-title-right" },
+        typeof props.count === "number" && props.count > 0 ? h("span", null, String(props.count)) : null,
+        props.action ?? null
+      )
     ),
     props.children
   );
@@ -877,6 +942,31 @@ function RefRow(props) {
         },
         props.t("checkout")
       ) : null,
+      props.kind === "branch" ? h(
+        "button",
+        {
+          type: "button",
+          onClick: () => {
+            setMenuOpen(false);
+            props.onRename(ref.name);
+          }
+        },
+        props.t("renameBranch")
+      ) : null,
+      props.kind === "branch" ? h(
+        "button",
+        {
+          type: "button",
+          disabled: ref.current,
+          title: ref.current ? props.t("currentBranchCannotDelete") : void 0,
+          onClick: () => {
+            if (ref.current) return;
+            setMenuOpen(false);
+            props.onDelete(ref.name);
+          }
+        },
+        props.t("deleteBranch")
+      ) : null,
       h(
         "button",
         {
@@ -918,7 +1008,21 @@ function RefRail(props) {
     ),
     h(
       Section,
-      { title: t("branches"), count: branches.length },
+      {
+        title: t("branches"),
+        count: branches.length,
+        action: h(
+          "button",
+          {
+            type: "button",
+            className: "dgt-rail-add",
+            title: t("newBranch"),
+            "aria-label": t("newBranch"),
+            onClick: props.onCreate
+          },
+          "+"
+        )
+      },
       branches.length > 0 ? branches.map(
         (ref) => h(RefRow, {
           key: "b:" + ref.name,
@@ -927,7 +1031,9 @@ function RefRail(props) {
           t,
           onOpen: props.onOpenRef,
           onCheckout: props.onCheckout,
-          onCopy: props.onCopyRef
+          onCopy: props.onCopyRef,
+          onRename: props.onRename,
+          onDelete: props.onDelete
         })
       ) : h("div", { className: "dgt-rail-empty" }, "\u2014")
     ),
@@ -1563,6 +1669,73 @@ function HistoryView(props) {
   );
 }
 
+// src/client/components/Dialogs.tsx
+function PromptDialog(props) {
+  const [value, setValue] = React.useState(props.initial);
+  const submit = () => {
+    const next = value.trim();
+    if (next !== "") props.onSubmit(next);
+  };
+  return h(
+    "div",
+    { className: "dgt-overlay", role: "presentation", onClick: props.onCancel },
+    h(
+      "div",
+      { className: "dgt-dialog", role: "dialog", "aria-modal": "true", onClick: (event) => event.stopPropagation() },
+      h("div", { className: "dgt-dialog-title" }, props.title),
+      h("label", { className: "dgt-dialog-label" }, props.label),
+      h("input", {
+        className: "dgt-dialog-input",
+        value,
+        autoFocus: true,
+        spellCheck: false,
+        onChange: (event) => setValue(event.target.value),
+        onKeyDown: (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            submit();
+          }
+          if (event.key === "Escape") props.onCancel();
+        }
+      }),
+      props.error !== "" ? h("div", { className: "dgt-dialog-error" }, props.error) : null,
+      h(
+        "div",
+        { className: "dgt-dialog-actions" },
+        h("button", { type: "button", className: "dgt-button", onClick: props.onCancel }, props.t("cancel")),
+        h(
+          "button",
+          { type: "button", className: "dgt-primary", disabled: props.busy || value.trim() === "", onClick: submit },
+          props.submitLabel
+        )
+      )
+    )
+  );
+}
+function ConfirmDialog(props) {
+  return h(
+    "div",
+    { className: "dgt-overlay", role: "presentation", onClick: props.onCancel },
+    h(
+      "div",
+      { className: "dgt-dialog", role: "dialog", "aria-modal": "true", onClick: (event) => event.stopPropagation() },
+      h("div", { className: "dgt-dialog-title" }, props.title),
+      h("div", { className: "dgt-dialog-body" }, props.body),
+      props.error !== "" ? h("div", { className: "dgt-dialog-error" }, props.error) : null,
+      h(
+        "div",
+        { className: "dgt-dialog-actions" },
+        h("button", { type: "button", className: "dgt-button", onClick: props.onCancel }, props.t("cancel")),
+        h(
+          "button",
+          { type: "button", className: "dgt-primary dgt-danger", disabled: props.busy, onClick: props.onConfirm },
+          props.submitLabel
+        )
+      )
+    )
+  );
+}
+
 // src/client/components/Workspace.tsx
 var POLL_MS = 2e3;
 var REPO_KEY = "dsh-git-tree/repository";
@@ -1594,6 +1767,9 @@ function Workspace(props) {
   const [commitFile, setCommitFile] = React.useState("");
   const [commitFileDiff, setCommitFileDiff] = React.useState(null);
   const [commitFileDiffLoading, setCommitFileDiffLoading] = React.useState(false);
+  const [dialog, setDialog] = React.useState(null);
+  const [dialogBusy, setDialogBusy] = React.useState(false);
+  const [dialogError, setDialogError] = React.useState("");
   const [statusError, setStatusError] = React.useState("");
   const [selected, setSelected] = React.useState(null);
   const [diff, setDiff] = React.useState(null);
@@ -1769,6 +1945,69 @@ function Workspace(props) {
     },
     [showToast, t]
   );
+  const closeDialog = React.useCallback(() => {
+    setDialog(null);
+    setDialogError("");
+    setDialogBusy(false);
+  }, []);
+  const afterBranchChange = React.useCallback(
+    async (message2) => {
+      showToast(message2);
+      closeDialog();
+      await loadRefs();
+      await loadStatus();
+    },
+    [closeDialog, loadRefs, loadStatus, showToast]
+  );
+  const submitCreate = React.useCallback(
+    async (name) => {
+      setDialogBusy(true);
+      setDialogError("");
+      try {
+        const result = await createBranch(name, repoPath || void 0);
+        if (!result.ok) throw new Error(result.error || t("branchActionFailed"));
+        await afterBranchChange(t("branchCreated") + " \xB7 " + name);
+      } catch (error) {
+        setDialogError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setDialogBusy(false);
+      }
+    },
+    [afterBranchChange, repoPath, t]
+  );
+  const submitRename = React.useCallback(
+    async (to) => {
+      const from = dialog?.branch ?? "";
+      setDialogBusy(true);
+      setDialogError("");
+      try {
+        const result = await renameBranch(from, to, repoPath || void 0);
+        if (!result.ok) throw new Error(result.error || t("branchActionFailed"));
+        if (historyScope === "branch:" + from) setHistoryScope("all");
+        await afterBranchChange(t("branchRenamed") + " \xB7 " + to);
+      } catch (error) {
+        setDialogError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setDialogBusy(false);
+      }
+    },
+    [afterBranchChange, dialog, historyScope, repoPath, t]
+  );
+  const submitDelete = React.useCallback(async () => {
+    const name = dialog?.branch ?? "";
+    setDialogBusy(true);
+    setDialogError("");
+    try {
+      const result = await deleteBranch(name, repoPath || void 0);
+      if (!result.ok) throw new Error(result.error || t("branchActionFailed"));
+      if (historyScope === "branch:" + name) setHistoryScope("all");
+      await afterBranchChange(t("branchDeleted") + " \xB7 " + name);
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDialogBusy(false);
+    }
+  }, [afterBranchChange, dialog, historyScope, repoPath, t]);
   React.useEffect(() => {
     if (view !== "history") return;
     setHistorySha("");
@@ -2000,8 +2239,52 @@ function Workspace(props) {
       onView: setView,
       onOpenRef: openRef,
       onCheckout: (name) => void checkout(name),
-      onCopyRef: copyRef
+      onCopyRef: copyRef,
+      onCreate: () => {
+        setDialogError("");
+        setDialog({ kind: "create" });
+      },
+      onRename: (name) => {
+        setDialogError("");
+        setDialog({ kind: "rename", branch: name });
+      },
+      onDelete: (name) => {
+        setDialogError("");
+        setDialog({ kind: "delete", branch: name });
+      }
     }), renderView()),
+    dialog?.kind === "create" ? h(PromptDialog, {
+      title: t("newBranch"),
+      label: t("branchName"),
+      initial: "",
+      submitLabel: t("createBranchAction"),
+      busy: dialogBusy,
+      error: dialogError,
+      t,
+      onCancel: closeDialog,
+      onSubmit: (value) => void submitCreate(value)
+    }) : null,
+    dialog?.kind === "rename" ? h(PromptDialog, {
+      title: t("renameBranch"),
+      label: t("branchName"),
+      initial: dialog.branch ?? "",
+      submitLabel: t("renameBranchAction"),
+      busy: dialogBusy,
+      error: dialogError,
+      t,
+      onCancel: closeDialog,
+      onSubmit: (value) => void submitRename(value)
+    }) : null,
+    dialog?.kind === "delete" ? h(ConfirmDialog, {
+      title: t("deleteBranch"),
+      body: (dialog.branch ?? "") + " \u2014 " + t("deleteBranchConfirm"),
+      submitLabel: t("delete"),
+      busy: dialogBusy,
+      error: dialogError,
+      t,
+      onCancel: closeDialog,
+      onConfirm: () => void submitDelete()
+    }) : null,
     toast ? h("div", { className: "dgt-toast", role: "status" }, toast) : null,
     notice ? h("div", { className: "dgt-toast", role: "status" }, notice) : null
   );
