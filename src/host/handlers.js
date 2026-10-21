@@ -367,6 +367,47 @@ export async function handleBranchDelete(ctx, request) {
   return json({ ok: true, name })
 }
 
+export async function handleMerge(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const branch = body.branch
+  if (!isSafeBranchName(branch)) throw new RequestError('无效的分支名', 400, 'invalid-branch-name')
+  const subprocess = subprocessOf(ctx)
+
+  const current = await currentBranchOf(subprocess, cwd)
+  if (current === '') throw new RequestError('当前处于分离头指针状态，无法合并', 409, 'detached-head')
+  if (current === branch) throw new RequestError('不能把分支合并到它自己', 409, 'same-branch')
+
+  try {
+    await git(subprocess, ['rev-parse', '--verify', 'refs/heads/' + branch], cwd, { maxBytes: 8 * 1024 })
+  } catch {
+    throw new RequestError('分支不存在', 404, 'unknown-branch')
+  }
+
+  const statusText = await git(
+    subprocess,
+    ['status', '--porcelain=v2', '--branch', '--untracked-files=all', '-z'],
+    cwd,
+    { maxBytes: MAX_STATUS_BYTES },
+  )
+  const dirty = parsePorcelainV2(statusText).entries.some(
+    (entry) =>
+      entry.kind !== 'untracked' && entry.kind !== 'ignored' && (entry.staged || entry.unstaged || entry.conflicted),
+  )
+  if (dirty) throw new RequestError('有未提交改动，先提交或贮藏再合并', 409, 'dirty-worktree')
+
+  try {
+    await git(subprocess, ['merge', '--no-edit', branch], cwd, { maxBytes: MAX_DIFF_BYTES })
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    if (/CONFLICT|Automatic merge failed|fix conflicts/i.test(detail)) {
+      throw new RequestError('合并产生冲突，冲突文件已列在改动里', 409, 'merge-conflict')
+    }
+    throw error
+  }
+  return json({ ok: true, branch, current })
+}
+
 export async function handleRefs(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
   const subprocess = subprocessOf(ctx)

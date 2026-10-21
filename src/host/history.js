@@ -17,14 +17,18 @@ export const DEFAULT_LIMIT = 200
 export const MAX_LIMIT = 500
 export const MAX_LANES = 8
 
-/** Loose but safe ref-name check; the host never passes a raw string to argv. */
+/**
+ * Ref-name check that follows git's own forbidden characters but stays Unicode
+ * friendly: Chinese branch names are legal refs and must work like any other.
+ */
 export function isSafeBranchName(value) {
   if (typeof value !== 'string' || value.length === 0 || value.length > 255) return false
   if (value.startsWith('-') || value.startsWith('/') || value.endsWith('/')) return false
-  if (value.endsWith('.') || value.endsWith('.lock') || value.endsWith('.lock/')) return false
+  if (value.endsWith('.') || value.endsWith('.lock') || value.includes('.lock/')) return false
   if (value.includes('..') || value.includes('//') || value.includes('@{')) return false
-  if (value.includes('\\') || value.includes(' ') || value.includes('\u0000')) return false
-  return /^[A-Za-z0-9._/-]+$/.test(value)
+  if (value === '@') return false
+  if (/[ ~^:?*\[\\\u0000-\u001f\u007f]/.test(value)) return false
+  return true
 }
 
 /** Turn `%D` into local branch and tag chips; remote refs are dropped. */

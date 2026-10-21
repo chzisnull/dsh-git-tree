@@ -68,6 +68,12 @@ var EN = {
   noFiles: "No files in this commit.",
   selectCommitFile: "Select a file to see its diff.",
   checkout: "Check out",
+  mergeIntoCurrent: "Merge into current branch",
+  mergeTitle: "Merge branch",
+  mergeBody: "will be merged into the current branch. Conflicts, if any, stay in the change list.",
+  mergeSelfHint: "The current branch cannot merge into itself",
+  merged: "Merged",
+  mergeFailed: "Merge failed",
   checkedOut: "Checked out",
   copyRefName: "Copy name",
   copySha: "Copy SHA",
@@ -193,6 +199,12 @@ var ZH = {
   noFiles: "\u8BE5\u63D0\u4EA4\u6CA1\u6709\u53D8\u66F4\u6587\u4EF6\u3002",
   selectCommitFile: "\u9009\u62E9\u6587\u4EF6\u67E5\u770B\u8BE5\u63D0\u4EA4\u5185\u7684\u5DEE\u5F02\u3002",
   checkout: "\u68C0\u51FA",
+  mergeIntoCurrent: "\u5408\u5E76\u5230\u5F53\u524D\u5206\u652F",
+  mergeTitle: "\u5408\u5E76\u5206\u652F",
+  mergeBody: "\u5C06\u5408\u5E76\u5230\u5F53\u524D\u5206\u652F\uFF1B\u82E5\u6709\u51B2\u7A81\uFF0C\u51B2\u7A81\u6587\u4EF6\u4F1A\u7559\u5728\u6539\u52A8\u5217\u8868\u91CC\u3002",
+  mergeSelfHint: "\u5F53\u524D\u5206\u652F\u4E0D\u80FD\u5408\u5E76\u5230\u81EA\u8EAB",
+  merged: "\u5DF2\u5408\u5E76",
+  mergeFailed: "\u5408\u5E76\u5931\u8D25",
   checkedOut: "\u5DF2\u68C0\u51FA",
   copyRefName: "\u590D\u5236\u540D\u79F0",
   copySha: "\u590D\u5236 SHA",
@@ -686,6 +698,7 @@ var COMMIT_INFO_ROUTE = "api/git-tree/commit-info";
 var CHECKOUT_ROUTE = "api/git-tree/checkout";
 var DISCARD_ROUTE = "api/git-tree/discard";
 var REMOVE_ROUTE = "api/git-tree/remove";
+var MERGE_ROUTE = "api/git-tree/merge";
 var BRANCH_CREATE_ROUTE = "api/git-tree/branch/create";
 var BRANCH_RENAME_ROUTE = "api/git-tree/branch/rename";
 var BRANCH_DELETE_ROUTE = "api/git-tree/branch/delete";
@@ -733,6 +746,9 @@ function fetchCommitInfo(params, signal) {
 }
 function fetchHistory(params, signal) {
   return getJson(HISTORY_ROUTE, params, signal);
+}
+function mergeBranch(branch, cwd) {
+  return postJson(MERGE_ROUTE + query({ cwd }), { branch });
 }
 function discardPaths(paths, side, cwd) {
   return postJson(DISCARD_ROUTE + query({ cwd }), { paths, side });
@@ -1154,6 +1170,20 @@ function RefRow(props) {
         "button",
         {
           type: "button",
+          disabled: ref.current,
+          title: ref.current ? props.t("mergeSelfHint") : void 0,
+          onClick: () => {
+            if (ref.current) return;
+            popover.close();
+            props.onMerge(ref.name);
+          }
+        },
+        props.t("mergeIntoCurrent")
+      ) : null,
+      props.kind === "branch" ? h(
+        "button",
+        {
+          type: "button",
           onClick: () => {
             popover.close();
             props.onRename(ref.name);
@@ -1240,6 +1270,7 @@ function RefRail(props) {
           t,
           onOpen: props.onOpenRef,
           onCheckout: props.onCheckout,
+          onMerge: props.onMerge,
           onCopy: props.onCopyRef,
           onRename: props.onRename,
           onDelete: props.onDelete,
@@ -1258,6 +1289,7 @@ function RefRail(props) {
           t,
           onOpen: props.onOpenRef,
           onCheckout: props.onCheckout,
+          onMerge: props.onMerge,
           onCopy: props.onCopyRef
         })
       ) : h("div", { className: "dgt-rail-empty" }, "\u2014")
@@ -2565,6 +2597,29 @@ function Workspace(props) {
       setDialogBusy(false);
     }
   }, [closeDialog, dialog?.kind, dialog?.path, loadStatus, repoPath, showToast, t]);
+  const submitMerge = React.useCallback(async () => {
+    const branch = dialog?.branch ?? "";
+    setDialogBusy(true);
+    setDialogError("");
+    try {
+      const result = await mergeBranch(branch, repoPath || void 0);
+      if (!result.ok) throw new Error(result.error || t("mergeFailed"));
+      closeDialog();
+      showToast(t("merged") + " \xB7 " + branch);
+      setSelected(null);
+      setDiff(null);
+      setHistorySha("");
+      await loadStatus();
+      await loadRefs();
+      if (view !== "status") await loadHistory(true);
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error));
+      await loadStatus();
+      await loadRefs();
+    } finally {
+      setDialogBusy(false);
+    }
+  }, [closeDialog, dialog?.branch, loadHistory, loadRefs, loadStatus, repoPath, showToast, t, view]);
   const fileMenu = (entry, side, event) => {
     const conflict = side === "conflicted" || entry.conflicted;
     const untracked = entry.kind === "untracked";
@@ -2617,6 +2672,15 @@ function Workspace(props) {
         disabled: record.current,
         hint: record.current ? t("currentBranchCannotDelete") : void 0,
         onSelect: () => void checkout(record.name)
+      },
+      {
+        label: t("mergeIntoCurrent"),
+        disabled: record.current,
+        hint: record.current ? t("mergeSelfHint") : void 0,
+        onSelect: () => {
+          setDialogError("");
+          setDialog({ kind: "merge", branch: record.name });
+        }
       },
       { label: t("renameBranch"), onSelect: () => {
         setDialogError("");
@@ -2820,6 +2884,10 @@ function Workspace(props) {
       onView: setView,
       onOpenRef: openRef,
       onCheckout: (name) => void checkout(name),
+      onMerge: (name) => {
+        setDialogError("");
+        setDialog({ kind: "merge", branch: name });
+      },
       onCopyRef: copyRef,
       onContextMenu: (record, kind, event) => refMenu(record, kind, event),
       onCreate: () => {
@@ -2868,6 +2936,16 @@ function Workspace(props) {
       onConfirm: () => void submitDelete()
     }) : null,
     contextMenu ? h(ContextMenu, { state: contextMenu, onClose: () => setContextMenu(null) }) : null,
+    dialog?.kind === "merge" ? h(ConfirmDialog, {
+      title: t("mergeTitle"),
+      body: (dialog.branch ?? "") + " \u2014 " + t("mergeBody") + " (" + (status?.branch || "\u2014") + ")",
+      submitLabel: t("mergeIntoCurrent"),
+      busy: dialogBusy,
+      error: dialogError,
+      t,
+      onCancel: closeDialog,
+      onConfirm: () => void submitMerge()
+    }) : null,
     dialog?.kind === "discard" ? h(ConfirmDialog, {
       title: t("discardTitle"),
       body: (dialog.path ?? "") + " \u2014 " + t("discardBody"),

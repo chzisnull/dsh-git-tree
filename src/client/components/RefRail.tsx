@@ -32,6 +32,7 @@ function RefRow(props: {
   t: Translate
   onOpen: (record: RefRecord, kind: 'branch' | 'tag') => void
   onCheckout: (name: string) => void
+  onMerge: (name: string) => void
   onCopy: (name: string) => void
   onRename: (name: string) => void
   onDelete: (name: string) => void
@@ -113,6 +114,22 @@ function RefRow(props: {
                 'button',
                 {
                   type: 'button',
+                  disabled: ref.current,
+                  title: ref.current ? props.t('mergeSelfHint') : undefined,
+                  onClick: () => {
+                    if (ref.current) return
+                    popover.close()
+                    props.onMerge(ref.name)
+                  },
+                },
+                props.t('mergeIntoCurrent'),
+              )
+            : null,
+          props.kind === 'branch'
+            ? h(
+                'button',
+                {
+                  type: 'button',
                   onClick: () => {
                     popover.close()
                     props.onRename(ref.name)
@@ -174,6 +191,7 @@ export function RefRail(props: {
   onView: (view: ViewKind) => void
   onOpenRef: (record: RefRecord, kind: 'branch' | 'tag') => void
   onCheckout: (name: string) => void
+  onMerge: (name: string) => void
   onCopyRef: (name: string) => void
   onCreate: () => void
   onRename: (name: string) => void
@@ -220,6 +238,7 @@ export function RefRail(props: {
               t,
               onOpen: props.onOpenRef,
               onCheckout: props.onCheckout,
+              onMerge: props.onMerge,
               onCopy: props.onCopyRef,
               onRename: props.onRename,
               onDelete: props.onDelete,
@@ -240,6 +259,7 @@ export function RefRail(props: {
               t,
               onOpen: props.onOpenRef,
               onCheckout: props.onCheckout,
+              onMerge: props.onMerge,
               onCopy: props.onCopyRef,
             }),
           )

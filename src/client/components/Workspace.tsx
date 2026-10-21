@@ -21,6 +21,7 @@ import {
   checkoutBranch,
   commitChanges,
   discardPaths,
+  mergeBranch,
   createBranch,
   deleteBranch,
   renameBranch,
@@ -89,7 +90,7 @@ export function Workspace(props: { t?: Translate }): any {
   const [commitFileDiffLoading, setCommitFileDiffLoading] = React.useState(false)
 
   const [dialog, setDialog] = React.useState<{
-    kind: 'create' | 'rename' | 'delete' | 'discard' | 'remove' | 'remove-untracked'
+    kind: 'create' | 'rename' | 'delete' | 'discard' | 'remove' | 'remove-untracked' | 'merge'
     branch?: string
     start?: string
     path?: string
@@ -584,6 +585,30 @@ export function Workspace(props: { t?: Translate }): any {
     }
   }, [closeDialog, dialog?.kind, dialog?.path, loadStatus, repoPath, showToast, t])
 
+  const submitMerge = React.useCallback(async () => {
+    const branch = dialog?.branch ?? ''
+    setDialogBusy(true)
+    setDialogError('')
+    try {
+      const result = await mergeBranch(branch, repoPath || undefined)
+      if (!result.ok) throw new Error(result.error || t('mergeFailed'))
+      closeDialog()
+      showToast(t('merged') + ' · ' + branch)
+      setSelected(null)
+      setDiff(null)
+      setHistorySha('')
+      await loadStatus()
+      await loadRefs()
+      if (view !== 'status') await loadHistory(true)
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error))
+      await loadStatus()
+      await loadRefs()
+    } finally {
+      setDialogBusy(false)
+    }
+  }, [closeDialog, dialog?.branch, loadHistory, loadRefs, loadStatus, repoPath, showToast, t, view])
+
   const fileMenu = (entry: GitFileEntry, side: EntrySide, event: any) => {
     const conflict = side === 'conflicted' || entry.conflicted
     const untracked = entry.kind === 'untracked'
@@ -640,6 +665,12 @@ export function Workspace(props: { t?: Translate }): any {
               disabled: record.current,
               hint: record.current ? t('currentBranchCannotDelete') : undefined,
               onSelect: () => void checkout(record.name),
+            },
+            {
+              label: t('mergeIntoCurrent'),
+              disabled: record.current,
+              hint: record.current ? t('mergeSelfHint') : undefined,
+              onSelect: () => { setDialogError(''); setDialog({ kind: 'merge', branch: record.name }) },
             },
             { label: t('renameBranch'), onSelect: () => { setDialogError(''); setDialog({ kind: 'rename', branch: record.name }) } },
             {
@@ -861,6 +892,10 @@ export function Workspace(props: { t?: Translate }): any {
           onView: setView,
           onOpenRef: openRef,
           onCheckout: (name: string) => void checkout(name),
+          onMerge: (name: string) => {
+            setDialogError('')
+            setDialog({ kind: 'merge', branch: name })
+          },
           onCopyRef: copyRef,
           onContextMenu: (record: RefRecord, kind: 'branch' | 'tag', event: any) => refMenu(record, kind, event),
           onCreate: () => {
@@ -916,6 +951,18 @@ export function Workspace(props: { t?: Translate }): any {
         })
       : null,
     contextMenu ? h(ContextMenu, { state: contextMenu, onClose: () => setContextMenu(null) }) : null,
+    dialog?.kind === 'merge'
+      ? h(ConfirmDialog, {
+          title: t('mergeTitle'),
+          body: (dialog.branch ?? '') + ' — ' + t('mergeBody') + ' (' + (status?.branch || '—') + ')',
+          submitLabel: t('mergeIntoCurrent'),
+          busy: dialogBusy,
+          error: dialogError,
+          t,
+          onCancel: closeDialog,
+          onConfirm: () => void submitMerge(),
+        })
+      : null,
     dialog?.kind === 'discard'
       ? h(ConfirmDialog, {
           title: t('discardTitle'),

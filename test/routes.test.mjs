@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { apply, inject, name } from '../index.js'
+import { isSafeBranchName } from '../src/host/history.js'
 
 const WORKSPACE = '/tmp/fake-workspace'
 
@@ -155,7 +156,7 @@ test('host plugin declares its name and hard service dependencies', () => {
   assert.deepEqual(inject, ['connection', 'subprocess'])
 })
 
-test('apply registers the sixteen authenticated exact Fetch routes', () => {
+test('apply registers the seventeen authenticated exact Fetch routes', () => {
   const ctx = fakeContext()
   apply(ctx)
 
@@ -171,6 +172,7 @@ test('apply registers the sixteen authenticated exact Fetch routes', () => {
       '/api/git-tree/diff',
       '/api/git-tree/discard',
       '/api/git-tree/history',
+      '/api/git-tree/merge',
       '/api/git-tree/open',
       '/api/git-tree/refs',
       '/api/git-tree/remove',
@@ -190,6 +192,7 @@ test('apply registers the sixteen authenticated exact Fetch routes', () => {
       '/api/git-tree/checkout',
       '/api/git-tree/discard',
       '/api/git-tree/remove',
+      '/api/git-tree/merge',
       '/api/git-tree/open',
       '/api/git-tree/branch/create',
       '/api/git-tree/branch/rename',
@@ -664,6 +667,73 @@ test('discard and remove refuse unsafe paths before spawning git', async () => {
     assert.equal(body.ok, false, route + ' must refuse traversal')
   }
   assert.equal(ctx.spawns.length, 0)
+})
+
+test('merge merges a local branch into the current one, unicode names included', async () => {
+  const clean = '# branch.oid abc\u0000# branch.head main\u0000'
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'status') return { exitCode: 0, stdout: clean, stderr: '' }
+      if (argv[1] === 'merge') return { exitCode: 0, stdout: '', stderr: '' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const { body } = await call(ctx, '/api/git-tree/merge', {
+    method: 'POST',
+    body: { branch: 'feature-chz-ui改版' },
+  })
+  assert.equal(body.ok, true)
+  const mergeCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'merge')
+  assert.deepEqual(mergeCall.argv.slice(1), ['merge', '--no-edit', 'feature-chz-ui改版'])
+})
+
+test('merge refuses a dirty work tree, a self merge and an unknown branch', async () => {
+  const dirty = fakeContext()
+  apply(dirty)
+  const refused = await call(dirty, '/api/git-tree/merge', { method: 'POST', body: { branch: 'topic' } })
+  assert.equal(refused.response.status, 409)
+  assert.equal(refused.body.code, 'dirty-worktree')
+  assert.equal(dirty.spawns.filter((spawn) => spawn.argv[1] === 'merge').length, 0)
+
+  const self = fakeContext()
+  apply(self)
+  const same = await call(self, '/api/git-tree/merge', { method: 'POST', body: { branch: 'main' } })
+  assert.equal(same.response.status, 409)
+  assert.equal(same.body.code, 'same-branch')
+
+  const unknown = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'rev-parse' && argv.includes('--verify')) return { exitCode: 128, stdout: '', stderr: 'not found' }
+      return defaultResult(argv)
+    },
+  })
+  apply(unknown)
+  const missing = await call(unknown, '/api/git-tree/merge', { method: 'POST', body: { branch: 'nope' } })
+  assert.equal(missing.response.status, 404)
+  assert.equal(missing.body.code, 'unknown-branch')
+})
+
+test('merge maps conflicts to a 409 instead of throwing', async () => {
+  const clean = '# branch.oid abc\u0000# branch.head main\u0000'
+  const ctx = fakeContext({
+    handler: (argv) => {
+      if (argv[1] === 'status') return { exitCode: 0, stdout: clean, stderr: '' }
+      if (argv[1] === 'merge') return { exitCode: 1, stdout: '', stderr: 'CONFLICT (content): Merge conflict in src/app.js' }
+      return defaultResult(argv)
+    },
+  })
+  apply(ctx)
+  const { response, body } = await call(ctx, '/api/git-tree/merge', { method: 'POST', body: { branch: 'topic' } })
+  assert.equal(response.status, 409)
+  assert.equal(body.code, 'merge-conflict')
+})
+
+test('branch names may contain unicode but not characters git forbids', () => {
+  for (const good of ['feature-chz-ui改版', '功能/中文分支', 'main']) assert.equal(isSafeBranchName(good), true, good)
+  for (const bad of ['a b', 'x~1', 'a..b', 'a:b', 'x.lock', '-rf', '@']) {
+    assert.equal(isSafeBranchName(bad), false, bad)
+  }
 })
 
 test('refs route parses branches, remotes and tags and marks the current branch', async () => {
