@@ -18,8 +18,10 @@ import {
   MAX_LIMIT,
   assignLanes,
   isSafeBranchName,
+  parseDecoration,
   parseHistoryLog,
 } from './history.js'
+import { COMMIT_FORMAT, isSafeCommitSha, parseCommitShow, parseNameStatus } from './commit.js'
 import { REF_ARGS, parseRefs } from './refs.js'
 import { openArgv } from './open.js'
 import { resolveCwd, safeRepoPath, workspaceRootOf } from './paths.js'
@@ -127,10 +129,17 @@ export async function handleDiff(ctx, request) {
   const path = safeRepoPath(url.searchParams.get('path'))
   const requested = url.searchParams.get('side')
   const side = requested === 'staged' || url.searchParams.get('staged') === '1' ? 'staged' : 'unstaged'
+  const commit = url.searchParams.get('commit') || ''
+  if (commit && !isSafeCommitSha(commit)) throw new RequestError('无效的提交哈希', 400, 'invalid-sha')
   const subprocess = subprocessOf(ctx)
 
-  const argv = ['diff', '--no-color', '--no-ext-diff', '--no-textconv']
-  if (side === 'staged') argv.push('--cached')
+  let argv
+  if (commit) {
+    argv = ['show', commit, '--no-color', '--no-ext-diff', '--no-textconv', '--format=']
+  } else {
+    argv = ['diff', '--no-color', '--no-ext-diff', '--no-textconv']
+    if (side === 'staged') argv.push('--cached')
+  }
   argv.push('--', path)
 
   const text = await git(subprocess, argv, cwd, { maxBytes: MAX_DIFF_BYTES, signal: request.signal })
@@ -192,6 +201,42 @@ export async function handleHistory(ctx, request) {
   const commits = hasMore ? parsed.slice(0, limit) : parsed
   const laneCount = assignLanes(commits)
   return json({ ok: true, commits, laneCount, hasMore, scope })
+}
+
+export async function handleCommitInfo(ctx, request) {
+  const { url, cwd } = handleCwd(ctx, request)
+  const sha = url.searchParams.get('sha')
+  if (!isSafeCommitSha(sha)) throw new RequestError('无效的提交哈希', 400, 'invalid-sha')
+  const subprocess = subprocessOf(ctx)
+
+  const showText = await git(
+    subprocess,
+    ['show', '--no-patch', '--decorate=full', '--format=' + COMMIT_FORMAT, sha],
+    cwd,
+    { maxBytes: 256 * 1024, signal: request.signal },
+  )
+  const parsed = parseCommitShow(showText)
+  if (!parsed) throw new RequestError('无法解析该提交', 400, 'invalid-commit')
+
+  const nameStatus = await git(
+    subprocess,
+    ['show', '--name-status', '--find-renames', '--format=', sha],
+    cwd,
+    { maxBytes: MAX_DIFF_BYTES, signal: request.signal },
+  )
+
+  return json({
+    ok: true,
+    sha: parsed.sha,
+    author: parsed.author,
+    authorEmail: parsed.authorEmail,
+    date: parsed.date,
+    subject: parsed.subject,
+    body: parsed.body,
+    parents: parsed.parents,
+    refs: parseDecoration(parsed.decoration),
+    files: parseNameStatus(nameStatus),
+  })
 }
 
 export async function handleRefs(ctx, request) {

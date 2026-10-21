@@ -1,8 +1,10 @@
 // History view: commits newest-first with a lane graph, five columns, a branch
-// scope switch and paged loading. The host assigns lanes; this view only draws.
+// scope switch and paged loading. Selecting a commit opens the detail pane with
+// its changed files and the per-file diff.
 
 import { h } from '../../react'
-import type { HistoryCommit, HistoryScope, Translate } from '../../types'
+import type { CommitDetailPayload, DiffPayload, HistoryCommit, HistoryScope, Translate } from '../../types'
+import { DiffFileBlock } from '../DiffView'
 
 const LANE_GAP = 14
 const GRAPH_WIDTH = 88
@@ -18,8 +20,7 @@ function formatDate(value: string): string {
   return match ? match[1] + '-' + match[2] + '-' + match[3] + ' ' + match[4] + ':' + match[5] : text
 }
 
-function Graph(props: { commit: HistoryCommit }): any {
-  const commit = props.commit
+function graphOf(commit: HistoryCommit): any {
   const y = ROW_HEIGHT / 2
   const x = laneX(commit.lane)
   const edges = commit.parentLanes.map((parentLane, index) =>
@@ -48,6 +49,108 @@ function Graph(props: { commit: HistoryCommit }): any {
   )
 }
 
+function Detail(props: {
+  detail: CommitDetailPayload | null
+  detailLoading: boolean
+  detailError: string
+  selectedFile: string
+  fileDiff: DiffPayload | null
+  fileDiffLoading: boolean
+  t: Translate
+  onSelectFile: (path: string) => void
+  onParent: (sha: string) => void
+}): any {
+  const { detail, t } = props
+  if (props.detailLoading && detail === null) {
+    return h('div', { className: 'dgt-detail' }, h('div', { className: 'dgt-placeholder' }, t('loading')))
+  }
+  if (props.detailError !== '') {
+    return h('div', { className: 'dgt-detail' }, h('div', { className: 'dgt-placeholder dgt-error' }, props.detailError))
+  }
+  if (detail === null) {
+    return h('div', { className: 'dgt-detail' }, h('div', { className: 'dgt-placeholder' }, t('selectCommit')))
+  }
+
+  const files = detail.files ?? []
+  const parents = detail.parents ?? []
+
+  return h(
+    'div',
+    { className: 'dgt-detail' },
+    h(
+      'div',
+      { className: 'dgt-detail-side' },
+      h(
+        'div',
+        { className: 'dgt-detail-meta' },
+        h('div', { className: 'dgt-detail-subject', title: detail.subject }, detail.subject ?? ''),
+        h('div', { className: 'dgt-detail-sha' }, detail.sha ?? ''),
+        h('div', { className: 'dgt-detail-line' }, (detail.author ?? '') + (detail.authorEmail ? ' <' + detail.authorEmail + '>' : '')),
+        h('div', { className: 'dgt-detail-line' }, formatDate(detail.date ?? '')),
+        parents.length > 0
+          ? h(
+              'div',
+              { className: 'dgt-detail-line' },
+              h('span', { className: 'dgt-detail-label' }, t('parentsField') + ': '),
+              parents.map((sha, index) =>
+                h(
+                  'button',
+                  {
+                    key: sha + ':' + String(index),
+                    type: 'button',
+                    className: 'dgt-link',
+                    onClick: () => props.onParent(sha),
+                  },
+                  sha.slice(0, 8),
+                ),
+              ),
+            )
+          : null,
+        detail.body ? h('pre', { className: 'dgt-detail-body' }, detail.body) : null,
+      ),
+      h('div', { className: 'dgt-detail-head' }, t('changedFiles')),
+      files.length === 0
+        ? h('div', { className: 'dgt-placeholder' }, t('noFiles'))
+        : h(
+            'div',
+            { className: 'dgt-detail-list' },
+            files.map((file) =>
+              h(
+                'button',
+                {
+                  key: file.path,
+                  type: 'button',
+                  className: 'dgt-detail-file',
+                  'data-active': props.selectedFile === file.path || undefined,
+                  title: file.origPath ? file.path + ' ← ' + file.origPath : file.path,
+                  onClick: () => props.onSelectFile(file.path),
+                },
+                h('span', { className: 'dgt-detail-letter', 'data-status': file.status }, file.status[0].toUpperCase()),
+                h('span', { className: 'dgt-detail-path' }, file.path),
+              ),
+            ),
+          ),
+    ),
+    h(
+      'div',
+      { className: 'dgt-detail-diff' },
+      props.selectedFile === ''
+        ? h('div', { className: 'dgt-placeholder' }, t('selectCommitFile'))
+        : props.fileDiffLoading
+          ? h('div', { className: 'dgt-placeholder' }, t('loading'))
+          : props.fileDiff && props.fileDiff.ok === false
+            ? h('div', { className: 'dgt-placeholder dgt-error' }, props.fileDiff.error || t('diffFailed'))
+            : props.fileDiff && props.fileDiff.binary
+              ? h('div', { className: 'dgt-placeholder' }, t('binaryFile'))
+              : props.fileDiff && props.fileDiff.files && props.fileDiff.files.length > 0
+                ? props.fileDiff.files.map((file, index) =>
+                    h(DiffFileBlock, { key: 'detail-file:' + String(index), file, t }),
+                  )
+                : h('div', { className: 'dgt-placeholder' }, t('noDiff')),
+    ),
+  )
+}
+
 export function HistoryView(props: {
   commits: HistoryCommit[]
   laneCount: number
@@ -56,10 +159,18 @@ export function HistoryView(props: {
   error: string
   scope: HistoryScope
   selectedSha: string
+  detail: CommitDetailPayload | null
+  detailLoading: boolean
+  detailError: string
+  selectedFile: string
+  fileDiff: DiffPayload | null
+  fileDiffLoading: boolean
   t: Translate
   onScope: (scope: HistoryScope) => void
   onSelect: (commit: HistoryCommit) => void
   onLoadMore: () => void
+  onSelectFile: (path: string) => void
+  onParent: (sha: string) => void
 }): any {
   const { commits, t } = props
 
@@ -135,7 +246,7 @@ export function HistoryView(props: {
                           }
                         },
                       },
-                      h('span', { className: 'dgt-hgraph' }, h(Graph, { commit })),
+                      h('span', { className: 'dgt-hgraph' }, graphOf(commit)),
                       h(
                         'span',
                         { className: 'dgt-hsubject', title: commit.subject },
@@ -143,11 +254,7 @@ export function HistoryView(props: {
                         commit.refs.map((ref) =>
                           h(
                             'span',
-                            {
-                              key: ref.kind + ':' + ref.name,
-                              className: 'dgt-refchip',
-                              'data-kind': ref.kind,
-                            },
+                            { key: ref.kind + ':' + ref.name, className: 'dgt-refchip', 'data-kind': ref.kind },
                             ref.name,
                           ),
                         ),
@@ -163,13 +270,29 @@ export function HistoryView(props: {
                         { className: 'dgt-hmore' },
                         h(
                           'button',
-                          { type: 'button', className: 'dgt-button', onClick: props.onLoadMore, disabled: props.loading },
+                          {
+                            type: 'button',
+                            className: 'dgt-button',
+                            onClick: props.onLoadMore,
+                            disabled: props.loading,
+                          },
                           t('loadMore'),
                         ),
                       )
                     : null,
                 ),
       ),
+      h(Detail, {
+        detail: props.detail,
+        detailLoading: props.detailLoading,
+        detailError: props.detailError,
+        selectedFile: props.selectedFile,
+        fileDiff: props.fileDiff,
+        fileDiffLoading: props.fileDiffLoading,
+        t,
+        onSelectFile: props.onSelectFile,
+        onParent: props.onParent,
+      }),
     ),
   )
 }

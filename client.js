@@ -58,6 +58,10 @@ var EN = {
   noCommits: "No commits yet.",
   historyFailed: "Could not read the history.",
   selectCommit: "Select a commit to see its detail.",
+  changedFiles: "Changed files",
+  parentsField: "Parents",
+  noFiles: "No files in this commit.",
+  selectCommitFile: "Select a file to see its diff.",
   itemsUnit: "items",
   commitMessageEmpty: "Write a message to commit.",
   commitShortcut: "\u2318\u21B5 to commit",
@@ -128,6 +132,10 @@ var ZH = {
   noCommits: "\u8FD8\u6CA1\u6709\u63D0\u4EA4\u3002",
   historyFailed: "\u8BFB\u53D6\u5386\u53F2\u5931\u8D25\u3002",
   selectCommit: "\u9009\u62E9\u4E00\u6761\u63D0\u4EA4\u67E5\u770B\u8BE6\u60C5\u3002",
+  changedFiles: "\u53D8\u66F4\u6587\u4EF6",
+  parentsField: "\u7236\u7EA7",
+  noFiles: "\u8BE5\u63D0\u4EA4\u6CA1\u6709\u53D8\u66F4\u6587\u4EF6\u3002",
+  selectCommitFile: "\u9009\u62E9\u6587\u4EF6\u67E5\u770B\u8BE5\u63D0\u4EA4\u5185\u7684\u5DEE\u5F02\u3002",
   itemsUnit: "\u9879",
   commitMessageEmpty: "\u586B\u5199\u63D0\u4EA4\u4FE1\u606F\u540E\u53EF\u63D0\u4EA4\u3002",
   commitShortcut: "\u2318\u21B5 \u63D0\u4EA4",
@@ -309,6 +317,41 @@ var CSS = `
 .dgt-hauthor,.dgt-hdate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   color:var(--dsw-alias-label-secondary);font-size:11.5px;}
 .dgt-hmore{display:flex;justify-content:center;padding:10px;}
+
+/* commit detail */
+.dgt-detail{flex:0 0 280px;max-height:46%;display:flex;min-height:0;border-top:1px solid var(--dsw-alias-border-l2);
+  background:var(--dsw-alias-bg-layer-1);}
+.dgt-detail-side{flex:0 0 320px;min-width:0;display:flex;flex-direction:column;overflow:hidden;
+  border-right:1px solid var(--dsw-alias-border-l2);}
+.dgt-detail-meta{flex:0 0 auto;display:flex;flex-direction:column;gap:2px;padding:8px 10px;
+  border-bottom:1px solid var(--dsw-alias-border-l1);}
+.dgt-detail-subject{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-detail-sha{font-family:var(--ds-font-family-code);font-size:11px;color:var(--dgt-meta);}
+.dgt-detail-line{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:11.5px;
+  color:var(--dsw-alias-label-secondary);}
+.dgt-detail-label{color:var(--dsw-alias-label-tertiary);}
+.dgt-link{appearance:none;border:0;background:transparent;padding:0 2px;color:var(--dsw-alias-brand-text);
+  font:inherit;font-family:var(--ds-font-family-code);font-size:11px;text-decoration:underline;cursor:pointer;}
+.dgt-detail-body{margin:4px 0 0;padding:0;max-height:56px;overflow:auto;white-space:pre-wrap;
+  font-size:11.5px;line-height:16px;color:var(--dsw-alias-label-secondary);}
+.dgt-detail-head{flex:0 0 auto;display:flex;align-items:center;height:24px;padding:0 10px;
+  background:var(--dsw-alias-bg-layer-2);border-bottom:1px solid var(--dsw-alias-border-l1);
+  color:var(--dsw-alias-label-secondary);font-size:11px;font-weight:600;}
+.dgt-detail-list{flex:1 1 auto;min-height:0;overflow:auto;padding:2px;}
+.dgt-detail-file{display:flex;align-items:center;gap:6px;width:100%;height:24px;padding:0 8px;
+  border:0;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;
+  text-align:left;cursor:pointer;}
+.dgt-detail-file:hover{background:var(--dsw-alias-interactive-bg-hover);}
+.dgt-detail-file[data-active]{background:var(--dsw-alias-interactive-bg-active);}
+.dgt-detail-letter{flex:0 0 auto;width:12px;text-align:center;font-family:var(--ds-font-family-code);
+  font-size:11px;font-weight:600;color:var(--dsw-alias-label-tertiary);}
+.dgt-detail-letter[data-status='added']{color:var(--dgt-ok);}
+.dgt-detail-letter[data-status='deleted']{color:var(--dgt-err);}
+.dgt-detail-letter[data-status='modified']{color:var(--dgt-warn);}
+.dgt-detail-letter[data-status='renamed']{color:var(--dsw-alias-brand-text);}
+.dgt-detail-path{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  direction:rtl;text-align:left;}
+.dgt-detail-diff{flex:1 1 auto;min-width:0;overflow:auto;background:var(--dsw-alias-bg-base);}
 .dgt-rail-btn{appearance:none;border:0;width:100%;background:transparent;text-align:left;
   font:inherit;font-size:13px;cursor:pointer;}
 
@@ -985,7 +1028,7 @@ function Line(props) {
     h("span", { className: "dgt-text" }, line.text)
   );
 }
-function FileBlock(props) {
+function DiffFileBlock(props) {
   const file = props.file;
   if (file.binary) {
     return h("div", { className: "dgt-placeholder" }, props.t("binaryFile"));
@@ -1045,7 +1088,7 @@ function DiffView(props) {
     h(
       "div",
       { className: "dgt-diff-body" },
-      entry === null ? h("div", { className: "dgt-empty" }, props.hasChanges ? t("noFileSelected") : t("nothingHint")) : loading ? h("div", { className: "dgt-empty" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-empty" }, diff.error || t("diffFailed")) : diff && diff.binary ? h("div", { className: "dgt-empty" }, t("binaryFile")) : diff && diff.files && diff.files.length > 0 ? diff.files.map((file, index) => h(FileBlock, { key: "file:" + String(index), file, t })) : h(
+      entry === null ? h("div", { className: "dgt-empty" }, props.hasChanges ? t("noFileSelected") : t("nothingHint")) : loading ? h("div", { className: "dgt-empty" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-empty" }, diff.error || t("diffFailed")) : diff && diff.binary ? h("div", { className: "dgt-empty" }, t("binaryFile")) : diff && diff.files && diff.files.length > 0 ? diff.files.map((file, index) => h(DiffFileBlock, { key: "file:" + String(index), file, t })) : h(
         "div",
         { className: "dgt-empty" },
         entry.kind === "untracked" ? t("untrackedNoDiff") : t("noDiff")
@@ -1176,8 +1219,7 @@ function formatDate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(text);
   return match ? match[1] + "-" + match[2] + "-" + match[3] + " " + match[4] + ":" + match[5] : text;
 }
-function Graph(props) {
-  const commit = props.commit;
+function graphOf(commit) {
   const y = ROW_HEIGHT / 2;
   const x = laneX(commit.lane);
   const edges = commit.parentLanes.map(
@@ -1203,6 +1245,81 @@ function Graph(props) {
     },
     edges,
     h("circle", { cx: x, cy: y, r: 4, fill: "currentColor" })
+  );
+}
+function Detail(props) {
+  const { detail, t } = props;
+  if (props.detailLoading && detail === null) {
+    return h("div", { className: "dgt-detail" }, h("div", { className: "dgt-placeholder" }, t("loading")));
+  }
+  if (props.detailError !== "") {
+    return h("div", { className: "dgt-detail" }, h("div", { className: "dgt-placeholder dgt-error" }, props.detailError));
+  }
+  if (detail === null) {
+    return h("div", { className: "dgt-detail" }, h("div", { className: "dgt-placeholder" }, t("selectCommit")));
+  }
+  const files = detail.files ?? [];
+  const parents = detail.parents ?? [];
+  return h(
+    "div",
+    { className: "dgt-detail" },
+    h(
+      "div",
+      { className: "dgt-detail-side" },
+      h(
+        "div",
+        { className: "dgt-detail-meta" },
+        h("div", { className: "dgt-detail-subject", title: detail.subject }, detail.subject ?? ""),
+        h("div", { className: "dgt-detail-sha" }, detail.sha ?? ""),
+        h("div", { className: "dgt-detail-line" }, (detail.author ?? "") + (detail.authorEmail ? " <" + detail.authorEmail + ">" : "")),
+        h("div", { className: "dgt-detail-line" }, formatDate(detail.date ?? "")),
+        parents.length > 0 ? h(
+          "div",
+          { className: "dgt-detail-line" },
+          h("span", { className: "dgt-detail-label" }, t("parentsField") + ": "),
+          parents.map(
+            (sha, index) => h(
+              "button",
+              {
+                key: sha + ":" + String(index),
+                type: "button",
+                className: "dgt-link",
+                onClick: () => props.onParent(sha)
+              },
+              sha.slice(0, 8)
+            )
+          )
+        ) : null,
+        detail.body ? h("pre", { className: "dgt-detail-body" }, detail.body) : null
+      ),
+      h("div", { className: "dgt-detail-head" }, t("changedFiles")),
+      files.length === 0 ? h("div", { className: "dgt-placeholder" }, t("noFiles")) : h(
+        "div",
+        { className: "dgt-detail-list" },
+        files.map(
+          (file) => h(
+            "button",
+            {
+              key: file.path,
+              type: "button",
+              className: "dgt-detail-file",
+              "data-active": props.selectedFile === file.path || void 0,
+              title: file.origPath ? file.path + " \u2190 " + file.origPath : file.path,
+              onClick: () => props.onSelectFile(file.path)
+            },
+            h("span", { className: "dgt-detail-letter", "data-status": file.status }, file.status[0].toUpperCase()),
+            h("span", { className: "dgt-detail-path" }, file.path)
+          )
+        )
+      )
+    ),
+    h(
+      "div",
+      { className: "dgt-detail-diff" },
+      props.selectedFile === "" ? h("div", { className: "dgt-placeholder" }, t("selectCommitFile")) : props.fileDiffLoading ? h("div", { className: "dgt-placeholder" }, t("loading")) : props.fileDiff && props.fileDiff.ok === false ? h("div", { className: "dgt-placeholder dgt-error" }, props.fileDiff.error || t("diffFailed")) : props.fileDiff && props.fileDiff.binary ? h("div", { className: "dgt-placeholder" }, t("binaryFile")) : props.fileDiff && props.fileDiff.files && props.fileDiff.files.length > 0 ? props.fileDiff.files.map(
+        (file, index) => h(DiffFileBlock, { key: "detail-file:" + String(index), file, t })
+      ) : h("div", { className: "dgt-placeholder" }, t("noDiff"))
+    )
   );
 }
 function HistoryView(props) {
@@ -1273,7 +1390,7 @@ function HistoryView(props) {
                   }
                 }
               },
-              h("span", { className: "dgt-hgraph" }, h(Graph, { commit })),
+              h("span", { className: "dgt-hgraph" }, graphOf(commit)),
               h(
                 "span",
                 { className: "dgt-hsubject", title: commit.subject },
@@ -1281,11 +1398,7 @@ function HistoryView(props) {
                 commit.refs.map(
                   (ref) => h(
                     "span",
-                    {
-                      key: ref.kind + ":" + ref.name,
-                      className: "dgt-refchip",
-                      "data-kind": ref.kind
-                    },
+                    { key: ref.kind + ":" + ref.name, className: "dgt-refchip", "data-kind": ref.kind },
                     ref.name
                   )
                 )
@@ -1300,12 +1413,28 @@ function HistoryView(props) {
             { className: "dgt-hmore" },
             h(
               "button",
-              { type: "button", className: "dgt-button", onClick: props.onLoadMore, disabled: props.loading },
+              {
+                type: "button",
+                className: "dgt-button",
+                onClick: props.onLoadMore,
+                disabled: props.loading
+              },
               t("loadMore")
             )
           ) : null
         )
-      )
+      ),
+      h(Detail, {
+        detail: props.detail,
+        detailLoading: props.detailLoading,
+        detailError: props.detailError,
+        selectedFile: props.selectedFile,
+        fileDiff: props.fileDiff,
+        fileDiffLoading: props.fileDiffLoading,
+        t,
+        onSelectFile: props.onSelectFile,
+        onParent: props.onParent
+      })
     )
   );
 }
@@ -1335,6 +1464,12 @@ function Workspace(props) {
   const [historyError, setHistoryError] = React.useState("");
   const [historyScope, setHistoryScope] = React.useState("all");
   const [historySha, setHistorySha] = React.useState("");
+  const [commitDetail, setCommitDetail] = React.useState(null);
+  const [commitDetailLoading, setCommitDetailLoading] = React.useState(false);
+  const [commitDetailError, setCommitDetailError] = React.useState("");
+  const [commitFile, setCommitFile] = React.useState("");
+  const [commitFileDiff, setCommitFileDiff] = React.useState(null);
+  const [commitFileDiffLoading, setCommitFileDiffLoading] = React.useState(false);
   const [statusError, setStatusError] = React.useState("");
   const [selected, setSelected] = React.useState(null);
   const [diff, setDiff] = React.useState(null);
@@ -1427,6 +1562,49 @@ function Workspace(props) {
       }
     },
     [historyCommits, historyScope, repoPath, t]
+  );
+  const loadCommitDetail = React.useCallback(
+    async (sha) => {
+      setCommitDetailLoading(true);
+      setCommitDetailError("");
+      setCommitDetail(null);
+      try {
+        const next = await fetchCommitInfo({ cwd: repoPath || void 0, sha });
+        if (!next.ok) {
+          setCommitDetailError(next.error || t("historyFailed"));
+        } else {
+          setCommitDetail(next);
+        }
+      } catch (error) {
+        setCommitDetailError(error instanceof Error ? error.message : String(error));
+      } finally {
+        setCommitDetailLoading(false);
+      }
+    },
+    [repoPath, t]
+  );
+  React.useEffect(() => {
+    if (view !== "history" || historySha === "") return;
+    setCommitFile("");
+    setCommitFileDiff(null);
+    void loadCommitDetail(historySha);
+  }, [historySha, view, repoPath]);
+  const openCommitFile = React.useCallback(
+    async (path) => {
+      if (historySha === "") return;
+      setCommitFile(path);
+      setCommitFileDiff(null);
+      setCommitFileDiffLoading(true);
+      try {
+        const next = await fetchDiff({ cwd: repoPath || void 0, path, commit: historySha });
+        setCommitFileDiff(next);
+      } catch (error) {
+        setCommitFileDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      } finally {
+        setCommitFileDiffLoading(false);
+      }
+    },
+    [historySha, repoPath]
   );
   React.useEffect(() => {
     if (view !== "history") return;
@@ -1584,12 +1762,20 @@ function Workspace(props) {
           error: historyError,
           scope: historyScope,
           selectedSha: historySha,
+          detail: commitDetail,
+          detailLoading: commitDetailLoading,
+          detailError: commitDetailError,
+          selectedFile: commitFile,
+          fileDiff: commitFileDiff,
+          fileDiffLoading: commitFileDiffLoading,
           t,
           onScope: (scope) => {
             setHistoryScope(scope);
             setHistorySha("");
           },
           onSelect: (commit2) => setHistorySha(commit2.sha),
+          onSelectFile: (path) => void openCommitFile(path),
+          onParent: (sha) => setHistorySha(sha),
           onLoadMore: () => void loadHistory(false)
         });
       case "status":

@@ -19,7 +19,7 @@ function Line(props: { line: DiffLine }): any {
   )
 }
 
-function FileBlock(props: { file: DiffFile; t: Translate }): any {
+export function DiffFileBlock(props: { file: DiffFile; t: Translate }): any {
   const file = props.file
   if (file.binary) {
     return h('div', { className: 'dgt-placeholder' }, props.t('binaryFile'))
@@ -105,7 +105,7 @@ export function DiffView(props: {
             : diff && diff.binary
               ? h('div', { className: 'dgt-empty' }, t('binaryFile'))
               : diff && diff.files && diff.files.length > 0
-                ? diff.files.map((file, index) => h(FileBlock, { key: 'file:' + String(index), file, t }))
+                ? diff.files.map((file, index) => h(DiffFileBlock, { key: 'file:' + String(index), file, t }))
                 : h(
                     'div',
                     { className: 'dgt-empty' },
