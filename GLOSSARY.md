@@ -64,6 +64,34 @@ _Avoid_: Chunk, patch, block
 One rendered line inside a hunk, classified as context, addition or deletion.
 _Avoid_: Row, code line
 
+**File status view** (文件状态视图):
+The workspace view that lists the working copy's changes; the default view.
+_Avoid_: Changes tab, working tree view
+
+**History view** (历史视图):
+The workspace view that lists commits newest-first as a lane graph with a detail pane for the selected commit.
+_Avoid_: Log, commit browser
+
+**Search view** (搜索视图):
+The workspace view that lists commits matching a query (message, author or path) using the history view's list.
+_Avoid_: Find, filter
+
+**Lane**:
+One column of the commit graph; a commit sits on a lane and lanes merge or split at merge commits.
+_Avoid_: Branch line, swim lane, column
+
+**Checkout** (检出):
+Switching the repository to a branch, moving `HEAD` and the working copy to it.
+_Avoid_: Switch, activate
+
+**Dirty working copy** (脏工作区):
+A working copy with staged, unstaged or conflicted changes; checkout refuses to run on one.
+_Avoid_: Uncommitted state, modified tree
+
+**Commit detail** (提交详情):
+The pane describing one selected commit: message, author, date, parents, refs and the files it changed.
+_Avoid_: Commit info, metadata
+
 **Rail** (左栏 / 引用树):
 The left column of the workspace panel that lists branches, remotes and tags.
 _Avoid_: Sidebar, navigator, tree
