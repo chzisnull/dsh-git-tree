@@ -158,6 +158,8 @@ export const EN: Record<string, string> = {
   aiPartialCatalog: 'Some providers could not be listed:',
   collapseCommit: 'Fold the commit box',
   expandCommit: 'Unfold the commit box',
+  foldCommit: 'Fold',
+  unfoldCommit: 'Unfold',
 }
 
 export const ZH: Record<string, string> = {
@@ -314,4 +316,6 @@ export const ZH: Record<string, string> = {
   aiPartialCatalog: '部分提供方的模型列表读取失败：',
   collapseCommit: '折叠提交区',
   expandCommit: '展开提交区',
+  foldCommit: '收起',
+  unfoldCommit: '展开',
 }

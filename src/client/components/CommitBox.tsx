@@ -86,8 +86,9 @@ export function CommitBox(props: {
           ? t('aiFromStaged')
           : t('aiFromAll')
 
-  /** The one control that folds and unfolds the card; only the visible half
-   *  renders it, so the DOM never carries two carets for one action. */
+  /** The one control that folds and unfolds the card: a labelled pill in the
+   *  meta row, so the same spot carries both states and the affordance is a
+   *  word ("Fold" / "Unfold"), not a bare caret nobody notices. */
   const toggle = () => h(
     'button',
     {
@@ -102,6 +103,7 @@ export function CommitBox(props: {
       },
       onKeyDown: (event: any) => event.stopPropagation(),
     },
+    h('span', { className: 'dgt-commit-toggle-label' }, collapsed ? t('unfoldCommit') : t('foldCommit')),
     h('span', { className: 'dgt-commit-caret', 'aria-hidden': 'true' }, '▾'),
   )
 
@@ -129,7 +131,7 @@ export function CommitBox(props: {
           preview || (staged > 0 ? t('commitMessageEmpty') : t('commitHint')),
         )
       : null,
-    collapsed ? toggle() : null,
+    toggle(),
   )
 
   // Folded the body keeps its DOM (so the height can animate) but leaves the
@@ -238,7 +240,6 @@ export function CommitBox(props: {
                   : null,
               )
             : null,
-          collapsed ? null : toggle(),
         ),
       ),
       h('textarea', {

@@ -187,7 +187,9 @@ var EN = {
   aiModelSaveFailed: "Could not save the model choice",
   aiPartialCatalog: "Some providers could not be listed:",
   collapseCommit: "Fold the commit box",
-  expandCommit: "Unfold the commit box"
+  expandCommit: "Unfold the commit box",
+  foldCommit: "Fold",
+  unfoldCommit: "Unfold"
 };
 var ZH = {
   panel: "Git",
@@ -342,7 +344,9 @@ var ZH = {
   aiModelSaveFailed: "\u4FDD\u5B58\u6A21\u578B\u9009\u62E9\u5931\u8D25",
   aiPartialCatalog: "\u90E8\u5206\u63D0\u4F9B\u65B9\u7684\u6A21\u578B\u5217\u8868\u8BFB\u53D6\u5931\u8D25\uFF1A",
   collapseCommit: "\u6298\u53E0\u63D0\u4EA4\u533A",
-  expandCommit: "\u5C55\u5F00\u63D0\u4EA4\u533A"
+  expandCommit: "\u5C55\u5F00\u63D0\u4EA4\u533A",
+  foldCommit: "\u6536\u8D77",
+  unfoldCommit: "\u5C55\u5F00"
 };
 
 // src/client/styles.ts
@@ -629,27 +633,35 @@ var CSS = `
 /* Folded: one strip that gives the diff the space back. Clicking it unfolds.
    The body keeps its DOM so 0fr \u2192 1fr can animate the height without measuring;
    folded it is inert, so the hidden controls leave the tab order too. */
-.dgt-commit{transition:padding .2s cubic-bezier(.2,.8,.2,1),gap .2s cubic-bezier(.2,.8,.2,1);}
-.dgt-commit-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .2s cubic-bezier(.2,.8,.2,1);}
+.dgt-commit{transition:padding .22s cubic-bezier(.2,.8,.2,1),gap .22s cubic-bezier(.2,.8,.2,1),
+  box-shadow .22s ease;}
+.dgt-commit-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .22s cubic-bezier(.2,.8,.2,1);}
 .dgt-commit-body[data-folded='true']{grid-template-rows:0fr;}
-.dgt-commit-body-inner{min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px;}
-.dgt-commit[data-collapsed]{padding:7px 10px 7px 12px;gap:0;}
-.dgt-commit[data-collapsed] .dgt-commit-meta{width:100%;gap:9px;cursor:pointer;border-radius:8px;
-  outline:none;min-height:24px;}
+.dgt-commit-body-inner{min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px;
+  opacity:1;transition:opacity .18s ease .05s;}
+.dgt-commit-body[data-folded='true'] .dgt-commit-body-inner{opacity:0;transition:opacity .1s ease;}
+.dgt-commit[data-collapsed]{padding:7px 10px 7px 12px;gap:0;box-shadow:0 1px 4px var(--dsw-alias-bg-mask-1);}
+.dgt-commit[data-collapsed] .dgt-commit-meta{width:100%;gap:9px;cursor:pointer;min-height:24px;}
 .dgt-commit[data-collapsed] .dgt-commit-meta:hover .dgt-commit-preview{color:var(--dsw-alias-label-secondary);}
-.dgt-commit[data-collapsed] .dgt-commit-meta:focus-visible{box-shadow:0 0 0 2px var(--dgt-line);}
-@media (prefers-reduced-motion:reduce){.dgt-commit,.dgt-commit-body{transition:none;}}
 .dgt-commit-preview{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  text-align:right;color:var(--dsw-alias-label-secondary);font-size:11px;}
+  text-align:right;color:var(--dsw-alias-label-tertiary);font-size:11px;transition:color .15s ease;}
 .dgt-commit-preview[data-empty]{color:var(--dsw-alias-label-tertiary);}
-.dgt-commit-toggle{appearance:none;display:inline-flex;align-items:center;justify-content:center;
-  flex:0 0 auto;width:24px;height:24px;padding:0;border:0;border-radius:7px;background:transparent;
-  color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;}
-.dgt-commit-toggle:hover{background:var(--dgt-line-soft);color:var(--dsw-alias-label-primary);}
-.dgt-commit-caret{font-size:10px;line-height:1;transition:transform .15s ease;}
+/* The fold control is a labelled pill, not a bare caret: same spot in both
+   states, a word that says what happens, and a border so it reads as a button. */
+.dgt-commit-toggle{appearance:none;display:inline-flex;align-items:center;gap:5px;flex:0 0 auto;
+  margin-left:auto;height:24px;padding:0 8px 0 9px;border:1px solid var(--dgt-line);border-radius:8px;
+  background:var(--dgt-card);color:var(--dsw-alias-label-secondary);font:inherit;font-size:10.5px;
+  line-height:1;cursor:pointer;transition:background .15s ease,border-color .15s ease,color .15s ease;}
+.dgt-commit-toggle:hover{border-color:color-mix(in srgb, var(--dgt-accent) 35%, var(--dgt-line));
+  background:var(--dgt-accent-soft);color:var(--dgt-accent-strong);}
+.dgt-commit-toggle:focus-visible{outline:none;border-color:var(--dgt-accent);
+  box-shadow:0 0 0 2px var(--dgt-accent-soft);}
+.dgt-commit-toggle-label{white-space:nowrap;}
+.dgt-commit-caret{font-size:10px;line-height:1;transition:transform .22s cubic-bezier(.2,.8,.2,1);}
 .dgt-commit[data-collapsed] .dgt-commit-caret{transform:rotate(180deg);}
-.dgt-commit-label .dgt-commit-toggle{margin-left:-2px;}
-@media (prefers-reduced-motion:reduce){.dgt-commit-caret{transition:none}}
+@media (prefers-reduced-motion:reduce){
+  .dgt-commit,.dgt-commit-body,.dgt-commit-body-inner,.dgt-commit-caret,.dgt-commit-toggle{transition:none;}
+}
 .dgt-commit-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dsw-alias-label-secondary);}
 .dgt-avatar{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;
   background:var(--dgt-accent-soft);color:var(--dgt-accent-strong);font-size:9.5px;font-weight:600;flex:0 0 auto;}
@@ -711,8 +723,8 @@ var CSS = `
   background:var(--dgt-accent-strong);color:var(--dsw-alias-label-primary-inverted);
   font:inherit;font-size:12px;font-weight:500;cursor:pointer;box-shadow:0 3px 10px color-mix(in srgb, var(--dgt-accent) 28%, transparent);}
 .dgt-primary:hover:not(:disabled){opacity:.94;}
-.dgt-primary:disabled{border:1px dashed color-mix(in srgb, var(--dsw-alias-label-tertiary) 60%, var(--dgt-line));
-  background:transparent;color:var(--dsw-alias-label-tertiary);box-shadow:none;cursor:default;}
+.dgt-primary:disabled{background:var(--dgt-accent-strong);color:var(--dsw-alias-label-primary-inverted);
+  opacity:.45;box-shadow:none;cursor:default;}
 .dgt-button,.dgt-clear{appearance:none;height:31px;padding:0 14px;border:1px solid var(--dgt-line);
   border-radius:9px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:12px;cursor:pointer;}
 .dgt-button:hover,.dgt-clear:hover{background:var(--dgt-line-soft);color:var(--dsw-alias-label-primary);}
@@ -1718,6 +1730,7 @@ function CommitBox(props) {
       },
       onKeyDown: (event) => event.stopPropagation()
     },
+    h("span", { className: "dgt-commit-toggle-label" }, collapsed ? t("unfoldCommit") : t("foldCommit")),
     h("span", { className: "dgt-commit-caret", "aria-hidden": "true" }, "\u25BE")
   );
   const preview = props.message.trim().split("\n")[0] ?? "";
@@ -1742,7 +1755,7 @@ function CommitBox(props) {
       { className: "dgt-commit-preview", "data-empty": preview === "" ? true : void 0 },
       preview || (staged > 0 ? t("commitMessageEmpty") : t("commitHint"))
     ) : null,
-    collapsed ? toggle() : null
+    toggle()
   );
   const body = h(
     "div",
@@ -1834,8 +1847,7 @@ function CommitBox(props) {
               { className: "dgt-ai-menu-failure" },
               t("aiPartialCatalog") + " " + ai.failures.map((failure) => failure.name).join("\u3001")
             ) : null
-          ) : null,
-          collapsed ? null : toggle()
+          ) : null
         )
       ),
       h("textarea", {
