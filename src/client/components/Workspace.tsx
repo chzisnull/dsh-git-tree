@@ -4,6 +4,8 @@
 
 import { h, React } from '../react'
 import type {
+  AiCommitControls,
+  AiModelsPayload,
   EntrySide,
   GitFileEntry,
   GitStatusPayload,
@@ -21,11 +23,14 @@ import {
   checkoutBranch,
   commitChanges,
   discardPaths,
+  generateCommitMessage,
   mergeBranch,
   pushBranch,
   createBranch,
   deleteBranch,
   renameBranch,
+  fetchAiModels,
+  saveAiModel,
   fetchCommitInfo,
   fetchDiff,
   fetchHistory,
@@ -37,7 +42,7 @@ import {
   stagePaths,
   unstagePaths,
 } from '../routes'
-import { rowKey, sideFor, splitEntries } from '../model'
+import { rowKey, sideFor, splitEntries, statusLetter } from '../model'
 import { TopBar } from './TopBar'
 import { RefRail } from './RefRail'
 import { StatusView } from './views/StatusView'
@@ -61,7 +66,10 @@ function sideOf(entry: GitFileEntry): EntrySide {
   return 'unstaged'
 }
 
-export function Workspace(props: { t?: Translate }): any {
+/** What the commit card needs from the AI model catalog; one object, one prop. */
+export type AiCommitProps = AiCommitControls
+
+export function Workspace(props: { t?: Translate; locale?: () => string }): any {
   const t: Translate = typeof props.t === 'function' ? props.t : (key: string) => key
 
   const [status, setStatus] = React.useState<GitStatusPayload | null>(null)
@@ -99,6 +107,9 @@ export function Workspace(props: { t?: Translate }): any {
   } | null>(null)
   const [contextMenu, setContextMenu] = React.useState<ContextMenuState | null>(null)
   const [pushAfter, setPushAfter] = React.useState(false)
+  const [aiModels, setAiModels] = React.useState<AiModelsPayload | null>(null)
+  const [aiLoading, setAiLoading] = React.useState(false)
+  const [aiBusy, setAiBusy] = React.useState(false)
   const [dialogBusy, setDialogBusy] = React.useState(false)
   const [dialogError, setDialogError] = React.useState('')
   const [statusError, setStatusError] = React.useState('')
@@ -156,6 +167,89 @@ export function Workspace(props: { t?: Translate }): any {
       /* the rail degrades to empty groups */
     }
   }, [repoPath])
+
+  /** Refresh the live DSH model catalog and the route the card will call. */
+  const loadAiModels = React.useCallback(async () => {
+    setAiLoading(true)
+    try {
+      const next = await fetchAiModels()
+      setAiModels(next.ok ? next : { ok: false, groups: [], failures: [], active: null, error: next.error })
+    } catch {
+      setAiModels({ ok: false, groups: [], failures: [], active: null })
+    } finally {
+      setAiLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    void loadAiModels()
+  }, [loadAiModels])
+
+  /**
+   * Write the commit message from the files the commit would include: the
+   * staged rows when there are any, otherwise every working-tree row (so a
+   * message can be drafted before staging).
+   */
+  const generateMessage = React.useCallback(async () => {
+    if (busyRef.current || aiBusy) return
+    const all = status?.entries ?? []
+    const staged = all.filter((entry) => entry.staged && !entry.conflicted)
+    const side: 'staged' | 'unstaged' = staged.length > 0 ? 'staged' : 'unstaged'
+    const source = (staged.length > 0 ? staged : all.filter((entry) => !entry.conflicted && entry.kind !== 'ignored')).slice(
+      0,
+      60,
+    )
+    const files = source.map((entry) => ({ path: entry.path, status: statusLetter(entry, side) }))
+    if (files.length === 0) {
+      showToast(t('aiNoChanges'))
+      return
+    }
+    setAiBusy(true)
+    setActionError('')
+    try {
+      const locale = typeof props.locale === 'function' ? props.locale() : 'en'
+      const payload = await generateCommitMessage({ side, files, locale }, repoPath || undefined)
+      if (!payload.ok || typeof payload.message !== 'string' || payload.message === '') {
+        throw new Error(payload.error || t('aiFailed'))
+      }
+      setMessage(payload.message)
+      showToast(t('aiDone'))
+      setTimeout(() => {
+        if (commitInput.current && commitInput.current.focus) commitInput.current.focus()
+      }, 0)
+    } catch (error) {
+      const text = error instanceof Error ? error.message : String(error)
+      setActionError(text)
+      showToast(text)
+    } finally {
+      setAiBusy(false)
+    }
+  }, [aiBusy, props.locale, repoPath, showToast, status, t])
+
+  const selectAiModel = React.useCallback(
+    async (provider: string, model: string) => {
+      try {
+        const saved = await saveAiModel(provider, model)
+        if (!saved.ok) throw new Error(saved.error || t('aiModelSaveFailed'))
+        await loadAiModels()
+        showToast(t('aiModelSwitched'))
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error))
+      }
+    },
+    [loadAiModels, showToast, t],
+  )
+
+  const aiCommit: AiCommitProps = {
+    loading: aiLoading,
+    busy: aiBusy,
+    groups: aiModels?.groups ?? [],
+    failures: aiModels?.failures ?? [],
+    active: aiModels?.active ?? null,
+    error: aiModels?.error || (aiModels && aiModels.ok === false ? t('aiFailed') : ''),
+    onGenerate: () => void generateMessage(),
+    onSelect: (provider: string, model: string) => void selectAiModel(provider, model),
+  }
 
   const openDiff = React.useCallback(async (entry: GitFileEntry, side: EntrySide) => {
     setSelected({ path: entry.path, side })
@@ -896,6 +990,7 @@ export function Workspace(props: { t?: Translate }): any {
           onPushAfter: setPushAfter,
           onMessage: setMessage,
           onCommit: () => void commit(),
+          ai: aiCommit,
         })
     }
   }

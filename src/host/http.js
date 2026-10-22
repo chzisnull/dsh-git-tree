@@ -19,6 +19,20 @@ export function failure(error) {
   return json({ ok: false, error: message, code }, status)
 }
 
+/** Read a request body that must be one JSON object; anything else is a 400. */
+export async function readJsonBody(request) {
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    throw new RequestError('请求体必须是 JSON 对象')
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new RequestError('请求体必须是 JSON 对象')
+  }
+  return body
+}
+
 /** Wrap a handler so a thrown error never escapes into the HTTP bridge. */
 export function guard(handler) {
   return async (request) => {

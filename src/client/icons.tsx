@@ -88,3 +88,23 @@ export function TerminalIcon(): any {
     h('path', { d: 'M8.2 10.1h3.2', fill: 'none', stroke: 'currentColor', strokeWidth: 1.2, strokeLinecap: 'round' }),
   ])
 }
+
+/** The "write it for me" spark: four points, inheriting the text colour. */
+export function SparkIcon(): any {
+  return svg([
+    h('path', {
+      d: 'M8 1.9 9.35 6.1 13.6 7.4 9.35 8.7 8 12.9 6.65 8.7 2.4 7.4 6.65 6.1 8 1.9Z',
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 1.15,
+      strokeLinejoin: 'round',
+    }),
+    h('path', {
+      d: 'M12.6 2.2v2.1M11.55 3.25h2.1',
+      fill: 'none',
+      stroke: 'currentColor',
+      strokeWidth: 1,
+      strokeLinecap: 'round',
+    }),
+  ])
+}

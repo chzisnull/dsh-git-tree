@@ -4,6 +4,7 @@
 
 import { h } from '../../react'
 import type {
+  AiCommitControls,
   DiffPayload,
   EntrySide,
   GitFileEntry,
@@ -37,6 +38,7 @@ export function StatusView(props: {
   canPush: boolean
   pushAfter: boolean
   onPushAfter: (value: boolean) => void
+  ai: AiCommitControls
 }): any {
   const { t } = props
 
@@ -83,6 +85,7 @@ export function StatusView(props: {
           onPushAfter: props.onPushAfter,
           onMessage: props.onMessage,
           onCommit: props.onCommit,
+          ai: props.ai,
         }),
       ),
     ),

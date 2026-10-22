@@ -113,6 +113,15 @@ export async function runProcess(subprocess, command, argv, cwd, options = {}) {
   return { code: outcome.exitCode, out: stdout?.text ?? '', err: (stderr?.text ?? '').trim() }
 }
 
+/** The checked-out branch, or '' when HEAD is detached. */
+export async function currentBranchOf(subprocess, cwd) {
+  try {
+    return (await git(subprocess, ['symbolic-ref', '--short', '-q', 'HEAD'], cwd, { maxBytes: 8 * 1024 })).trim()
+  } catch {
+    return ''
+  }
+}
+
 /** Run git and throw on a non-zero exit, carrying git's own message. */
 export async function git(subprocess, argv, cwd, options) {
   const result = await execGit(subprocess, argv, cwd, options)

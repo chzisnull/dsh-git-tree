@@ -6,9 +6,9 @@
 
 ![Git 工作区面板](docs/design/frame2-workspace.png)
 
-## 0.6.1 能做什么
+## 0.7.0 能做什么
 
-这一版是**本地 Git 工作台**：文件状态、历史、搜索、本地分支——读改动、暂存、提交、切分支、看任意一次提交，全在面板里完成，并支持推送当前分支。fetch / pull、远程分支和远端管理还没有做。
+这一版是**本地 Git 工作台**：文件状态、历史、搜索、本地分支——读改动、暂存、提交、切分支、看任意一次提交，全在面板里完成，支持推送当前分支，也可以让 DSH 里的模型来写提交信息。fetch / pull、远程分支和远端管理还没有做。
 
 - **一个 `main` 面板**，入口是左侧图标栏里的 `Git` 一行——和「插件」页面用的是同一类座位，所以它自动拿到整个中栏、窗口顶部安全区和 DSH 的深浅色。
 - **顶部仓库切换**：列出 DSH 已注册的 workspace，选中哪个，所有路由就作用在哪个仓库。
@@ -23,13 +23,14 @@
 - **右键操作**：改动行可提交（暂存并聚焦提交框）、暂存/取消暂存、放弃更改、删除文件 / 删除未跟踪文件、复制路径；分支行可检出、重命名、删除、复制名称；提交行可复制 SHA、从此提交新建分支、复制提交信息。危险操作先确认，只有可执行的破坏项是红色。
 - **推送**：把当前分支推到它的 upstream（首次推送自动建立跟踪）。永不 force；认证失败和非快进会被翻译成可读的下一步提示。
 - **提交并推送**：提交卡片里的复选框，提交成功后立即推送；推送失败不会回滚提交。
+- **AI 生成提交信息**：提交卡片里的 ✨ 按钮，按这次提交会包含的文件（有暂存就用暂存，没有就用全部改动）的 diff 生成提交信息；旁边的模型按钮从 DSH 的实时模型列表（所有已注册提供方，分组展示）里挑模型。选择按 DSH home 记住，调用本身走 DSH 自己的 `llm` 服务，插件里不另配一套 provider。它只把文字填进输入框——仍然由你检查、点提交。所选文件的 diff 会发给你选中的模型。
 - **本地动作**：在 Finder 中显示、在终端打开（macOS）。
 - **实时**：面板可见时每 2 秒刷新，写操作后立即刷新。
 - **写操作面很小**：stage / unstage / commit、放弃更改、删除、分支新建-重命名-删除、检出、合并到当前分支，以及一个永不 force 的当前分支推送。没有 `reset --hard`、没有 force push、没有 amend、没有 rebase、没有 stash 路由。
 
 ## 状态
 
-| 能力 | 0.6.1 |
+| 能力 | 0.7.0 |
 | --- | --- |
 | `main` 面板 + 侧栏入口 | 已完成 |
 | 仓库切换（DSH workspaces） | 已完成 |
@@ -37,6 +38,7 @@
 | 冲突 / 已暂存 / 未暂存分组 | 已完成 |
 | 结构化单文件 diff | 已完成 |
 | 暂存 / 取消暂存 / 提交 | 已完成 |
+| AI 生成提交信息 + DSH 模型选择 | 已完成 |
 | 历史视图（泳道 / 分页 / 过滤） | 已完成 |
 | 提交详情 + 提交内 diff | 已完成 |
 | 搜索（信息 / 作者 / 路径） | 已完成 |
@@ -63,21 +65,43 @@
 - Sourcetree 的 diff **没有语法高亮**，只用整行底色区分增删。这个面板刻意保持一致——diff 里「哪几行变了」比「哪个 token 是关键字」重要。
 - 所有颜色都是 `--dsw-alias-*` 主题 token，深浅色不用做第二套设计。一旦有人写死颜色，`npm test` 会直接失败。
 
+## AI 生成提交信息
+
+提交卡片里的 ✨ 按钮和模型按钮，是一个刻意做小的功能：
+
+- **用哪个模型**：列表来自 `ctx.llm` 的实时目录——DSH 注册的每个提供方，以及它声明的模型。和 DSH 模型选择器看到的是同一份数据，每次请求现取，所以你在 DSH 设置里新加的模型不用重开面板就能出现在这里。
+- **用哪些文件**：这次提交会包含的文件的 diff——有暂存就用暂存行，没有就用工作区行。未跟踪文件只贡献路径不贡献内容（`git diff` 没有可对比的一侧）；diff 超过 24 KB 会被截断并标注。
+- **会发出去什么**：文件列表和这份 diff，发给你选中的模型，每按一次发一次。没有别的——不发送提交历史、凭据或会话上下文。
+- **它不做什么**：不提交、不暂存、不改文件。文字只填进输入框，由你修改或放弃。
+- **选择存在哪**：`~/.dsh/git-tree/ai-settings.json`（或 `$DSH_HOME/git-tree/ai-settings.json`），由宿主半写入。没有保存过就用 DSH 默认 Agent 模型；如果那条路由已不在列表里，卡片显示「选择模型」而不是去调用一条坏路由。
+- **失败会明说**：缺凭据、限流、模型想调用工具、空回复、超时，各自返回自己的提示，而不是一句笼统的错误。
+
 ## 在 DSH 里怎么接
 
 | 半边 | 文件 | 作用 |
 | --- | --- | --- |
-| Host | `index.js`（纯 ESM，无构建） | 用 `ctx.connection.fetch.register` 注册七条带鉴权的 exact Fetch 路由，用 `ctx.subprocess` 跑 git |
+| Host | `index.js`（纯 ESM，无构建） | 用 `ctx.connection.fetch.register` 注册一组带鉴权的 exact Fetch 路由（见下），用 `ctx.subprocess` 跑 git，用 `ctx.llm` 生成提交信息 |
 | Client | `client.js`（由 `src/client/index.tsx` 构建） | 把侧栏图标注册进 `sidebar.panellist`、把面板注册进 `main`，两者共用 id `git-tree` |
 
 ```
 GET  /api/git-tree/workspaces          → DSH 已注册 workspace
 GET  /api/git-tree/status?cwd=…        → 分支、upstream、ahead/behind、entries、counts
-GET  /api/git-tree/diff?path=…&side=…  → files → hunks → lines、统计
-GET  /api/git-tree/refs?cwd=…          → 分支、远程、标签
+GET  /api/git-tree/diff?path=…&side=…  → files → hunks → lines、统计（或 commit=<sha>）
+GET  /api/git-tree/refs?cwd=…          → 本地分支、标签
+GET  /api/git-tree/history?scope=…     → 带泳道的提交、分页、过滤
+GET  /api/git-tree/commit-info?sha=…   → 元信息、父级、refs、变更文件
+GET  /api/git-tree/ai/models           → DSH 模型目录 + 已保存/默认路由
 POST /api/git-tree/stage               → { paths[] }
 POST /api/git-tree/unstage             → { paths[] }
 POST /api/git-tree/commit              → { message } → { sha, shortSha, subject }
+POST /api/git-tree/commit-message      → { side, files[] } → { message }（一次模型调用）
+POST /api/git-tree/ai/model            → { provider, model } → 记住选择
+POST /api/git-tree/checkout            → { branch } → 脏工作区拒绝
+POST /api/git-tree/branch/create|rename|delete
+POST /api/git-tree/open                → { target: 'finder' | 'terminal' }
+POST /api/git-tree/push                → 当前分支 → 它的 upstream（永不 force）
+POST /api/git-tree/discard             → { paths[], side } → git restore
+POST /api/git-tree/remove              → { paths[], untracked } → git rm / git clean
 ```
 
 git 不走 shell；子进程环境带 `GIT_TERMINAL_PROMPT=0`（永不卡在认证）、`GIT_OPTIONAL_LOCKS=0`（不在你的仓库里拿可选锁）、`GIT_CONFIG_COUNT=0`，输出与耗时都有上限。绝对路径、含 `..`、以 `-` 开头的路径在进入 `argv` 之前就被拒绝；工作区之外的 `cwd` 一律 403。

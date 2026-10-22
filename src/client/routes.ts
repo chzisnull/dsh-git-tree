@@ -3,6 +3,8 @@
 // the session cookie and passes the Connection fence.
 
 import type {
+  AiMessagePayload,
+  AiModelsPayload,
   DiffPayload,
   HistoryPayload,
   MutationPayload,
@@ -32,6 +34,9 @@ const STAGE_ROUTE = 'api/git-tree/stage'
 const UNSTAGE_ROUTE = 'api/git-tree/unstage'
 const COMMIT_ROUTE = 'api/git-tree/commit'
 const OPEN_ROUTE = 'api/git-tree/open'
+const AI_MODELS_ROUTE = 'api/git-tree/ai/models'
+const AI_MODEL_ROUTE = 'api/git-tree/ai/model'
+const COMMIT_MESSAGE_ROUTE = 'api/git-tree/commit-message'
 
 function query(params: Record<string, string | undefined>): string {
   const search = new URLSearchParams()
@@ -142,4 +147,24 @@ export function commitChanges(message: string, cwd?: string): Promise<MutationPa
 
 export function openLocal(target: OpenTarget, cwd?: string): Promise<OpenPayload> {
   return postJson<OpenPayload>(OPEN_ROUTE + query({ cwd }), { target })
+}
+
+export function fetchAiModels(signal?: AbortSignal): Promise<AiModelsPayload> {
+  return getJson<AiModelsPayload>(AI_MODELS_ROUTE, {}, signal)
+}
+
+export function saveAiModel(provider: string, model: string): Promise<AiModelsPayload> {
+  return postJson<AiModelsPayload>(AI_MODEL_ROUTE, { provider, model })
+}
+
+/** Ask the selected model to write a commit message for the given files. */
+export function generateCommitMessage(
+  input: {
+    side: 'staged' | 'unstaged'
+    files: { path: string; status: string }[]
+    locale: string
+  },
+  cwd?: string,
+): Promise<AiMessagePayload> {
+  return postJson<AiMessagePayload>(COMMIT_MESSAGE_ROUTE + query({ cwd }), input)
 }

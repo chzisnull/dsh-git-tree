@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "Git 工作区",
-    "description": "类 Sourcetree 的 Git 工作区面板：本地分支、工作区改动与差异预览，占满主面板高度。"
+    "description": "类 Sourcetree 的 Git 工作区面板：本地分支、工作区改动、差异预览，还能让 AI 写提交信息，占满主面板高度。"
   }
 }

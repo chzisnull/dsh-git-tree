@@ -1,14 +1,28 @@
 // Commit box pinned to the bottom, Sourcetree's shape: author, branch, staged
 // count, a message editor, and one primary action. There is no second confirm
 // dialog — the box itself is the confirmation, as in Sourcetree.
+//
+// Two auxiliary controls sit in the message label row: "AI generate" writes the
+// message from the selected files, and the model chip picks which DSH model
+// does it. The model list is the host's live catalog, so the panel never keeps
+// a second copy of it.
 
 import { h } from '../react'
-import type { GitStatusPayload, Translate } from '../types'
+import { usePopover } from '../menu'
+import { SparkIcon } from '../icons'
+import type { AiModelGroup, AiModelRoute, GitStatusPayload, Translate } from '../types'
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
   if (parts.length === 0) return '?'
   return (parts[0][0] + (parts[1]?.[0] ?? '')).toUpperCase()
+}
+
+/** Short label the chip shows: the model name, trimmed to fit the card. */
+function shortModelName(route: AiModelRoute | null, t: Translate): string {
+  if (!route) return t('aiNoModel')
+  const name = route.label || route.model
+  return name.length > 26 ? name.slice(0, 25) + '…' : name
 }
 
 export function CommitBox(props: {
@@ -24,14 +38,27 @@ export function CommitBox(props: {
   canPush: boolean
   pushAfter: boolean
   onPushAfter: (value: boolean) => void
+  ai: {
+    loading: boolean
+    busy: boolean
+    groups: AiModelGroup[]
+    failures: { id: string; name: string; message: string }[]
+    active: AiModelRoute | null
+    onGenerate: () => void
+    onSelect: (provider: string, model: string) => void
+  }
 }): any {
-  const { status, t } = props
+  const { status, t, ai } = props
   const identity = status?.identity
   const staged = status?.counts?.staged ?? 0
+  const unstaged = status?.counts?.unstaged ?? 0
   const conflicts = status?.counts?.conflicted ?? 0
   const branch = status?.branch || '—'
   const blocked = conflicts > 0
   const canCommit = staged > 0 && props.message.trim() !== '' && !blocked && !props.busy
+  const hasChanges = staged + unstaged > 0
+  const canGenerate = hasChanges && !ai.busy && !props.busy && !blocked && ai.active !== null
+  const picker = usePopover()
 
   const defaultHint = blocked
     ? t('conflictsBlockCommit')
@@ -40,6 +67,16 @@ export function CommitBox(props: {
       : props.message.trim() === ''
         ? t('commitMessageEmpty')
         : t('commitShortcut')
+
+  const generateTitle = !hasChanges
+    ? t('aiNoChanges')
+    : blocked
+      ? t('conflictsBlockCommit')
+      : ai.active === null
+        ? t('aiNoModelTip')
+        : staged > 0
+          ? t('aiFromStaged')
+          : t('aiFromAll')
 
   return h(
     'div',
@@ -60,6 +97,96 @@ export function CommitBox(props: {
       'div',
       { className: 'dgt-commit-label' },
       h('span', null, t('commitMessageLabel')),
+      h(
+        'div',
+        { className: 'dgt-ai' },
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'dgt-ai-generate',
+            'data-busy': ai.busy ? 'true' : undefined,
+            disabled: !canGenerate,
+            title: generateTitle,
+            onClick: ai.onGenerate,
+          },
+          h(SparkIcon, null),
+          ai.busy ? t('aiGenerating') : t('aiGenerate'),
+        ),
+        h(
+          'button',
+          {
+            type: 'button',
+            className: 'dgt-ai-chip',
+            title: t('aiModelTip'),
+            'aria-haspopup': 'listbox',
+            'aria-expanded': picker.open,
+            ref: picker.triggerRef,
+            onClick: picker.toggle,
+          },
+          h('span', { className: 'dgt-ai-chip-name' }, shortModelName(ai.active, t)),
+          h('span', { className: 'dgt-ai-caret', 'aria-hidden': 'true' }, '▾'),
+        ),
+        picker.open
+          ? h(
+              'div',
+              {
+                className: 'dgt-ai-menu',
+                role: 'listbox',
+                'aria-label': t('aiModel'),
+                ref: picker.menuRef,
+              },
+              h('div', { className: 'dgt-ai-menu-head' }, t('aiModelTip')),
+              ai.loading
+                ? h('div', { className: 'dgt-ai-menu-empty' }, t('loading'))
+                : ai.groups.length === 0
+                  ? h('div', { className: 'dgt-ai-menu-empty' }, ai.error || t('aiNoModelTip'))
+                  : ai.groups.map((group) =>
+                      h(
+                        'div',
+                        { className: 'dgt-ai-group', key: group.id },
+                        h('div', { className: 'dgt-ai-group-title' }, group.name),
+                        group.models.map((model) =>
+                          h(
+                            'button',
+                            {
+                              key: group.id + '/' + model.id,
+                              type: 'button',
+                              className: 'dgt-ai-option',
+                              role: 'option',
+                              'aria-selected': ai.active?.provider === group.id && ai.active?.model === model.id,
+                              'data-current':
+                                ai.active?.provider === group.id && ai.active?.model === model.id
+                                  ? true
+                                  : undefined,
+                              onClick: () => {
+                                picker.close()
+                                ai.onSelect(group.id, model.id)
+                              },
+                            },
+                            h(
+                              'span',
+                              { className: 'dgt-ai-option-check' },
+                              ai.active?.provider === group.id && ai.active?.model === model.id ? '✓' : '',
+                            ),
+                            h('span', { className: 'dgt-ai-option-name' }, model.name || model.id),
+                            model.name && model.name !== model.id
+                              ? h('span', { className: 'dgt-ai-option-id' }, model.id)
+                              : null,
+                          ),
+                        ),
+                      ),
+                    ),
+              ai.failures.length > 0
+                ? h(
+                    'div',
+                    { className: 'dgt-ai-menu-failure' },
+                    t('aiPartialCatalog') + ' ' + ai.failures.map((failure) => failure.name).join('、'),
+                  )
+                : null,
+            )
+          : null,
+      ),
     ),
     h('textarea', {
       className: 'dgt-commit-input',

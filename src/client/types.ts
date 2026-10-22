@@ -209,4 +209,57 @@ export interface MutationPayload {
   upstream?: string
 }
 
+/** One model route in the commit-message picker. */
+export interface AiModelRoute {
+  provider: string
+  model: string
+  label: string
+}
+
+/** One provider group of the DSH model catalog. */
+export interface AiModelGroup {
+  id: string
+  name: string
+  models: { provider: string; id: string; name: string; description?: string }[]
+}
+
+export interface AiModelFailure {
+  id: string
+  name: string
+  message: string
+}
+
+export interface AiModelsPayload {
+  ok: boolean
+  groups?: AiModelGroup[]
+  failures?: AiModelFailure[]
+  default?: { provider: string; model: string } | null
+  selected?: { provider: string; model: string } | null
+  active?: AiModelRoute | null
+  error?: string
+  code?: string
+}
+
+export interface AiMessagePayload {
+  ok: boolean
+  message?: string
+  provider?: string
+  model?: string
+  error?: string
+  code?: string
+}
+
+/** Everything the commit card needs for its two AI controls. */
+export interface AiCommitControls {
+  loading: boolean
+  busy: boolean
+  groups: AiModelGroup[]
+  failures: AiModelFailure[]
+  active: AiModelRoute | null
+  /** Why the catalog is empty, when the host reported a failure. */
+  error?: string
+  onGenerate: () => void
+  onSelect: (provider: string, model: string) => void
+}
+
 export type Translate = (key: string) => string

@@ -12,6 +12,7 @@
 
 import {
   GIT_PUSH_TIMEOUT_MS,
+  currentBranchOf,
   MAX_DIFF_BYTES,
   MAX_PUSH_BYTES,
   MAX_REFS_BYTES,
@@ -36,7 +37,7 @@ import { REF_ARGS, parseRefs } from './refs.js'
 import { openArgv } from './open.js'
 import { resolveCwd, safeRepoPath, workspaceRootOf } from './paths.js'
 import { GitError, RequestError } from './errors.js'
-import { json } from './http.js'
+import { json, readJsonBody } from './http.js'
 
 const MAX_WRITE_PATHS = 500
 const MAX_COMMIT_MESSAGE = 8192
@@ -290,15 +291,6 @@ export async function handleCheckout(ctx, request) {
   return json({ ok: true, branch })
 }
 
-/** The checked-out branch, or '' when HEAD is detached. */
-async function currentBranchOf(subprocess, cwd) {
-  try {
-    return (await git(subprocess, ['symbolic-ref', '--short', '-q', 'HEAD'], cwd, { maxBytes: 8 * 1024 })).trim()
-  } catch {
-    return ''
-  }
-}
-
 export async function handleBranchCreate(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
   const body = await readJsonBody(request)
@@ -509,16 +501,6 @@ export async function handleRefs(ctx, request) {
 }
 
 // ── write routes ───────────────────────────────────────────────────────────
-
-async function readJsonBody(request) {
-  try {
-    const body = await request.json()
-    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('not an object')
-    return body
-  } catch {
-    throw new RequestError('请求体必须是 JSON 对象')
-  }
-}
 
 /** Validate a list of repository-relative paths before any of them reaches argv. */
 function safePathList(value) {

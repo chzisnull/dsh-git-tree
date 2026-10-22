@@ -111,3 +111,11 @@ _Avoid_: Sidebar, navigator, tree
 **Entry row**:
 One clickable row in the change list, bound to a path and to the side (staged, unstaged or conflict) it was listed under.
 _Avoid_: File row, list item
+
+**Commit message model** (提交信息模型):
+The DSH model route that writes a commit message from the selected files' diff; a plugin setting stored under the DSH home, defaulting to the DSH default Agent model.
+_Avoid_: AI model, generator
+
+**AI commit message** (AI 生成提交信息):
+A commit message drafted by the selected model from the files this commit would include; it only fills the message box and never commits.
+_Avoid_: Auto-commit, generated commit

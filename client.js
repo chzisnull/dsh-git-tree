@@ -171,7 +171,21 @@ var EN = {
   behind: "behind",
   noChanges: "No changes",
   filesChanged: "files",
-  code: "Code"
+  code: "Code",
+  aiGenerate: "AI write",
+  aiGenerating: "Writing\u2026",
+  aiModel: "Commit message model",
+  aiModelTip: "Choose the DSH model that writes the commit message",
+  aiNoModel: "Choose model",
+  aiNoModelTip: "No model available \u2014 pick one from the DSH model list",
+  aiNoChanges: "Nothing to summarize yet",
+  aiFromStaged: "Write from the staged files",
+  aiFromAll: "Write from every changed file",
+  aiDone: "Commit message written",
+  aiFailed: "Could not write the commit message",
+  aiModelSwitched: "Commit message model updated",
+  aiModelSaveFailed: "Could not save the model choice",
+  aiPartialCatalog: "Some providers could not be listed:"
 };
 var ZH = {
   panel: "Git",
@@ -310,7 +324,21 @@ var ZH = {
   behind: "\u843D\u540E",
   noChanges: "\u6CA1\u6709\u6539\u52A8",
   filesChanged: "\u4E2A\u6587\u4EF6",
-  code: "\u4EE3\u7801"
+  code: "\u4EE3\u7801",
+  aiGenerate: "AI \u751F\u6210",
+  aiGenerating: "\u751F\u6210\u4E2D\u2026",
+  aiModel: "\u63D0\u4EA4\u4FE1\u606F\u6A21\u578B",
+  aiModelTip: "\u9009\u62E9\u751F\u6210\u63D0\u4EA4\u4FE1\u606F\u7528\u7684 DSH \u6A21\u578B",
+  aiNoModel: "\u9009\u62E9\u6A21\u578B",
+  aiNoModelTip: "\u8FD8\u6CA1\u6709\u53EF\u7528\u6A21\u578B\uFF0C\u4ECE DSH \u6A21\u578B\u5217\u8868\u91CC\u9009\u4E00\u4E2A",
+  aiNoChanges: "\u8FD8\u6CA1\u6709\u53EF\u603B\u7ED3\u7684\u6539\u52A8",
+  aiFromStaged: "\u4F9D\u636E\u5DF2\u6682\u5B58\u7684\u6587\u4EF6\u751F\u6210",
+  aiFromAll: "\u4F9D\u636E\u5168\u90E8\u6539\u52A8\u6587\u4EF6\u751F\u6210",
+  aiDone: "\u5DF2\u751F\u6210\u63D0\u4EA4\u4FE1\u606F",
+  aiFailed: "\u751F\u6210\u63D0\u4EA4\u4FE1\u606F\u5931\u8D25",
+  aiModelSwitched: "\u5DF2\u5207\u6362\u751F\u6210\u63D0\u4EA4\u4FE1\u606F\u7684\u6A21\u578B",
+  aiModelSaveFailed: "\u4FDD\u5B58\u6A21\u578B\u9009\u62E9\u5931\u8D25",
+  aiPartialCatalog: "\u90E8\u5206\u63D0\u4F9B\u65B9\u7684\u6A21\u578B\u5217\u8868\u8BFB\u53D6\u5931\u8D25\uFF1A"
 };
 
 // src/client/styles.ts
@@ -610,6 +638,43 @@ var CSS = `
 .dgt-commit-check input{accent-color:var(--dgt-accent-strong);margin:0;width:13px;height:13px;}
 .dgt-commit-check[data-disabled]{opacity:.75;cursor:default;}
 .dgt-commit-check em{font-style:normal;color:var(--dsw-alias-label-tertiary);font-size:10.5px;}
+
+/* AI commit message: one quiet action plus the model chip it calls */
+.dgt-ai{position:relative;display:flex;align-items:center;gap:4px;}
+.dgt-ai-generate{appearance:none;display:inline-flex;align-items:center;gap:4px;height:23px;padding:0 9px;
+  border:1px solid color-mix(in srgb, var(--dgt-accent) 22%, var(--dgt-line));border-radius:8px;
+  background:var(--dgt-accent-soft);color:var(--dgt-accent-strong);
+  font:inherit;font-size:10.5px;font-weight:500;cursor:pointer;white-space:nowrap;}
+.dgt-ai-generate svg{width:11px;height:11px;flex:0 0 auto;}
+.dgt-ai-generate:hover:not(:disabled){border-color:color-mix(in srgb, var(--dgt-accent) 40%, var(--dgt-line));}
+.dgt-ai-generate:disabled{border-color:var(--dgt-line);background:transparent;color:var(--dsw-alias-label-caption);
+  cursor:default;}
+.dgt-ai-generate[data-busy='true'] svg{animation:dgt-spin 1.4s linear infinite;}
+.dgt-ai-chip{appearance:none;display:inline-flex;align-items:center;gap:4px;max-width:220px;height:23px;
+  padding:0 7px;border:1px solid var(--dgt-line);border-radius:8px;background:transparent;
+  color:var(--dsw-alias-label-secondary);font:inherit;font-size:10.5px;cursor:pointer;}
+.dgt-ai-chip:hover{background:var(--dgt-line-soft);color:var(--dsw-alias-label-primary);}
+.dgt-ai-chip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-ai-caret{font-size:9px;line-height:1;color:var(--dsw-alias-label-tertiary);}
+.dgt-ai-menu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:45;width:min(360px,64vw);
+  max-height:min(340px,52vh);overflow:auto;padding:6px;border:1px solid var(--dgt-line);border-radius:12px;
+  background:var(--dgt-card);box-shadow:0 14px 34px var(--dsw-alias-bg-mask-1);scrollbar-width:thin;}
+.dgt-ai-menu-head{padding:4px 8px 6px;border-bottom:1px solid var(--dgt-line-soft);margin-bottom:4px;
+  color:var(--dsw-alias-label-tertiary);font-size:10.5px;}
+.dgt-ai-menu-empty{padding:8px;color:var(--dsw-alias-label-tertiary);font-size:11.5px;}
+.dgt-ai-group{padding:2px 0;}
+.dgt-ai-group-title{padding:4px 8px 3px;color:var(--dsw-alias-label-tertiary);font-size:10px;
+  text-transform:none;letter-spacing:.02em;}
+.dgt-ai-option{display:flex;align-items:center;gap:7px;width:100%;padding:5px 8px;border:0;border-radius:7px;
+  background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;text-align:left;cursor:pointer;}
+.dgt-ai-option:hover{background:var(--dgt-accent-soft);}
+.dgt-ai-option[data-current]{background:var(--dgt-accent-soft);}
+.dgt-ai-option-check{width:12px;flex:0 0 auto;color:var(--dgt-accent-strong);font-size:10.5px;}
+.dgt-ai-option-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-ai-option-id{flex:0 0 auto;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--dsw-alias-label-tertiary);font-size:10px;}
+.dgt-ai-menu-failure{padding:6px 8px 2px;border-top:1px solid var(--dgt-line-soft);margin-top:4px;
+  color:var(--dsw-alias-label-tertiary);font-size:10px;line-height:15px;}
 .dgt-commit-foot{display:flex;align-items:center;gap:10px;}
 .dgt-hint{flex:1 1 auto;min-width:0;color:var(--dsw-alias-label-tertiary);font-size:10.5px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -689,6 +754,9 @@ var STAGE_ROUTE = "api/git-tree/stage";
 var UNSTAGE_ROUTE = "api/git-tree/unstage";
 var COMMIT_ROUTE = "api/git-tree/commit";
 var OPEN_ROUTE = "api/git-tree/open";
+var AI_MODELS_ROUTE = "api/git-tree/ai/models";
+var AI_MODEL_ROUTE = "api/git-tree/ai/model";
+var COMMIT_MESSAGE_ROUTE = "api/git-tree/commit-message";
 function query(params) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) if (value !== void 0 && value !== "") search.set(key, value);
@@ -765,6 +833,15 @@ function commitChanges(message, cwd) {
 }
 function openLocal(target, cwd) {
   return postJson(OPEN_ROUTE + query({ cwd }), { target });
+}
+function fetchAiModels(signal) {
+  return getJson(AI_MODELS_ROUTE, {}, signal);
+}
+function saveAiModel(provider, model) {
+  return postJson(AI_MODEL_ROUTE, { provider, model });
+}
+function generateCommitMessage(input, cwd) {
+  return postJson(COMMIT_MESSAGE_ROUTE + query({ cwd }), input);
 }
 
 // src/client/model.ts
@@ -887,6 +964,24 @@ function TerminalIcon() {
     h("rect", { x: 1.9, y: 2.6, width: 12.2, height: 10.8, rx: 1.4, fill: "none", stroke: "currentColor", strokeWidth: 1.2 }),
     h("path", { d: "M4.4 6.2 6.6 8l-2.2 1.8", fill: "none", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round", strokeLinejoin: "round" }),
     h("path", { d: "M8.2 10.1h3.2", fill: "none", stroke: "currentColor", strokeWidth: 1.2, strokeLinecap: "round" })
+  ]);
+}
+function SparkIcon() {
+  return svg([
+    h("path", {
+      d: "M8 1.9 9.35 6.1 13.6 7.4 9.35 8.7 8 12.9 6.65 8.7 2.4 7.4 6.65 6.1 8 1.9Z",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1.15,
+      strokeLinejoin: "round"
+    }),
+    h("path", {
+      d: "M12.6 2.2v2.1M11.55 3.25h2.1",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 1,
+      strokeLinecap: "round"
+    })
   ]);
 }
 
@@ -1561,15 +1656,25 @@ function initials(name) {
   if (parts.length === 0) return "?";
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
+function shortModelName(route, t) {
+  if (!route) return t("aiNoModel");
+  const name = route.label || route.model;
+  return name.length > 26 ? name.slice(0, 25) + "\u2026" : name;
+}
 function CommitBox(props) {
-  const { status, t } = props;
+  const { status, t, ai } = props;
   const identity = status?.identity;
   const staged = status?.counts?.staged ?? 0;
+  const unstaged = status?.counts?.unstaged ?? 0;
   const conflicts = status?.counts?.conflicted ?? 0;
   const branch = status?.branch || "\u2014";
   const blocked = conflicts > 0;
   const canCommit = staged > 0 && props.message.trim() !== "" && !blocked && !props.busy;
+  const hasChanges = staged + unstaged > 0;
+  const canGenerate = hasChanges && !ai.busy && !props.busy && !blocked && ai.active !== null;
+  const picker = usePopover();
   const defaultHint = blocked ? t("conflictsBlockCommit") : staged === 0 ? t("commitHint") : props.message.trim() === "" ? t("commitMessageEmpty") : t("commitShortcut");
+  const generateTitle = !hasChanges ? t("aiNoChanges") : blocked ? t("conflictsBlockCommit") : ai.active === null ? t("aiNoModelTip") : staged > 0 ? t("aiFromStaged") : t("aiFromAll");
   return h(
     "div",
     { className: "dgt-commit" },
@@ -1588,7 +1693,84 @@ function CommitBox(props) {
     h(
       "div",
       { className: "dgt-commit-label" },
-      h("span", null, t("commitMessageLabel"))
+      h("span", null, t("commitMessageLabel")),
+      h(
+        "div",
+        { className: "dgt-ai" },
+        h(
+          "button",
+          {
+            type: "button",
+            className: "dgt-ai-generate",
+            "data-busy": ai.busy ? "true" : void 0,
+            disabled: !canGenerate,
+            title: generateTitle,
+            onClick: ai.onGenerate
+          },
+          h(SparkIcon, null),
+          ai.busy ? t("aiGenerating") : t("aiGenerate")
+        ),
+        h(
+          "button",
+          {
+            type: "button",
+            className: "dgt-ai-chip",
+            title: t("aiModelTip"),
+            "aria-haspopup": "listbox",
+            "aria-expanded": picker.open,
+            ref: picker.triggerRef,
+            onClick: picker.toggle
+          },
+          h("span", { className: "dgt-ai-chip-name" }, shortModelName(ai.active, t)),
+          h("span", { className: "dgt-ai-caret", "aria-hidden": "true" }, "\u25BE")
+        ),
+        picker.open ? h(
+          "div",
+          {
+            className: "dgt-ai-menu",
+            role: "listbox",
+            "aria-label": t("aiModel"),
+            ref: picker.menuRef
+          },
+          h("div", { className: "dgt-ai-menu-head" }, t("aiModelTip")),
+          ai.loading ? h("div", { className: "dgt-ai-menu-empty" }, t("loading")) : ai.groups.length === 0 ? h("div", { className: "dgt-ai-menu-empty" }, ai.error || t("aiNoModelTip")) : ai.groups.map(
+            (group) => h(
+              "div",
+              { className: "dgt-ai-group", key: group.id },
+              h("div", { className: "dgt-ai-group-title" }, group.name),
+              group.models.map(
+                (model) => h(
+                  "button",
+                  {
+                    key: group.id + "/" + model.id,
+                    type: "button",
+                    className: "dgt-ai-option",
+                    role: "option",
+                    "aria-selected": ai.active?.provider === group.id && ai.active?.model === model.id,
+                    "data-current": ai.active?.provider === group.id && ai.active?.model === model.id ? true : void 0,
+                    onClick: () => {
+                      picker.close();
+                      ai.onSelect(group.id, model.id);
+                    }
+                  },
+                  h(
+                    "span",
+                    { className: "dgt-ai-option-check" },
+                    ai.active?.provider === group.id && ai.active?.model === model.id ? "\u2713" : ""
+                  ),
+                  h("span", { className: "dgt-ai-option-name" }, model.name || model.id),
+                  model.name && model.name !== model.id ? h("span", { className: "dgt-ai-option-id" }, model.id) : null
+                )
+              )
+            )
+          ),
+          ai.failures.length > 0 ? h(
+            "div",
+            { className: "dgt-ai-menu-failure" },
+            t("aiPartialCatalog") + " " + ai.failures.map((failure) => failure.name).join("\u3001")
+          ) : null
+        ) : null
+      )
     ),
     h("textarea", {
       className: "dgt-commit-input",
@@ -1692,7 +1874,8 @@ function StatusView(props) {
           pushAfter: props.pushAfter,
           onPushAfter: props.onPushAfter,
           onMessage: props.onMessage,
-          onCommit: props.onCommit
+          onCommit: props.onCommit,
+          ai: props.ai
         })
       )
     )
@@ -2183,6 +2366,9 @@ function Workspace(props) {
   const [dialog, setDialog] = React.useState(null);
   const [contextMenu, setContextMenu] = React.useState(null);
   const [pushAfter, setPushAfter] = React.useState(false);
+  const [aiModels, setAiModels] = React.useState(null);
+  const [aiLoading, setAiLoading] = React.useState(false);
+  const [aiBusy, setAiBusy] = React.useState(false);
   const [dialogBusy, setDialogBusy] = React.useState(false);
   const [dialogError, setDialogError] = React.useState("");
   const [statusError, setStatusError] = React.useState("");
@@ -2235,6 +2421,78 @@ function Workspace(props) {
     } catch {
     }
   }, [repoPath]);
+  const loadAiModels = React.useCallback(async () => {
+    setAiLoading(true);
+    try {
+      const next = await fetchAiModels();
+      setAiModels(next.ok ? next : { ok: false, groups: [], failures: [], active: null, error: next.error });
+    } catch {
+      setAiModels({ ok: false, groups: [], failures: [], active: null });
+    } finally {
+      setAiLoading(false);
+    }
+  }, []);
+  React.useEffect(() => {
+    void loadAiModels();
+  }, [loadAiModels]);
+  const generateMessage = React.useCallback(async () => {
+    if (busyRef.current || aiBusy) return;
+    const all = status?.entries ?? [];
+    const staged = all.filter((entry) => entry.staged && !entry.conflicted);
+    const side = staged.length > 0 ? "staged" : "unstaged";
+    const source = (staged.length > 0 ? staged : all.filter((entry) => !entry.conflicted && entry.kind !== "ignored")).slice(
+      0,
+      60
+    );
+    const files = source.map((entry) => ({ path: entry.path, status: statusLetter(entry, side) }));
+    if (files.length === 0) {
+      showToast(t("aiNoChanges"));
+      return;
+    }
+    setAiBusy(true);
+    setActionError("");
+    try {
+      const locale = typeof props.locale === "function" ? props.locale() : "en";
+      const payload = await generateCommitMessage({ side, files, locale }, repoPath || void 0);
+      if (!payload.ok || typeof payload.message !== "string" || payload.message === "") {
+        throw new Error(payload.error || t("aiFailed"));
+      }
+      setMessage(payload.message);
+      showToast(t("aiDone"));
+      setTimeout(() => {
+        if (commitInput.current && commitInput.current.focus) commitInput.current.focus();
+      }, 0);
+    } catch (error) {
+      const text = error instanceof Error ? error.message : String(error);
+      setActionError(text);
+      showToast(text);
+    } finally {
+      setAiBusy(false);
+    }
+  }, [aiBusy, props.locale, repoPath, showToast, status, t]);
+  const selectAiModel = React.useCallback(
+    async (provider, model) => {
+      try {
+        const saved = await saveAiModel(provider, model);
+        if (!saved.ok) throw new Error(saved.error || t("aiModelSaveFailed"));
+        await loadAiModels();
+        showToast(t("aiModelSwitched"));
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [loadAiModels, showToast, t]
+  );
+  const aiCommit = {
+    loading: aiLoading,
+    busy: aiBusy,
+    groups: aiModels?.groups ?? [],
+    failures: aiModels?.failures ?? [],
+    active: aiModels?.active ?? null,
+    error: aiModels?.error || (aiModels && aiModels.ok === false ? t("aiFailed") : ""),
+    onGenerate: () => void generateMessage(),
+    onSelect: (provider, model) => void selectAiModel(provider, model)
+  };
   const openDiff = React.useCallback(async (entry, side) => {
     setSelected({ path: entry.path, side });
     setDiff(null);
@@ -2914,7 +3172,8 @@ function Workspace(props) {
           pushAfter,
           onPushAfter: setPushAfter,
           onMessage: setMessage,
-          onCommit: () => void commit()
+          onCommit: () => void commit(),
+          ai: aiCommit
         });
     }
   };
@@ -3103,10 +3362,20 @@ function apply(ctx) {
   ctx.slots.inject(
     "main",
     () => ctx.slots.register(
-      { name: "main", key: PANEL_ID, locale: NS, inject: () => ({ t }) },
+      { name: "main", key: PANEL_ID, locale: NS, inject: () => ({ t, locale: () => activeLocale(ctx) }) },
       Workspace
     )
   );
+}
+function activeLocale(ctx) {
+  try {
+    const localeCtx = ctx.locale;
+    const snapshot = typeof localeCtx.getSnapshot === "function" ? localeCtx.getSnapshot() : null;
+    if (snapshot && typeof snapshot.active === "string" && snapshot.active) return snapshot.active;
+  } catch {
+  }
+  if (typeof navigator !== "undefined" && typeof navigator.language === "string") return navigator.language;
+  return "en";
 }
 
 return module.exports;

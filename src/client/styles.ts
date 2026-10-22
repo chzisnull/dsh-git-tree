@@ -299,6 +299,43 @@ export const CSS = `
 .dgt-commit-check input{accent-color:var(--dgt-accent-strong);margin:0;width:13px;height:13px;}
 .dgt-commit-check[data-disabled]{opacity:.75;cursor:default;}
 .dgt-commit-check em{font-style:normal;color:var(--dsw-alias-label-tertiary);font-size:10.5px;}
+
+/* AI commit message: one quiet action plus the model chip it calls */
+.dgt-ai{position:relative;display:flex;align-items:center;gap:4px;}
+.dgt-ai-generate{appearance:none;display:inline-flex;align-items:center;gap:4px;height:23px;padding:0 9px;
+  border:1px solid color-mix(in srgb, var(--dgt-accent) 22%, var(--dgt-line));border-radius:8px;
+  background:var(--dgt-accent-soft);color:var(--dgt-accent-strong);
+  font:inherit;font-size:10.5px;font-weight:500;cursor:pointer;white-space:nowrap;}
+.dgt-ai-generate svg{width:11px;height:11px;flex:0 0 auto;}
+.dgt-ai-generate:hover:not(:disabled){border-color:color-mix(in srgb, var(--dgt-accent) 40%, var(--dgt-line));}
+.dgt-ai-generate:disabled{border-color:var(--dgt-line);background:transparent;color:var(--dsw-alias-label-caption);
+  cursor:default;}
+.dgt-ai-generate[data-busy='true'] svg{animation:dgt-spin 1.4s linear infinite;}
+.dgt-ai-chip{appearance:none;display:inline-flex;align-items:center;gap:4px;max-width:220px;height:23px;
+  padding:0 7px;border:1px solid var(--dgt-line);border-radius:8px;background:transparent;
+  color:var(--dsw-alias-label-secondary);font:inherit;font-size:10.5px;cursor:pointer;}
+.dgt-ai-chip:hover{background:var(--dgt-line-soft);color:var(--dsw-alias-label-primary);}
+.dgt-ai-chip-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-ai-caret{font-size:9px;line-height:1;color:var(--dsw-alias-label-tertiary);}
+.dgt-ai-menu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:45;width:min(360px,64vw);
+  max-height:min(340px,52vh);overflow:auto;padding:6px;border:1px solid var(--dgt-line);border-radius:12px;
+  background:var(--dgt-card);box-shadow:0 14px 34px var(--dsw-alias-bg-mask-1);scrollbar-width:thin;}
+.dgt-ai-menu-head{padding:4px 8px 6px;border-bottom:1px solid var(--dgt-line-soft);margin-bottom:4px;
+  color:var(--dsw-alias-label-tertiary);font-size:10.5px;}
+.dgt-ai-menu-empty{padding:8px;color:var(--dsw-alias-label-tertiary);font-size:11.5px;}
+.dgt-ai-group{padding:2px 0;}
+.dgt-ai-group-title{padding:4px 8px 3px;color:var(--dsw-alias-label-tertiary);font-size:10px;
+  text-transform:none;letter-spacing:.02em;}
+.dgt-ai-option{display:flex;align-items:center;gap:7px;width:100%;padding:5px 8px;border:0;border-radius:7px;
+  background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;text-align:left;cursor:pointer;}
+.dgt-ai-option:hover{background:var(--dgt-accent-soft);}
+.dgt-ai-option[data-current]{background:var(--dgt-accent-soft);}
+.dgt-ai-option-check{width:12px;flex:0 0 auto;color:var(--dgt-accent-strong);font-size:10.5px;}
+.dgt-ai-option-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-ai-option-id{flex:0 0 auto;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  color:var(--dsw-alias-label-tertiary);font-size:10px;}
+.dgt-ai-menu-failure{padding:6px 8px 2px;border-top:1px solid var(--dgt-line-soft);margin-top:4px;
+  color:var(--dsw-alias-label-tertiary);font-size:10px;line-height:15px;}
 .dgt-commit-foot{display:flex;align-items:center;gap:10px;}
 .dgt-hint{flex:1 1 auto;min-width:0;color:var(--dsw-alias-label-tertiary);font-size:10.5px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

@@ -51,6 +51,7 @@ import {
   handleWorkspaces,
 } from './src/host/handlers.js'
 import { guard } from './src/host/http.js'
+import { handleAiModels, handleAiModelSave, handleGenerateCommitMessage } from './src/host/ai.js'
 
 /** Stable Cordis plugin name (not strictly required; matches the patch row id). */
 export const name = 'dsh-git-tree'
@@ -82,6 +83,9 @@ const ROUTES = [
   { path: '/api/git-tree/discard', methods: ['POST'], handler: handleDiscard },
   { path: '/api/git-tree/remove', methods: ['POST'], handler: handleRemove },
   { path: '/api/git-tree/open', methods: ['POST'], handler: handleOpen },
+  { path: '/api/git-tree/ai/models', methods: ['GET'], handler: handleAiModels },
+  { path: '/api/git-tree/ai/model', methods: ['POST'], handler: handleAiModelSave },
+  { path: '/api/git-tree/commit-message', methods: ['POST'], handler: handleGenerateCommitMessage },
 ]
 
 /**

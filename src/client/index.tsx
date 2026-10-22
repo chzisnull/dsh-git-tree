@@ -89,11 +89,26 @@ export function apply(ctx: ClientCtx): void {
     ),
   )
 
-  // 4. the panel itself: root-scoped keyed `main` entry, full-height.
+  // 4. the panel itself: root-scoped keyed `main` entry, full-height. The
+  //    active locale id rides along so an AI-written commit message follows the
+  //    language the panel is actually showing.
   ctx.slots.inject('main', () =>
     ctx.slots.register(
-      { name: 'main', key: PANEL_ID, locale: NS, inject: () => ({ t }) },
+      { name: 'main', key: PANEL_ID, locale: NS, inject: () => ({ t, locale: () => activeLocale(ctx) }) },
       Workspace,
     ),
   )
+}
+
+/** Active UI locale id (`zh`, `en`, …), read from the live locale snapshot. */
+function activeLocale(ctx: ClientCtx): string {
+  try {
+    const localeCtx = ctx.locale as unknown as { getSnapshot?: () => { active?: string } }
+    const snapshot = typeof localeCtx.getSnapshot === 'function' ? localeCtx.getSnapshot() : null
+    if (snapshot && typeof snapshot.active === 'string' && snapshot.active) return snapshot.active
+  } catch {
+    /* older locale service: fall through to the browser default */
+  }
+  if (typeof navigator !== 'undefined' && typeof navigator.language === 'string') return navigator.language
+  return 'en'
 }
