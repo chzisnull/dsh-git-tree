@@ -4,11 +4,15 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 [中文文档](README.zh.md)
 
-![The Git workspace panel](docs/design/frame2-workspace.png)
+![dsh-git-tree](docs/media/cover.png)
+
+[![Watch the 35-second intro](docs/media/promo-loop.gif)](docs/media/promo.mp4)
+
+`35-second intro (mp4, 3.6 MB)` · [`poster`](docs/media/poster.png)
 
 ## What it does today
 
-Version 0.7.2 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
+Version 0.7.3 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Repository switcher** in the toolbar: pick any workspace registered in DSH; every route then runs against that repository.
@@ -31,7 +35,7 @@ Version 0.7.2 is the **local workbench slice**: file status, history, search and
 
 ## Status
 
-| Area | 0.7.2 |
+| Area | 0.7.3 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | repository switcher (DSH workspaces) | done |
@@ -151,6 +155,19 @@ The test suite needs no DSH, no git and no browser:
 - `test/ui-contract.test.mjs` — the built bundle: module-loader wrapper, exactly two slot registrations under one id, routes called, theme tokens only, no `document.body`.
 - `test/client-boot.test.mjs` — evaluates the built bundle in Node, materialises the plugin and calls `apply()` against a Cordis-like context that throws on undeclared services.
 - `test/client-imports.test.mjs` — a narrow static guard: every route helper the shell uses must be imported (esbuild does not catch free identifiers).
+
+## Intro media
+
+`docs/media/` holds the promo kit: the intro film, a silent loop for this page, the tall poster and the wide cover.
+
+| File | What it is |
+| --- | --- |
+| [`promo.mp4`](docs/media/promo.mp4) | 35 s intro (1920×1080, H.264, 3.6 MB) |
+| [`promo-loop.gif`](docs/media/promo-loop.gif) | 6 s silent loop used above (900 px wide) |
+| [`poster.png`](docs/media/poster.png) | tall poster, 1782×2353 |
+| [`cover.png`](docs/media/cover.png) | wide cover, 1600×900 |
+
+The film and images were captured from the real panel against a fictional demo repository (`aurora-notes`, author `Lin Wei <lin@example.dev>`); the install segment is a real install of the published package in a throwaway DSH profile.
 
 ## Design mockups
 

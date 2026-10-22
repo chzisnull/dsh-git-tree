@@ -4,9 +4,13 @@
 
 [English](README.md)
 
-![Git 工作区面板](docs/design/frame2-workspace.png)
+![dsh-git-tree](docs/media/cover.png)
 
-## 0.7.2 能做什么
+[![35 秒介绍片](docs/media/promo-loop.gif)](docs/media/promo.mp4)
+
+`35 秒介绍片（mp4，3.6 MB）` · [`海报`](docs/media/poster.png)
+
+## 0.7.3 能做什么
 
 这一版是**本地 Git 工作台**：文件状态、历史、搜索、本地分支——读改动、暂存、提交、切分支、看任意一次提交，全在面板里完成，支持推送当前分支，也可以让 DSH 里的模型来写提交信息。fetch / pull、远程分支和远端管理还没有做。
 
@@ -31,7 +35,7 @@
 
 ## 状态
 
-| 能力 | 0.7.2 |
+| 能力 | 0.7.3 |
 | --- | --- |
 | `main` 面板 + 侧栏入口 | 已完成 |
 | 仓库切换（DSH workspaces） | 已完成 |
@@ -149,7 +153,18 @@ npm test           # 78 条断言：清单、宿主路由、解析器、客户�
 - `test/ui-contract.test.mjs` —— 构建产物：loader 包装、恰好两次 slot 注册且共用 id、调用路由、只用主题 token、不碰 `document.body`。
 - `test/client-boot.test.mjs` —— 在 Node 里执行构建产物、物化插件，用「未声明服务即抛错」的 Cortis 式 ctx 调 `apply()`。
 
-## 效果图
+## 介绍片与海报
+
+`docs/media/` 里是这套宣传素材：介绍短片、本页用的无声循环、竖版海报和横版头图。
+
+| 文件 | 内容 |
+| --- | --- |
+| [`promo.mp4`](docs/media/promo.mp4) | 35 秒介绍片（1920×1080，H.264，3.6 MB） |
+| [`promo-loop.gif`](docs/media/promo-loop.gif) | 上方那张 6 秒无声循环（900 px 宽） |
+| [`poster.png`](docs/media/poster.png) | 竖版海报 1782×2353 |
+| [`cover.png`](docs/media/cover.png) | 横版头图 1600×900 |
+
+片子与图片都取自真实面板，演示仓库是虚构的 `aurora-notes`（作者 `Lin Wei <lin@example.dev>`）；安装段是在一次性 DSH profile 里对已发布包做的真实安装。
 
 `docs/design/` 里是实现对照的四张画板：
 
