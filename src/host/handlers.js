@@ -37,6 +37,7 @@ import { REF_ARGS, parseRefs } from './refs.js'
 import { openArgv } from './open.js'
 import { resolveCwd, safeRepoPath, workspaceRootOf } from './paths.js'
 import { GitError, RequestError } from './errors.js'
+import { orderWorkspaces, readRepositoryPrefs, recordOpened, togglePinned, writeRepositoryPrefs } from './repositories.js'
 import { mapRemoteFailure, resolvePullTarget, splitUpstream } from './remote.js'
 import {
   hasConflictMarkers,
@@ -106,7 +107,31 @@ export async function handleWorkspaces(ctx) {
     const segments = current.split(/[\\/]+/).filter(Boolean)
     workspaces.unshift({ id: current, path: current, title: segments[segments.length - 1] || current })
   }
-  return json({ ok: true, current, workspaces })
+  return json({ ok: true, current, workspaces: orderWorkspaces(workspaces, readRepositoryPrefs()) })
+}
+
+/** Pin or unpin one workspace in the switcher. */
+export async function handleRepositoryPin(ctx, request) {
+  const body = await readJsonBody(request)
+  const path = typeof body.path === 'string' ? body.path.trim() : ''
+  if (!path || path.length > 4096) throw new RequestError('无效的仓库路径', 400, 'invalid-path')
+  const pinned = body.pinned !== false
+  const prefs = togglePinned(readRepositoryPrefs(), path, pinned)
+  if (!writeRepositoryPrefs(prefs)) {
+    throw new RequestError('无法保存置顶（DSH 目录不可写）', 409, 'settings-unwritable')
+  }
+  return json({ ok: true, path, pinned, pinnedPaths: prefs.pinned })
+}
+
+/** Count one deliberate switch to a repository; drives the "frequently used" order. */
+export async function handleRepositoryOpen(ctx, request) {
+  const body = await readJsonBody(request)
+  const path = typeof body.path === 'string' ? body.path.trim() : ''
+  if (!path || path.length > 4096) throw new RequestError('无效的仓库路径', 400, 'invalid-path')
+  const prefs = recordOpened(readRepositoryPrefs(), path)
+  // A read-only home must not block switching, so the write stays best effort.
+  writeRepositoryPrefs(prefs)
+  return json({ ok: true, path, openCount: prefs.opened[path] ? prefs.opened[path].count : 0 })
 }
 
 export async function handleStatus(ctx, request) {

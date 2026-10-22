@@ -205,6 +205,11 @@ export interface WorkspaceRecord {
   id: string
   path: string
   title: string
+  /** Pinned by the user; pinned rows render above the usage-sorted list. */
+  pinned?: boolean
+  /** How many times the user switched to this repository from the panel. */
+  openCount?: number
+  lastOpenedAt?: number
 }
 
 export interface WorkspacesPayload {

@@ -40,6 +40,15 @@ var EN = {
   revealInFinder: "Reveal in Finder",
   openInTerminal: "Open in Terminal",
   openFailed: "Could not open the folder.",
+  pinnedSection: "Pinned",
+  allRepositories: "All repositories",
+  repositoriesSection: "Repositories",
+  pinRepository: "Pin to top",
+  unpinRepository: "Unpin",
+  openedTimes: "opened",
+  pinFailed: "Could not save the pin",
+  pinnedDone: "Pinned",
+  unpinnedDone: "Unpinned",
   switchRepository: "Switch repository",
   repoFilter: "Filter repositories",
   refsColumn: "Refs",
@@ -230,6 +239,15 @@ var ZH = {
   revealInFinder: "\u5728 Finder \u4E2D\u663E\u793A",
   openInTerminal: "\u5728\u7EC8\u7AEF\u4E2D\u6253\u5F00",
   openFailed: "\u65E0\u6CD5\u6253\u5F00\u8BE5\u76EE\u5F55\u3002",
+  pinnedSection: "\u7F6E\u9876",
+  allRepositories: "\u5168\u90E8\u4ED3\u5E93",
+  repositoriesSection: "\u4ED3\u5E93",
+  pinRepository: "\u7F6E\u9876",
+  unpinRepository: "\u53D6\u6D88\u7F6E\u9876",
+  openedTimes: "\u6253\u5F00\u6B21\u6570",
+  pinFailed: "\u4FDD\u5B58\u7F6E\u9876\u5931\u8D25",
+  pinnedDone: "\u5DF2\u7F6E\u9876",
+  unpinnedDone: "\u5DF2\u53D6\u6D88\u7F6E\u9876",
   switchRepository: "\u5207\u6362\u4ED3\u5E93",
   repoFilter: "\u7B5B\u9009\u4ED3\u5E93",
   refsColumn: "\u5F15\u7528",
@@ -469,6 +487,27 @@ var CSS = `
 .dgt-repo-menu-path{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   color:var(--dsw-alias-label-tertiary);font-size:10.5px;direction:rtl;text-align:left;}
 .dgt-repo-menu-empty{padding:6px 9px;color:var(--dsw-alias-label-tertiary);font-size:11.5px;}
+/* Pinned / usage-ordered repository sections */
+.dgt-repo-sections{display:flex;flex-direction:column;gap:4px;}
+.dgt-repo-section{display:flex;flex-direction:column;gap:1px;}
+.dgt-repo-section-head{display:flex;align-items:center;gap:6px;padding:6px 9px 3px;
+  color:var(--dsw-alias-label-tertiary);font-size:10px;letter-spacing:.03em;}
+.dgt-repo-section-head svg{width:11px;height:11px;opacity:.8;}
+.dgt-repo-section-count{margin-left:auto;font-size:10px;opacity:.65;}
+.dgt-repo-row{display:flex;align-items:center;gap:8px;padding:5px 7px 5px 9px;border-radius:8px;
+  cursor:pointer;outline:none;}
+.dgt-repo-row:hover,.dgt-repo-row[data-current]{background:var(--dgt-accent-soft);}
+.dgt-repo-row:focus-visible{box-shadow:0 0 0 2px var(--dgt-accent-soft);}
+.dgt-repo-row-main{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1 1 auto;}
+.dgt-repo-count{flex:0 0 auto;font-size:10px;color:var(--dsw-alias-label-tertiary);
+  background:var(--dgt-line-soft);border-radius:999px;padding:1px 7px;}
+.dgt-repo-pin{appearance:none;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  width:22px;height:22px;padding:0;border:0;border-radius:6px;background:transparent;
+  color:var(--dsw-alias-label-tertiary);cursor:pointer;opacity:0;transition:opacity .12s ease,color .12s ease;}
+.dgt-repo-row:hover .dgt-repo-pin,.dgt-repo-pin:focus-visible,.dgt-repo-pin[data-pinned]{opacity:1;}
+.dgt-repo-pin:hover{background:var(--dgt-page);color:var(--dgt-accent-strong);}
+.dgt-repo-pin[data-pinned]{color:var(--dgt-accent-strong);}
+@media (prefers-reduced-motion:reduce){.dgt-repo-pin{transition:none;}}
 
 /* branch / sync pills */
 .dgt-refs{display:flex;align-items:center;gap:6px;margin-left:auto;min-width:0;}
@@ -903,6 +942,8 @@ var REMOVE_ROUTE = "api/git-tree/remove";
 var MERGE_ROUTE = "api/git-tree/merge";
 var PUSH_ROUTE = "api/git-tree/push";
 var FETCH_ROUTE = "api/git-tree/fetch";
+var REPOSITORY_PIN_ROUTE = "api/git-tree/repositories/pin";
+var REPOSITORY_OPEN_ROUTE = "api/git-tree/repositories/open";
 var PULL_ROUTE = "api/git-tree/pull";
 var BRANCH_CREATE_ROUTE = "api/git-tree/branch/create";
 var BRANCH_RENAME_ROUTE = "api/git-tree/branch/rename";
@@ -1022,6 +1063,12 @@ function revertConflict(path, cwd) {
 function markConflictResolved(path, cwd) {
   return postJson(CONFLICT_MARK_ROUTE + query({ cwd }), { path });
 }
+function setRepositoryPin(path, pinned) {
+  return postJson(REPOSITORY_PIN_ROUTE, { path, pinned });
+}
+function recordRepositoryOpen(path) {
+  return postJson(REPOSITORY_OPEN_ROUTE, { path });
+}
 
 // src/client/model.ts
 function lastSegment(path) {
@@ -1092,6 +1139,19 @@ function CommitIcon() {
   return svg([
     h("circle", { cx: 8, cy: 8, r: 4.2, fill: "none", stroke: "currentColor", strokeWidth: 1.3 }),
     h("path", { d: "M8 1.4v2.4M8 12.2v2.4", fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round" })
+  ]);
+}
+function PinIcon(props) {
+  const filled = props?.filled === true;
+  return svg([
+    h("path", {
+      d: "M10.4 1.9 14.1 5.6 11.9 6.4 8.8 9.5 8.6 12.8 3.2 7.4 6.5 7.2 9.6 4.1Z",
+      fill: filled ? "currentColor" : "none",
+      stroke: "currentColor",
+      strokeWidth: 1.15,
+      strokeLinejoin: "round"
+    }),
+    h("path", { d: "M3.6 12.4 1.9 14.1", fill: "none", stroke: "currentColor", strokeWidth: 1.25, strokeLinecap: "round" })
   ]);
 }
 function FetchIcon() {
@@ -1231,9 +1291,63 @@ function TopBar(props) {
   const ahead = status?.ahead ?? 0;
   const behind = status?.behind ?? 0;
   const staged = status?.counts?.staged ?? 0;
+  const pinnedVisible = visible.filter((workspace) => workspace.pinned === true);
+  const otherVisible = visible.filter((workspace) => workspace.pinned !== true);
   const repoPath = props.currentPath || status?.repoRoot || status?.cwd || "";
   const current = props.workspaces.find((workspace) => workspace.path === repoPath);
   const title = current?.title || (status?.repoRoot ? lastSegment(status.repoRoot) : t("panel"));
+  const renderRow = (workspace) => h(
+    "div",
+    {
+      key: workspace.id,
+      className: "dgt-repo-row",
+      role: "option",
+      tabIndex: 0,
+      "aria-selected": workspace.path === repoPath,
+      "data-current": workspace.path === repoPath || void 0,
+      title: (workspace.openCount ?? 0) > 0 ? workspace.path + " \xB7 " + t("openedTimes") + " " + String(workspace.openCount) : workspace.path,
+      onClick: () => {
+        popover.close();
+        props.onSelectWorkspace(workspace.path);
+      },
+      onKeyDown: (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          popover.close();
+          props.onSelectWorkspace(workspace.path);
+        }
+      }
+    },
+    h(
+      "span",
+      { className: "dgt-repo-row-main" },
+      h(
+        "span",
+        { className: "dgt-repo-menu-title" },
+        workspace.path === repoPath ? h("span", { className: "dgt-repo-check" }, "\u2713") : null,
+        workspace.title
+      ),
+      h("span", { className: "dgt-repo-menu-path" }, workspace.path)
+    ),
+    (workspace.openCount ?? 0) > 0 ? h("span", { className: "dgt-repo-count", title: t("openedTimes") }, String(workspace.openCount)) : null,
+    h(
+      "button",
+      {
+        type: "button",
+        className: "dgt-repo-pin",
+        "data-pinned": workspace.pinned ? true : void 0,
+        "aria-pressed": workspace.pinned === true,
+        "aria-label": workspace.pinned ? t("unpinRepository") : t("pinRepository"),
+        title: workspace.pinned ? t("unpinRepository") : t("pinRepository"),
+        onClick: (event) => {
+          event.stopPropagation();
+          props.onTogglePin(workspace.path, workspace.pinned !== true);
+        },
+        onKeyDown: (event) => event.stopPropagation()
+      },
+      h(PinIcon, { filled: workspace.pinned === true })
+    )
+  );
   return h(
     "header",
     { className: "dgt-topbar" },
@@ -1267,29 +1381,32 @@ function TopBar(props) {
           autoFocus: true,
           onChange: (event) => setFilter(event.target.value)
         }),
-        visible.length === 0 ? h("div", { className: "dgt-repo-menu-empty" }, t("noRepositories")) : visible.map(
-          (workspace) => h(
-            "button",
-            {
-              key: workspace.id,
-              type: "button",
-              className: "dgt-repo-menu-item",
-              role: "option",
-              "aria-selected": workspace.path === repoPath,
-              "data-current": workspace.path === repoPath || void 0,
-              onClick: () => {
-                popover.close();
-                props.onSelectWorkspace(workspace.path);
-              }
-            },
+        visible.length === 0 ? h("div", { className: "dgt-repo-menu-empty" }, t("noRepositories")) : h(
+          "div",
+          { className: "dgt-repo-sections" },
+          pinnedVisible.length > 0 ? h(
+            "div",
+            { className: "dgt-repo-section" },
             h(
-              "span",
-              { className: "dgt-repo-menu-title" },
-              workspace.path === repoPath ? h("span", { className: "dgt-repo-check" }, "\u2713") : null,
-              workspace.title
+              "div",
+              { className: "dgt-repo-section-head" },
+              h(PinIcon, { filled: true }),
+              h("span", null, t("pinnedSection")),
+              h("span", { className: "dgt-repo-section-count" }, String(pinnedVisible.length))
             ),
-            h("span", { className: "dgt-repo-menu-path" }, workspace.path)
-          )
+            pinnedVisible.map(renderRow)
+          ) : null,
+          otherVisible.length > 0 ? h(
+            "div",
+            { className: "dgt-repo-section" },
+            h(
+              "div",
+              { className: "dgt-repo-section-head" },
+              h("span", null, pinnedVisible.length > 0 ? t("allRepositories") : t("repositoriesSection")),
+              h("span", { className: "dgt-repo-section-count" }, String(otherVisible.length))
+            ),
+            otherVisible.map(renderRow)
+          ) : null
         )
       ) : null
     ),
@@ -3159,22 +3276,27 @@ function Workspace(props) {
     }
     void loadHistory(true);
   }, [view, repoPath, historyScope, appliedQuery, appliedAuthor, appliedPath]);
+  const loadWorkspaces = React.useCallback(async () => {
+    try {
+      const list = await fetchWorkspaces();
+      if (list.ok) setWorkspaces(list.workspaces ?? []);
+      return list.workspaces ?? [];
+    } catch {
+      return [];
+    }
+  }, []);
   React.useEffect(() => {
     let cancelled = false;
     void (async () => {
-      try {
-        const list = await fetchWorkspaces();
-        if (cancelled || !list.ok) return;
-        setWorkspaces(list.workspaces ?? []);
-        const saved = typeof localStorage !== "undefined" ? localStorage.getItem(REPO_KEY) : null;
-        if (saved && (list.workspaces ?? []).some((workspace) => workspace.path === saved)) setRepoPath(saved);
-      } catch {
-      }
+      const list = await loadWorkspaces();
+      if (cancelled) return;
+      const saved = typeof localStorage !== "undefined" ? localStorage.getItem(REPO_KEY) : null;
+      if (saved && list.some((workspace) => workspace.path === saved)) setRepoPath(saved);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadWorkspaces]);
   React.useEffect(() => {
     void loadStatus();
     void loadRefs();
@@ -3641,21 +3763,40 @@ function Workspace(props) {
       setBusy(false);
     }
   }, [afterPush, message, pushAfter, repoPath, showToast, status, t]);
-  const switchWorkspace = React.useCallback((path) => {
-    setRepoPath(path);
-    try {
-      if (typeof localStorage !== "undefined") localStorage.setItem(REPO_KEY, path);
-    } catch {
-    }
-    setSelected(null);
-    setDiff(null);
-    setActionError("");
-    setMessage("");
-    setView("status");
-    setHistoryCommits([]);
-    setHistorySha("");
-    setPushAfter(false);
-  }, []);
+  const switchWorkspace = React.useCallback(
+    (path) => {
+      if (path === repoPath) return;
+      setRepoPath(path);
+      try {
+        if (typeof localStorage !== "undefined") localStorage.setItem(REPO_KEY, path);
+      } catch {
+      }
+      setSelected(null);
+      setDiff(null);
+      setActionError("");
+      setMessage("");
+      setView("status");
+      setHistoryCommits([]);
+      setHistorySha("");
+      setPushAfter(false);
+      void recordRepositoryOpen(path).then(() => loadWorkspaces()).catch(() => {
+      });
+    },
+    [loadWorkspaces, repoPath]
+  );
+  const toggleRepositoryPin = React.useCallback(
+    async (path, pinned) => {
+      try {
+        const result = await setRepositoryPin(path, pinned);
+        if (!result.ok) throw new Error(result.error || t("pinFailed"));
+        await loadWorkspaces();
+        showToast(pinned ? t("pinnedDone") + " \xB7 " + path : t("unpinnedDone") + " \xB7 " + path);
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error));
+      }
+    },
+    [loadWorkspaces, showToast, t]
+  );
   const entries = status?.entries ?? [];
   const rows = splitEntries(entries);
   const selectedKey = selected ? rowKey(selected.path, selected.side) : "";
@@ -3788,6 +3929,7 @@ function Workspace(props) {
       onRefresh: () => void loadStatus(),
       onOpen: (target) => void openLocalAction(target),
       onSelectWorkspace: switchWorkspace,
+      onTogglePin: (path, pinned) => void toggleRepositoryPin(path, pinned),
       canPush,
       canFetch,
       hasUpstream: Boolean(status?.upstream),

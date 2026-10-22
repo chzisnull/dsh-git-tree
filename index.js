@@ -49,6 +49,8 @@ import {
   handleMerge,
   handlePull,
   handleRefs,
+  handleRepositoryOpen,
+  handleRepositoryPin,
   handleRemove,
   handleStage,
   handleStatus,
@@ -76,6 +78,8 @@ export const inject = ['connection', 'subprocess']
 /** Exact Fetch route paths. */
 const ROUTES = [
   { path: '/api/git-tree/workspaces', methods: ['GET'], handler: handleWorkspaces },
+  { path: '/api/git-tree/repositories/pin', methods: ['POST'], handler: handleRepositoryPin },
+  { path: '/api/git-tree/repositories/open', methods: ['POST'], handler: handleRepositoryOpen },
   { path: '/api/git-tree/status', methods: ['GET'], handler: handleStatus },
   { path: '/api/git-tree/diff', methods: ['GET'], handler: handleDiff },
   { path: '/api/git-tree/refs', methods: ['GET'], handler: handleRefs },

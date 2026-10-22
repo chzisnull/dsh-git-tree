@@ -139,3 +139,11 @@ _Avoid_: Sync, update
 **Diverged branches** (分叉):
 Local and remote each have commits the other lacks, so the current branch cannot fast-forward.
 _Avoid_: Out of date, conflict
+
+**Pinned repository** (置顶仓库):
+A workspace the user pinned in the repository switcher; pinned workspaces always list above the usage-ordered ones, in the order they were pinned.
+_Avoid_: Favourite, bookmark
+
+**Open count** (打开次数):
+How many times the user deliberately switched to a repository from the panel; it orders the unpinned part of the switcher, together with the last-opened time.
+_Avoid_: Visits, popularity

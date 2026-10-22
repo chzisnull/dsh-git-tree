@@ -7,7 +7,7 @@ import { h, React } from '../react'
 import type { GitStatusPayload, OpenTarget, Translate, WorkspaceRecord } from '../types'
 import { lastSegment } from '../model'
 import { Chip } from './atoms'
-import { CommitIcon, FetchIcon, FolderIcon, PullIcon, PushIcon, RefreshIcon, TerminalIcon } from '../icons'
+import { CommitIcon, FetchIcon, FolderIcon, PinIcon, PullIcon, PushIcon, RefreshIcon, TerminalIcon } from '../icons'
 import { usePopover } from '../menu'
 
 export function TopBar(props: {
@@ -21,6 +21,7 @@ export function TopBar(props: {
   onOpen: (target: OpenTarget) => void
   onCommitFocus: () => void
   onSelectWorkspace: (path: string) => void
+  onTogglePin: (path: string, pinned: boolean) => void
   canFetch: boolean
   hasUpstream: boolean
   fetching: boolean
@@ -41,9 +42,70 @@ export function TopBar(props: {
   const ahead = status?.ahead ?? 0
   const behind = status?.behind ?? 0
   const staged = status?.counts?.staged ?? 0
+  const pinnedVisible = visible.filter((workspace) => workspace.pinned === true)
+  const otherVisible = visible.filter((workspace) => workspace.pinned !== true)
   const repoPath = props.currentPath || status?.repoRoot || status?.cwd || ''
   const current = props.workspaces.find((workspace) => workspace.path === repoPath)
   const title = current?.title || (status?.repoRoot ? lastSegment(status.repoRoot) : t('panel'))
+
+  const renderRow = (workspace: WorkspaceRecord): any =>
+    h(
+      'div',
+      {
+        key: workspace.id,
+        className: 'dgt-repo-row',
+        role: 'option',
+        tabIndex: 0,
+        'aria-selected': workspace.path === repoPath,
+        'data-current': workspace.path === repoPath || undefined,
+        title:
+          (workspace.openCount ?? 0) > 0
+            ? workspace.path + ' · ' + t('openedTimes') + ' ' + String(workspace.openCount)
+            : workspace.path,
+        onClick: () => {
+          popover.close()
+          props.onSelectWorkspace(workspace.path)
+        },
+        onKeyDown: (event: any) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            popover.close()
+            props.onSelectWorkspace(workspace.path)
+          }
+        },
+      },
+      h(
+        'span',
+        { className: 'dgt-repo-row-main' },
+        h(
+          'span',
+          { className: 'dgt-repo-menu-title' },
+          workspace.path === repoPath ? h('span', { className: 'dgt-repo-check' }, '✓') : null,
+          workspace.title,
+        ),
+        h('span', { className: 'dgt-repo-menu-path' }, workspace.path),
+      ),
+      (workspace.openCount ?? 0) > 0
+        ? h('span', { className: 'dgt-repo-count', title: t('openedTimes') }, String(workspace.openCount))
+        : null,
+      h(
+        'button',
+        {
+          type: 'button',
+          className: 'dgt-repo-pin',
+          'data-pinned': workspace.pinned ? true : undefined,
+          'aria-pressed': workspace.pinned === true,
+          'aria-label': workspace.pinned ? t('unpinRepository') : t('pinRepository'),
+          title: workspace.pinned ? t('unpinRepository') : t('pinRepository'),
+          onClick: (event: any) => {
+            event.stopPropagation()
+            props.onTogglePin(workspace.path, workspace.pinned !== true)
+          },
+          onKeyDown: (event: any) => event.stopPropagation(),
+        },
+        h(PinIcon, { filled: workspace.pinned === true }),
+      ),
+    )
 
   return h(
     'header',
@@ -81,29 +143,36 @@ export function TopBar(props: {
             }),
             visible.length === 0
               ? h('div', { className: 'dgt-repo-menu-empty' }, t('noRepositories'))
-              : visible.map((workspace) =>
-                  h(
-                    'button',
-                    {
-                      key: workspace.id,
-                      type: 'button',
-                      className: 'dgt-repo-menu-item',
-                      role: 'option',
-                      'aria-selected': workspace.path === repoPath,
-                      'data-current': workspace.path === repoPath || undefined,
-                      onClick: () => {
-                        popover.close()
-                        props.onSelectWorkspace(workspace.path)
-                      },
-                    },
-                    h(
-                      'span',
-                      { className: 'dgt-repo-menu-title' },
-                      workspace.path === repoPath ? h('span', { className: 'dgt-repo-check' }, '✓') : null,
-                      workspace.title,
-                    ),
-                    h('span', { className: 'dgt-repo-menu-path' }, workspace.path),
-                  ),
+              : h(
+                  'div',
+                  { className: 'dgt-repo-sections' },
+                  pinnedVisible.length > 0
+                    ? h(
+                        'div',
+                        { className: 'dgt-repo-section' },
+                        h(
+                          'div',
+                          { className: 'dgt-repo-section-head' },
+                          h(PinIcon, { filled: true }),
+                          h('span', null, t('pinnedSection')),
+                          h('span', { className: 'dgt-repo-section-count' }, String(pinnedVisible.length)),
+                        ),
+                        pinnedVisible.map(renderRow),
+                      )
+                    : null,
+                  otherVisible.length > 0
+                    ? h(
+                        'div',
+                        { className: 'dgt-repo-section' },
+                        h(
+                          'div',
+                          { className: 'dgt-repo-section-head' },
+                          h('span', null, pinnedVisible.length > 0 ? t('allRepositories') : t('repositoriesSection')),
+                          h('span', { className: 'dgt-repo-section-count' }, String(otherVisible.length)),
+                        ),
+                        otherVisible.map(renderRow),
+                      )
+                    : null,
                 ),
           )
         : null,

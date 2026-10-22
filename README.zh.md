@@ -10,12 +10,12 @@
 
 `35 秒介绍片（mp4，3.6 MB）` · [`海报`](docs/media/poster.png)
 
-## 0.9.0 能做什么
+## 0.10.0 能做什么
 
 这一版是**本地 Git 工作台**：文件状态、历史、搜索、本地分支——读改动、暂存、提交、切分支、看任意一次提交，全在面板里完成，支持推送当前分支，也可以让 DSH 里的模型来写提交信息。fetch / pull、远程分支和远端管理还没有做。
 
 - **一个 `main` 面板**，入口是左侧图标栏里的 `Git` 一行——和「插件」页面用的是同一类座位，所以它自动拿到整个中栏、窗口顶部安全区和 DSH 的深浅色。
-- **顶部仓库切换**：列出 DSH 已注册的 workspace，选中哪个，所有路由就作用在哪个仓库。
+- **顶部仓库切换**：列出 DSH 已注册的 workspace，选中哪个，所有路由就作用在哪个仓库；仓库可以置顶（置顶区按置顶顺序在前），其余按你切换过去的次数排序、次数相同按最近一次。
 - **分支与同步状态**：当前分支、upstream、ahead/behind、仓库根目录。
 - **Sourcetree 的改动模型**：冲突 / 已暂存 / 未暂存三组带计数；重命名保留原路径；同一文件两侧都有改动时两栏各出现一次（数据来自 `git status --porcelain=v2 --branch -z`）。
 - **结构化 diff**：宿主解析成 files → hunks → lines，渲染双行号、hunk 头、整行底色与 `+N −M`。
@@ -37,7 +37,7 @@
 
 ## 状态
 
-| 能力 | 0.9.0 |
+| 能力 | 0.10.0 |
 | --- | --- |
 | `main` 面板 + 侧栏入口 | 已完成 |
 | 仓库切换（DSH workspaces） | 已完成 |
@@ -93,7 +93,9 @@
 | Client | `client.js`（由 `src/client/index.tsx` 构建） | 把侧栏图标注册进 `sidebar.panellist`、把面板注册进 `main`，两者共用 id `git-tree` |
 
 ```
-GET  /api/git-tree/workspaces          → DSH 已注册 workspace
+GET  /api/git-tree/workspaces          → DSH 已注册 workspace（带置顶与打开次数，已排好序）
+POST /api/git-tree/repositories/pin    → { path, pinned } → 置顶 / 取消置顶
+POST /api/git-tree/repositories/open   → { path } → 记录一次主动切换
 GET  /api/git-tree/status?cwd=…        → 分支、upstream、ahead/behind、entries、counts
 GET  /api/git-tree/diff?path=…&side=…  → files → hunks → lines、统计（或 commit=<sha>）
 GET  /api/git-tree/refs?cwd=…          → 本地分支、标签

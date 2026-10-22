@@ -44,7 +44,9 @@ import {
   fetchWorkspaces,
   openLocal,
   pullBranch,
+  recordRepositoryOpen,
   removePaths,
+  setRepositoryPin,
   stagePaths,
   unstagePaths,
 } from '../routes'
@@ -561,24 +563,30 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, repoPath, historyScope, appliedQuery, appliedAuthor, appliedPath])
 
+  /** Refresh the switcher list with its pins and usage counts. */
+  const loadWorkspaces = React.useCallback(async () => {
+    try {
+      const list = await fetchWorkspaces()
+      if (list.ok) setWorkspaces(list.workspaces ?? [])
+      return list.workspaces ?? []
+    } catch {
+      return []
+    }
+  }, [])
+
   // Registered workspaces for the toolbar switcher; restore the last choice.
   React.useEffect(() => {
     let cancelled = false
     void (async () => {
-      try {
-        const list = await fetchWorkspaces()
-        if (cancelled || !list.ok) return
-        setWorkspaces(list.workspaces ?? [])
-        const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(REPO_KEY) : null
-        if (saved && (list.workspaces ?? []).some((workspace) => workspace.path === saved)) setRepoPath(saved)
-      } catch {
-        /* the switcher stays with the session workspace */
-      }
+      const list = await loadWorkspaces()
+      if (cancelled) return
+      const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(REPO_KEY) : null
+      if (saved && list.some((workspace) => workspace.path === saved)) setRepoPath(saved)
     })()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loadWorkspaces])
 
   React.useEffect(() => {
     void loadStatus()
@@ -1073,8 +1081,10 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
     }
   }, [afterPush, message, pushAfter, repoPath, showToast, status, t])
 
-  const switchWorkspace = React.useCallback((path: string) => {
-    setRepoPath(path)
+  const switchWorkspace = React.useCallback(
+    (path: string) => {
+      if (path === repoPath) return
+      setRepoPath(path)
     try {
       if (typeof localStorage !== 'undefined') localStorage.setItem(REPO_KEY, path)
     } catch {
@@ -1087,8 +1097,28 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
     setView('status')
     setHistoryCommits([])
     setHistorySha('')
-    setPushAfter(false)
-  }, [])
+      setPushAfter(false)
+      // Count the switch, then re-read the ordered list (pins and counts moved).
+      void recordRepositoryOpen(path)
+        .then(() => loadWorkspaces())
+        .catch(() => {})
+    },
+    [loadWorkspaces, repoPath],
+  )
+
+  const toggleRepositoryPin = React.useCallback(
+    async (path: string, pinned: boolean) => {
+      try {
+        const result = await setRepositoryPin(path, pinned)
+        if (!result.ok) throw new Error(result.error || t('pinFailed'))
+        await loadWorkspaces()
+        showToast(pinned ? t('pinnedDone') + ' · ' + path : t('unpinnedDone') + ' · ' + path)
+      } catch (error) {
+        showToast(error instanceof Error ? error.message : String(error))
+      }
+    },
+    [loadWorkspaces, showToast, t],
+  )
 
   const entries = status?.entries ?? []
   const rows = splitEntries(entries)
@@ -1240,6 +1270,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
       onRefresh: () => void loadStatus(),
       onOpen: (target: OpenTarget) => void openLocalAction(target),
       onSelectWorkspace: switchWorkspace,
+      onTogglePin: (path: string, pinned: boolean) => void toggleRepositoryPin(path, pinned),
       canPush,
       canFetch,
       hasUpstream: Boolean(status?.upstream),

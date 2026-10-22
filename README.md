@@ -12,10 +12,10 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.9.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
+Version 0.10.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
-- **Repository switcher** in the toolbar: pick any workspace registered in DSH; every route then runs against that repository.
+- **Repository switcher** in the toolbar: pick any workspace registered in DSH; every route then runs against that repository. Workspaces can be pinned (pinned ones list first, in pin order) and the rest are ordered by how often you switch to them, then by the last time you did.
 - **Branch + sync state**: current branch, upstream, ahead/behind, repository root.
 - **Sourcetree's change model**: conflict, staged and unstaged groups with counts; renames keep their original path; a file changed on both sides appears in both groups (driven by `git status --porcelain=v2 --branch -z`).
 - **Structured diff**: parsed on the host into files → hunks → lines, rendered with dual line numbers, hunk headers, whole-row tints and `+N −M`.
@@ -37,7 +37,7 @@ Version 0.9.0 is the **local workbench slice**: file status, history, search and
 
 ## Status
 
-| Area | 0.9.0 |
+| Area | 0.10.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | repository switcher (DSH workspaces) | done |
@@ -95,7 +95,9 @@ The ✨ button and the model chip in the commit card are one small, bounded feat
 | Client | `client.js` (built from `src/client/index.tsx`) | registers the sidebar launcher into `sidebar.panellist` and the panel into `main`, both under the id `git-tree` |
 
 ```
-GET  /api/git-tree/workspaces              → registered DSH workspaces
+GET  /api/git-tree/workspaces              → registered DSH workspaces + pins/open counts, ordered
+POST /api/git-tree/repositories/pin        → { path, pinned } → pin / unpin one workspace
+POST /api/git-tree/repositories/open       → { path } → count one deliberate switch
 GET  /api/git-tree/status?cwd=…            → branch, upstream, ahead/behind, entries[], counts
 GET  /api/git-tree/diff?path=…&side=…      → files → hunks → lines, stats (or commit=<sha>)
 GET  /api/git-tree/refs?cwd=…              → local branches, tags

@@ -16,7 +16,6 @@
 
 import { randomUUID } from 'node:crypto'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { currentBranchOf, git, subprocessOf } from './git.js'
 import { parseUnifiedDiff } from './diff.js'
@@ -47,11 +46,9 @@ export const AI_TIMEOUT_MS = 60_000
 
 const STATUS_LETTERS = new Set(['M', 'A', 'D', 'R', 'C', 'U', '?', 'T'])
 
-/** DSH home (`DSH_HOME` when set, `~/.dsh` otherwise), matching the settings provider. */
-export function dshHome() {
-  const configured = process.env.DSH_HOME
-  return typeof configured === 'string' && configured !== '' ? configured : join(homedir(), '.dsh')
-}
+import { dshHome } from './home.js'
+
+export { dshHome }
 
 /** Where the chosen commit-message model is remembered. */
 export function aiSettingsPath() {

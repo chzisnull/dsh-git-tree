@@ -29,6 +29,8 @@ const REMOVE_ROUTE = 'api/git-tree/remove'
 const MERGE_ROUTE = 'api/git-tree/merge'
 const PUSH_ROUTE = 'api/git-tree/push'
 const FETCH_ROUTE = 'api/git-tree/fetch'
+const REPOSITORY_PIN_ROUTE = 'api/git-tree/repositories/pin'
+const REPOSITORY_OPEN_ROUTE = 'api/git-tree/repositories/open'
 const PULL_ROUTE = 'api/git-tree/pull'
 const BRANCH_CREATE_ROUTE = 'api/git-tree/branch/create'
 const BRANCH_RENAME_ROUTE = 'api/git-tree/branch/rename'
@@ -200,4 +202,13 @@ export function revertConflict(path: string, cwd?: string): Promise<MutationPayl
 
 export function markConflictResolved(path: string, cwd?: string): Promise<MutationPayload> {
   return postJson<MutationPayload>(CONFLICT_MARK_ROUTE + query({ cwd }), { path })
+}
+
+
+export function setRepositoryPin(path: string, pinned: boolean): Promise<MutationPayload> {
+  return postJson<MutationPayload>(REPOSITORY_PIN_ROUTE, { path, pinned })
+}
+
+export function recordRepositoryOpen(path: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(REPOSITORY_OPEN_ROUTE, { path })
 }

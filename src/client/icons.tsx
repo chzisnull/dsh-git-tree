@@ -25,6 +25,21 @@ export function CommitIcon(): any {
   ])
 }
 
+/** Pushpin: outlined when unpinned, solid when pinned. */
+export function PinIcon(props?: { filled?: boolean }): any {
+  const filled = props?.filled === true
+  return svg([
+    h('path', {
+      d: 'M10.4 1.9 14.1 5.6 11.9 6.4 8.8 9.5 8.6 12.8 3.2 7.4 6.5 7.2 9.6 4.1Z',
+      fill: filled ? 'currentColor' : 'none',
+      stroke: 'currentColor',
+      strokeWidth: 1.15,
+      strokeLinejoin: 'round',
+    }),
+    h('path', { d: 'M3.6 12.4 1.9 14.1', fill: 'none', stroke: 'currentColor', strokeWidth: 1.25, strokeLinecap: 'round' }),
+  ])
+}
+
 /** Fetch: two arrows cycling, the universal "talk to the remote" glyph. */
 export function FetchIcon(): any {
   return svg([
