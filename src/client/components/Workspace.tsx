@@ -54,6 +54,7 @@ import type { ViewKind } from '../types'
 
 const POLL_MS = 2000
 const REPO_KEY = 'dsh-git-tree/repository'
+const COMMIT_FOLD_KEY = 'dsh-git-tree/commit-collapsed'
 
 function findEntry(status: GitStatusPayload | null, path: string): GitFileEntry | null {
   return (status?.entries ?? []).find((entry) => entry.path === path) ?? null
@@ -107,6 +108,15 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
   } | null>(null)
   const [contextMenu, setContextMenu] = React.useState<ContextMenuState | null>(null)
   const [pushAfter, setPushAfter] = React.useState(false)
+  // The commit card folds to one strip; the choice outlives the panel, like the
+  // repository choice, so a user who wants the diff space keeps it.
+  const [commitCollapsed, setCommitCollapsed] = React.useState<boolean>(() => {
+    try {
+      return typeof localStorage !== 'undefined' && localStorage.getItem(COMMIT_FOLD_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
   const [aiModels, setAiModels] = React.useState<AiModelsPayload | null>(null)
   const [aiLoading, setAiLoading] = React.useState(false)
   const [aiBusy, setAiBusy] = React.useState(false)
@@ -130,6 +140,15 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
   React.useEffect(() => {
     busyRef.current = busy
   }, [busy])
+
+  const setCommitFold = React.useCallback((folded: boolean) => {
+    setCommitCollapsed(folded)
+    try {
+      if (typeof localStorage !== 'undefined') localStorage.setItem(COMMIT_FOLD_KEY, folded ? '1' : '0')
+    } catch {
+      /* storage may be unavailable; the fold still holds for this mount */
+    }
+  }, [])
 
   const showToast = React.useCallback((text: string) => {
     setToast(text)
@@ -635,6 +654,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
           if (!staged.ok) throw new Error(staged.error || t('stageFailed'))
           await loadStatus({ silent: true })
         }
+        setCommitFold(false)
         setTimeout(() => {
           if (commitInput.current && commitInput.current.focus) commitInput.current.focus()
         }, 0)
@@ -644,7 +664,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
         setBusy(false)
       }
     },
-    [loadStatus, repoPath, t],
+    [loadStatus, repoPath, setCommitFold, t],
   )
 
   const submitDiscard = React.useCallback(async () => {
@@ -981,6 +1001,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
           actionError,
           t,
           commitInputRef: commitInput,
+          commitCollapsed,
+          onToggleCommitCollapsed: () => setCommitFold(!commitCollapsed),
           onSelect: (entry: GitFileEntry, side: EntrySide) => void openDiff(entry, side),
           onToggle: (entry: GitFileEntry, side: EntrySide) => void toggle(entry, side),
           onCopyPath: copyPath,

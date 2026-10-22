@@ -283,6 +283,30 @@ export const CSS = `
 .dgt-commit{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px 14px 13px;
   border:1px solid var(--dgt-line);border-radius:12px;background:var(--dgt-card);
   box-shadow:0 2px 12px var(--dsw-alias-bg-mask-1);}
+/* Folded: one strip that gives the diff the space back. Clicking it unfolds.
+   The body keeps its DOM so 0fr → 1fr can animate the height without measuring;
+   folded it is inert, so the hidden controls leave the tab order too. */
+.dgt-commit{transition:padding .2s cubic-bezier(.2,.8,.2,1),gap .2s cubic-bezier(.2,.8,.2,1);}
+.dgt-commit-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .2s cubic-bezier(.2,.8,.2,1);}
+.dgt-commit-body[data-folded='true']{grid-template-rows:0fr;}
+.dgt-commit-body-inner{min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px;}
+.dgt-commit[data-collapsed]{padding:7px 10px 7px 12px;gap:0;}
+.dgt-commit[data-collapsed] .dgt-commit-meta{width:100%;gap:9px;cursor:pointer;border-radius:8px;
+  outline:none;min-height:24px;}
+.dgt-commit[data-collapsed] .dgt-commit-meta:hover .dgt-commit-preview{color:var(--dsw-alias-label-secondary);}
+.dgt-commit[data-collapsed] .dgt-commit-meta:focus-visible{box-shadow:0 0 0 2px var(--dgt-line);}
+@media (prefers-reduced-motion:reduce){.dgt-commit,.dgt-commit-body{transition:none;}}
+.dgt-commit-preview{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  text-align:right;color:var(--dsw-alias-label-secondary);font-size:11px;}
+.dgt-commit-preview[data-empty]{color:var(--dsw-alias-label-tertiary);}
+.dgt-commit-toggle{appearance:none;display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 auto;width:24px;height:24px;padding:0;border:0;border-radius:7px;background:transparent;
+  color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;}
+.dgt-commit-toggle:hover{background:var(--dgt-line-soft);color:var(--dsw-alias-label-primary);}
+.dgt-commit-caret{font-size:10px;line-height:1;transition:transform .15s ease;}
+.dgt-commit[data-collapsed] .dgt-commit-caret{transform:rotate(180deg);}
+.dgt-commit-label .dgt-commit-toggle{margin-left:-2px;}
+@media (prefers-reduced-motion:reduce){.dgt-commit-caret{transition:none}}
 .dgt-commit-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dsw-alias-label-secondary);}
 .dgt-avatar{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;
   background:var(--dgt-accent-soft);color:var(--dgt-accent-strong);font-size:9.5px;font-weight:600;flex:0 0 auto;}

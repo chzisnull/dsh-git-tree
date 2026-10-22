@@ -38,6 +38,8 @@ export function StatusView(props: {
   canPush: boolean
   pushAfter: boolean
   onPushAfter: (value: boolean) => void
+  commitCollapsed: boolean
+  onToggleCommitCollapsed: () => void
   ai: AiCommitControls
 }): any {
   const { t } = props
@@ -85,6 +87,8 @@ export function StatusView(props: {
           onPushAfter: props.onPushAfter,
           onMessage: props.onMessage,
           onCommit: props.onCommit,
+          collapsed: props.commitCollapsed,
+          onToggleCollapsed: props.onToggleCommitCollapsed,
           ai: props.ai,
         }),
       ),

@@ -156,6 +156,8 @@ export const EN: Record<string, string> = {
   aiModelSwitched: 'Commit message model updated',
   aiModelSaveFailed: 'Could not save the model choice',
   aiPartialCatalog: 'Some providers could not be listed:',
+  collapseCommit: 'Fold the commit box',
+  expandCommit: 'Unfold the commit box',
 }
 
 export const ZH: Record<string, string> = {
@@ -310,4 +312,6 @@ export const ZH: Record<string, string> = {
   aiModelSwitched: '已切换生成提交信息的模型',
   aiModelSaveFailed: '保存模型选择失败',
   aiPartialCatalog: '部分提供方的模型列表读取失败：',
+  collapseCommit: '折叠提交区',
+  expandCommit: '展开提交区',
 }

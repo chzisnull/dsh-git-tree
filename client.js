@@ -185,7 +185,9 @@ var EN = {
   aiFailed: "Could not write the commit message",
   aiModelSwitched: "Commit message model updated",
   aiModelSaveFailed: "Could not save the model choice",
-  aiPartialCatalog: "Some providers could not be listed:"
+  aiPartialCatalog: "Some providers could not be listed:",
+  collapseCommit: "Fold the commit box",
+  expandCommit: "Unfold the commit box"
 };
 var ZH = {
   panel: "Git",
@@ -338,7 +340,9 @@ var ZH = {
   aiFailed: "\u751F\u6210\u63D0\u4EA4\u4FE1\u606F\u5931\u8D25",
   aiModelSwitched: "\u5DF2\u5207\u6362\u751F\u6210\u63D0\u4EA4\u4FE1\u606F\u7684\u6A21\u578B",
   aiModelSaveFailed: "\u4FDD\u5B58\u6A21\u578B\u9009\u62E9\u5931\u8D25",
-  aiPartialCatalog: "\u90E8\u5206\u63D0\u4F9B\u65B9\u7684\u6A21\u578B\u5217\u8868\u8BFB\u53D6\u5931\u8D25\uFF1A"
+  aiPartialCatalog: "\u90E8\u5206\u63D0\u4F9B\u65B9\u7684\u6A21\u578B\u5217\u8868\u8BFB\u53D6\u5931\u8D25\uFF1A",
+  collapseCommit: "\u6298\u53E0\u63D0\u4EA4\u533A",
+  expandCommit: "\u5C55\u5F00\u63D0\u4EA4\u533A"
 };
 
 // src/client/styles.ts
@@ -622,6 +626,30 @@ var CSS = `
 .dgt-commit{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;margin-top:10px;padding:12px 14px 13px;
   border:1px solid var(--dgt-line);border-radius:12px;background:var(--dgt-card);
   box-shadow:0 2px 12px var(--dsw-alias-bg-mask-1);}
+/* Folded: one strip that gives the diff the space back. Clicking it unfolds.
+   The body keeps its DOM so 0fr \u2192 1fr can animate the height without measuring;
+   folded it is inert, so the hidden controls leave the tab order too. */
+.dgt-commit{transition:padding .2s cubic-bezier(.2,.8,.2,1),gap .2s cubic-bezier(.2,.8,.2,1);}
+.dgt-commit-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .2s cubic-bezier(.2,.8,.2,1);}
+.dgt-commit-body[data-folded='true']{grid-template-rows:0fr;}
+.dgt-commit-body-inner{min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:8px;}
+.dgt-commit[data-collapsed]{padding:7px 10px 7px 12px;gap:0;}
+.dgt-commit[data-collapsed] .dgt-commit-meta{width:100%;gap:9px;cursor:pointer;border-radius:8px;
+  outline:none;min-height:24px;}
+.dgt-commit[data-collapsed] .dgt-commit-meta:hover .dgt-commit-preview{color:var(--dsw-alias-label-secondary);}
+.dgt-commit[data-collapsed] .dgt-commit-meta:focus-visible{box-shadow:0 0 0 2px var(--dgt-line);}
+@media (prefers-reduced-motion:reduce){.dgt-commit,.dgt-commit-body{transition:none;}}
+.dgt-commit-preview{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  text-align:right;color:var(--dsw-alias-label-secondary);font-size:11px;}
+.dgt-commit-preview[data-empty]{color:var(--dsw-alias-label-tertiary);}
+.dgt-commit-toggle{appearance:none;display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 auto;width:24px;height:24px;padding:0;border:0;border-radius:7px;background:transparent;
+  color:var(--dsw-alias-label-tertiary);font:inherit;cursor:pointer;}
+.dgt-commit-toggle:hover{background:var(--dgt-line-soft);color:var(--dsw-alias-label-primary);}
+.dgt-commit-caret{font-size:10px;line-height:1;transition:transform .15s ease;}
+.dgt-commit[data-collapsed] .dgt-commit-caret{transform:rotate(180deg);}
+.dgt-commit-label .dgt-commit-toggle{margin-left:-2px;}
+@media (prefers-reduced-motion:reduce){.dgt-commit-caret{transition:none}}
 .dgt-commit-meta{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--dsw-alias-label-secondary);}
 .dgt-avatar{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;
   background:var(--dgt-accent-soft);color:var(--dgt-accent-strong);font-size:9.5px;font-weight:600;flex:0 0 auto;}
@@ -1673,160 +1701,200 @@ function CommitBox(props) {
   const hasChanges = staged + unstaged > 0;
   const canGenerate = hasChanges && !ai.busy && !props.busy && !blocked && ai.active !== null;
   const picker = usePopover();
+  const collapsed = props.collapsed === true;
   const defaultHint = blocked ? t("conflictsBlockCommit") : staged === 0 ? t("commitHint") : props.message.trim() === "" ? t("commitMessageEmpty") : t("commitShortcut");
   const generateTitle = !hasChanges ? t("aiNoChanges") : blocked ? t("conflictsBlockCommit") : ai.active === null ? t("aiNoModelTip") : staged > 0 ? t("aiFromStaged") : t("aiFromAll");
-  return h(
+  const toggle = () => h(
+    "button",
+    {
+      type: "button",
+      className: "dgt-commit-toggle",
+      "aria-expanded": !collapsed,
+      "aria-label": collapsed ? t("expandCommit") : t("collapseCommit"),
+      title: collapsed ? t("expandCommit") : t("collapseCommit"),
+      onClick: (event) => {
+        event.stopPropagation();
+        props.onToggleCollapsed();
+      },
+      onKeyDown: (event) => event.stopPropagation()
+    },
+    h("span", { className: "dgt-commit-caret", "aria-hidden": "true" }, "\u25BE")
+  );
+  const preview = props.message.trim().split("\n")[0] ?? "";
+  const meta = h(
     "div",
-    { className: "dgt-commit" },
+    {
+      className: "dgt-commit-meta",
+      // Clicking the strip unfolds; the caret button stays the keyboard target,
+      // so no interactive control is nested inside another one.
+      ...collapsed ? { title: t("expandCommit"), onClick: () => props.onToggleCollapsed() } : {}
+    },
+    h("span", { className: "dgt-avatar" }, initials(identity?.name || "")),
     h(
-      "div",
-      { className: "dgt-commit-meta" },
-      h("span", { className: "dgt-avatar" }, initials(identity?.name || "")),
-      h(
-        "span",
-        { className: "dgt-commit-author" },
-        identity?.name ? identity.name + (identity.email ? " <" + identity.email + ">" : "") : t("author") + ": \u2014"
-      ),
-      h("span", { className: "dgt-commit-branch" }, "\u2387 " + branch),
-      h("span", { className: "dgt-commit-branch" }, String(staged) + " " + t("filesChanged"))
+      "span",
+      { className: "dgt-commit-author" },
+      identity?.name ? identity.name + (identity.email ? " <" + identity.email + ">" : "") : t("author") + ": \u2014"
     ),
+    h("span", { className: "dgt-commit-branch" }, "\u2387 " + branch),
+    h("span", { className: "dgt-commit-branch" }, String(staged) + " " + t("filesChanged")),
+    collapsed ? h(
+      "span",
+      { className: "dgt-commit-preview", "data-empty": preview === "" ? true : void 0 },
+      preview || (staged > 0 ? t("commitMessageEmpty") : t("commitHint"))
+    ) : null,
+    collapsed ? toggle() : null
+  );
+  const body = h(
+    "div",
+    {
+      className: "dgt-commit-body",
+      "data-folded": collapsed ? "true" : void 0,
+      "aria-hidden": collapsed ? "true" : void 0,
+      inert: collapsed ? "" : void 0
+    },
     h(
       "div",
-      { className: "dgt-commit-label" },
-      h("span", null, t("commitMessageLabel")),
+      { className: "dgt-commit-body-inner" },
       h(
         "div",
-        { className: "dgt-ai" },
+        { className: "dgt-commit-label" },
+        h("span", null, t("commitMessageLabel")),
         h(
-          "button",
-          {
-            type: "button",
-            className: "dgt-ai-generate",
-            "data-busy": ai.busy ? "true" : void 0,
-            disabled: !canGenerate,
-            title: generateTitle,
-            onClick: ai.onGenerate
-          },
-          h(SparkIcon, null),
-          ai.busy ? t("aiGenerating") : t("aiGenerate")
-        ),
-        h(
-          "button",
-          {
-            type: "button",
-            className: "dgt-ai-chip",
-            title: t("aiModelTip"),
-            "aria-haspopup": "listbox",
-            "aria-expanded": picker.open,
-            ref: picker.triggerRef,
-            onClick: picker.toggle
-          },
-          h("span", { className: "dgt-ai-chip-name" }, shortModelName(ai.active, t)),
-          h("span", { className: "dgt-ai-caret", "aria-hidden": "true" }, "\u25BE")
-        ),
-        picker.open ? h(
           "div",
-          {
-            className: "dgt-ai-menu",
-            role: "listbox",
-            "aria-label": t("aiModel"),
-            ref: picker.menuRef
-          },
-          h("div", { className: "dgt-ai-menu-head" }, t("aiModelTip")),
-          ai.loading ? h("div", { className: "dgt-ai-menu-empty" }, t("loading")) : ai.groups.length === 0 ? h("div", { className: "dgt-ai-menu-empty" }, ai.error || t("aiNoModelTip")) : ai.groups.map(
-            (group) => h(
-              "div",
-              { className: "dgt-ai-group", key: group.id },
-              h("div", { className: "dgt-ai-group-title" }, group.name),
-              group.models.map(
-                (model) => h(
-                  "button",
-                  {
-                    key: group.id + "/" + model.id,
-                    type: "button",
-                    className: "dgt-ai-option",
-                    role: "option",
-                    "aria-selected": ai.active?.provider === group.id && ai.active?.model === model.id,
-                    "data-current": ai.active?.provider === group.id && ai.active?.model === model.id ? true : void 0,
-                    onClick: () => {
-                      picker.close();
-                      ai.onSelect(group.id, model.id);
-                    }
-                  },
-                  h(
-                    "span",
-                    { className: "dgt-ai-option-check" },
-                    ai.active?.provider === group.id && ai.active?.model === model.id ? "\u2713" : ""
-                  ),
-                  h("span", { className: "dgt-ai-option-name" }, model.name || model.id),
-                  model.name && model.name !== model.id ? h("span", { className: "dgt-ai-option-id" }, model.id) : null
+          { className: "dgt-ai" },
+          h(
+            "button",
+            {
+              type: "button",
+              className: "dgt-ai-generate",
+              "data-busy": ai.busy ? "true" : void 0,
+              disabled: !canGenerate || collapsed,
+              title: generateTitle,
+              onClick: ai.onGenerate
+            },
+            h(SparkIcon, null),
+            ai.busy ? t("aiGenerating") : t("aiGenerate")
+          ),
+          h(
+            "button",
+            {
+              type: "button",
+              className: "dgt-ai-chip",
+              title: t("aiModelTip"),
+              "aria-haspopup": "listbox",
+              "aria-expanded": picker.open,
+              ref: picker.triggerRef,
+              onClick: picker.toggle
+            },
+            h("span", { className: "dgt-ai-chip-name" }, shortModelName(ai.active, t)),
+            h("span", { className: "dgt-ai-caret", "aria-hidden": "true" }, "\u25BE")
+          ),
+          picker.open ? h(
+            "div",
+            {
+              className: "dgt-ai-menu",
+              role: "listbox",
+              "aria-label": t("aiModel"),
+              ref: picker.menuRef
+            },
+            h("div", { className: "dgt-ai-menu-head" }, t("aiModelTip")),
+            ai.loading ? h("div", { className: "dgt-ai-menu-empty" }, t("loading")) : ai.groups.length === 0 ? h("div", { className: "dgt-ai-menu-empty" }, ai.error || t("aiNoModelTip")) : ai.groups.map(
+              (group) => h(
+                "div",
+                { className: "dgt-ai-group", key: group.id },
+                h("div", { className: "dgt-ai-group-title" }, group.name),
+                group.models.map(
+                  (model) => h(
+                    "button",
+                    {
+                      key: group.id + "/" + model.id,
+                      type: "button",
+                      className: "dgt-ai-option",
+                      role: "option",
+                      "aria-selected": ai.active?.provider === group.id && ai.active?.model === model.id,
+                      "data-current": ai.active?.provider === group.id && ai.active?.model === model.id ? true : void 0,
+                      onClick: () => {
+                        picker.close();
+                        ai.onSelect(group.id, model.id);
+                      }
+                    },
+                    h(
+                      "span",
+                      { className: "dgt-ai-option-check" },
+                      ai.active?.provider === group.id && ai.active?.model === model.id ? "\u2713" : ""
+                    ),
+                    h("span", { className: "dgt-ai-option-name" }, model.name || model.id),
+                    model.name && model.name !== model.id ? h("span", { className: "dgt-ai-option-id" }, model.id) : null
+                  )
                 )
               )
-            )
-          ),
-          ai.failures.length > 0 ? h(
-            "div",
-            { className: "dgt-ai-menu-failure" },
-            t("aiPartialCatalog") + " " + ai.failures.map((failure) => failure.name).join("\u3001")
-          ) : null
-        ) : null
-      )
-    ),
-    h("textarea", {
-      className: "dgt-commit-input",
-      ref: props.inputRef,
-      value: props.message,
-      placeholder: t("commitPlaceholder"),
-      spellCheck: false,
-      onChange: (event) => props.onMessage(event.target.value),
-      onKeyDown: (event) => {
-        if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-          event.preventDefault();
-          if (canCommit) props.onCommit();
+            ),
+            ai.failures.length > 0 ? h(
+              "div",
+              { className: "dgt-ai-menu-failure" },
+              t("aiPartialCatalog") + " " + ai.failures.map((failure) => failure.name).join("\u3001")
+            ) : null
+          ) : null,
+          collapsed ? null : toggle()
+        )
+      ),
+      h("textarea", {
+        className: "dgt-commit-input",
+        ref: props.inputRef,
+        value: props.message,
+        placeholder: t("commitPlaceholder"),
+        spellCheck: false,
+        onChange: (event) => props.onMessage(event.target.value),
+        onKeyDown: (event) => {
+          if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+            event.preventDefault();
+            if (canCommit) props.onCommit();
+          }
         }
-      }
-    }),
-    h(
-      "label",
-      {
-        className: "dgt-commit-check",
-        "data-disabled": props.canPush ? void 0 : true,
-        title: props.canPush ? void 0 : t("pushNoRemote")
-      },
-      h("input", {
-        type: "checkbox",
-        checked: props.pushAfter,
-        disabled: !props.canPush,
-        onChange: (event) => props.onPushAfter(event.target.checked)
       }),
-      h("span", null, t("pushAfterCommit")),
-      props.canPush ? null : h("em", null, t("pushNoRemote"))
-    ),
-    h(
-      "div",
-      { className: "dgt-commit-foot" },
       h(
-        "span",
-        { className: "dgt-hint", "data-tone": props.hintTone === "error" ? "error" : void 0 },
-        props.hint || defaultHint
-      ),
-      h(
-        "button",
-        { type: "button", className: "dgt-clear", onClick: () => props.onMessage("") },
-        t("clear")
-      ),
-      h(
-        "button",
+        "label",
         {
-          type: "button",
-          className: "dgt-primary",
-          disabled: !canCommit,
-          onClick: props.onCommit
+          className: "dgt-commit-check",
+          "data-disabled": props.canPush ? void 0 : true,
+          title: props.canPush ? void 0 : t("pushNoRemote")
         },
-        props.busy ? t("loading") : t("commit")
+        h("input", {
+          type: "checkbox",
+          checked: props.pushAfter,
+          disabled: !props.canPush,
+          onChange: (event) => props.onPushAfter(event.target.checked)
+        }),
+        h("span", null, t("pushAfterCommit")),
+        props.canPush ? null : h("em", null, t("pushNoRemote"))
+      ),
+      h(
+        "div",
+        { className: "dgt-commit-foot" },
+        h(
+          "span",
+          { className: "dgt-hint", "data-tone": props.hintTone === "error" ? "error" : void 0 },
+          props.hint || defaultHint
+        ),
+        h(
+          "button",
+          { type: "button", className: "dgt-clear", onClick: () => props.onMessage("") },
+          t("clear")
+        ),
+        h(
+          "button",
+          {
+            type: "button",
+            className: "dgt-primary",
+            disabled: !canCommit,
+            onClick: props.onCommit
+          },
+          props.busy ? t("loading") : t("commit")
+        )
       )
     )
   );
+  return h("div", { className: "dgt-commit", "data-collapsed": collapsed ? true : void 0 }, meta, body);
 }
 
 // src/client/components/views/StatusView.tsx
@@ -1875,6 +1943,8 @@ function StatusView(props) {
           onPushAfter: props.onPushAfter,
           onMessage: props.onMessage,
           onCommit: props.onCommit,
+          collapsed: props.commitCollapsed,
+          onToggleCollapsed: props.onToggleCommitCollapsed,
           ai: props.ai
         })
       )
@@ -2329,6 +2399,7 @@ function ContextMenu(props) {
 // src/client/components/Workspace.tsx
 var POLL_MS = 2e3;
 var REPO_KEY = "dsh-git-tree/repository";
+var COMMIT_FOLD_KEY = "dsh-git-tree/commit-collapsed";
 function findEntry(status, path) {
   return (status?.entries ?? []).find((entry) => entry.path === path) ?? null;
 }
@@ -2366,6 +2437,13 @@ function Workspace(props) {
   const [dialog, setDialog] = React.useState(null);
   const [contextMenu, setContextMenu] = React.useState(null);
   const [pushAfter, setPushAfter] = React.useState(false);
+  const [commitCollapsed, setCommitCollapsed] = React.useState(() => {
+    try {
+      return typeof localStorage !== "undefined" && localStorage.getItem(COMMIT_FOLD_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
   const [aiModels, setAiModels] = React.useState(null);
   const [aiLoading, setAiLoading] = React.useState(false);
   const [aiBusy, setAiBusy] = React.useState(false);
@@ -2388,6 +2466,13 @@ function Workspace(props) {
   React.useEffect(() => {
     busyRef.current = busy;
   }, [busy]);
+  const setCommitFold = React.useCallback((folded) => {
+    setCommitCollapsed(folded);
+    try {
+      if (typeof localStorage !== "undefined") localStorage.setItem(COMMIT_FOLD_KEY, folded ? "1" : "0");
+    } catch {
+    }
+  }, []);
   const showToast = React.useCallback((text) => {
     setToast(text);
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -2839,6 +2924,7 @@ function Workspace(props) {
           if (!staged.ok) throw new Error(staged.error || t("stageFailed"));
           await loadStatus({ silent: true });
         }
+        setCommitFold(false);
         setTimeout(() => {
           if (commitInput.current && commitInput.current.focus) commitInput.current.focus();
         }, 0);
@@ -2848,7 +2934,7 @@ function Workspace(props) {
         setBusy(false);
       }
     },
-    [loadStatus, repoPath, t]
+    [loadStatus, repoPath, setCommitFold, t]
   );
   const submitDiscard = React.useCallback(async () => {
     const path = dialog?.path ?? "";
@@ -3164,6 +3250,8 @@ function Workspace(props) {
           actionError,
           t,
           commitInputRef: commitInput,
+          commitCollapsed,
+          onToggleCommitCollapsed: () => setCommitFold(!commitCollapsed),
           onSelect: (entry, side) => void openDiff(entry, side),
           onToggle: (entry, side) => void toggle(entry, side),
           onCopyPath: copyPath,
