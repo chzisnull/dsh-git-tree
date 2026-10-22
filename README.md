@@ -12,7 +12,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.8.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
+Version 0.9.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Repository switcher** in the toolbar: pick any workspace registered in DSH; every route then runs against that repository.
@@ -25,6 +25,7 @@ Version 0.8.0 is the **local workbench slice**: file status, history, search and
 - **Search view**: find commits by message, author or file path; results reuse the history list and detail.
 - **Branches**: click a branch to browse its history, double-click to check out; create, rename and delete local branches from the rail. Checkout refuses a dirty working copy instead of stashing your changes.
 - **Right-click actions**: file rows offer commit (stage + focus the message), stage/unstage, discard changes, delete file / delete untracked file and copy path; branch rows offer checkout, rename, delete and copy name; commit rows offer copy SHA, new branch from this commit and copy message. Destructive items confirm first and only live items are red.
+- **Fetch and pull**: Fetch reads the remote's refs (pruned) so ahead/behind is current; Pull fast-forwards the current branch to its upstream, or to `origin/<same branch>` when the branch tracks nothing. Fetch and pull run as two separate actions, the panel fetches once when it opens, and a diverged branch asks before the plugin merges the remote in — conflicts land in the conflict view.
 - **Push**: push the current branch to its upstream (setting the upstream on first push). Never forces; authentication and non-fast-forward failures are translated into readable next steps.
 - **Commit and push**: a checkbox in the commit card pushes right after a successful commit. A failed push never rolls the commit back.
 - **Foldable commit card**: the card folds to one strip — author, branch, staged count and the first line of the message — so the diff gets the space back. The Fold/Unfold pill sits at the right of the metadata row in both states; clicking the strip unfolds too, and the fold is remembered across reloads. A row action that opens the message box unfolds it first.
@@ -36,7 +37,7 @@ Version 0.8.0 is the **local workbench slice**: file status, history, search and
 
 ## Status
 
-| Area | 0.8.0 |
+| Area | 0.9.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | repository switcher (DSH workspaces) | done |
@@ -56,7 +57,8 @@ Version 0.8.0 is the **local workbench slice**: file status, history, search and
 | auto refresh | done |
 | right-sidebar tab (compact mode) | not yet |
 | push current branch | done |
-| fetch / pull / remote branches / remote management | not yet |
+| fetch / pull | done |
+| remote branches / remote management | not yet |
 | merge into current branch | done |
 | conflict view + AI conflict resolution | done |
 | rebase / stash / manual 3-way merge editor | not yet |
@@ -113,6 +115,8 @@ POST /api/git-tree/checkout                → { branch } → refuses a dirty wo
 POST /api/git-tree/branch/create|rename|delete
 POST /api/git-tree/open                    → { target: 'finder' | 'terminal' }
 POST /api/git-tree/push                    → current branch → its upstream (no force)
+POST /api/git-tree/fetch                   → git fetch <remote> --prune (working tree untouched)
+POST /api/git-tree/pull                    → { mode: 'ff-only' | 'merge' } → fetch, then fast-forward
 POST /api/git-tree/discard                 → { paths[], side } → git restore
 POST /api/git-tree/remove                  → { paths[], untracked } → git rm / git clean
 ```

@@ -25,6 +25,25 @@ export function CommitIcon(): any {
   ])
 }
 
+/** Fetch: two arrows cycling, the universal "talk to the remote" glyph. */
+export function FetchIcon(): any {
+  return svg([
+    h('path', { d: 'M13.2 5.6a5.2 5.2 0 0 0-8.9-1.2', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round' }),
+    h('path', { d: 'M2.6 2.3v3h3', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+    h('path', { d: 'M2.8 10.4a5.2 5.2 0 0 0 8.9 1.2', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round' }),
+    h('path', { d: 'M13.4 13.7v-3h-3', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+  ])
+}
+
+/** Pull: an arrow coming down onto a line — the mirror of the push glyph. */
+export function PullIcon(): any {
+  return svg([
+    h('path', { d: 'M8 2.6v7.2', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round' }),
+    h('path', { d: 'M4.8 6.6 8 9.8l3.2-3.2', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round', strokeLinejoin: 'round' }),
+    h('path', { d: 'M3 13.2h10', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round' }),
+  ])
+}
+
 export function PushIcon(): any {
   return svg([
     h('path', { d: 'M8 13V3.4', fill: 'none', stroke: 'currentColor', strokeWidth: 1.4, strokeLinecap: 'round' }),

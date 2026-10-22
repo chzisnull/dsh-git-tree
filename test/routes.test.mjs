@@ -160,7 +160,7 @@ test('host plugin declares its name and hard service dependencies', () => {
   assert.deepEqual(inject, ['connection', 'subprocess'])
 })
 
-test('apply registers the twenty-five authenticated exact Fetch routes', () => {
+test('apply registers the twenty-seven authenticated exact Fetch routes', () => {
   const ctx = fakeContext()
   apply(ctx)
 
@@ -182,9 +182,11 @@ test('apply registers the twenty-five authenticated exact Fetch routes', () => {
       '/api/git-tree/conflict/revert',
       '/api/git-tree/diff',
       '/api/git-tree/discard',
+      '/api/git-tree/fetch',
       '/api/git-tree/history',
       '/api/git-tree/merge',
       '/api/git-tree/open',
+      '/api/git-tree/pull',
       '/api/git-tree/push',
       '/api/git-tree/refs',
       '/api/git-tree/remove',
@@ -213,6 +215,8 @@ test('apply registers the twenty-five authenticated exact Fetch routes', () => {
       '/api/git-tree/merge',
       '/api/git-tree/open',
       '/api/git-tree/push',
+      '/api/git-tree/pull',
+      '/api/git-tree/fetch',
       '/api/git-tree/branch/create',
       '/api/git-tree/branch/rename',
       '/api/git-tree/branch/delete',

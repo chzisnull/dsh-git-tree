@@ -127,3 +127,15 @@ _Avoid_: Combined diff, merge diff
 **AI conflict resolution** (AI 解决冲突):
 A model-proposed merge of one conflicted file, previewed as a diff and written only after the user applies it; the conflict can be restored with `git checkout --merge`.
 _Avoid_: Auto-merge, conflict fixer
+
+**Fetch** (获取):
+Reading the remote's refs into the local remote-tracking branches; it updates ahead/behind and never touches the working tree.
+_Avoid_: Sync, update
+
+**Pull** (拉取):
+Fetch, then fast-forward the current branch to its upstream; a diverged branch needs an explicit merge instead.
+_Avoid_: Sync, update
+
+**Diverged branches** (分叉):
+Local and remote each have commits the other lacks, so the current branch cannot fast-forward.
+_Avoid_: Out of date, conflict

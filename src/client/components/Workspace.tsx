@@ -39,9 +39,11 @@ import {
   fetchDiff,
   fetchHistory,
   fetchRefs,
+  fetchRemote,
   fetchStatus,
   fetchWorkspaces,
   openLocal,
+  pullBranch,
   removePaths,
   stagePaths,
   unstagePaths,
@@ -104,7 +106,17 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
   const [commitFileDiffLoading, setCommitFileDiffLoading] = React.useState(false)
 
   const [dialog, setDialog] = React.useState<{
-    kind: 'create' | 'rename' | 'delete' | 'discard' | 'remove' | 'remove-untracked' | 'merge' | 'push' | 'conflict-revert'
+    kind:
+      | 'create'
+      | 'rename'
+      | 'delete'
+      | 'discard'
+      | 'remove'
+      | 'remove-untracked'
+      | 'merge'
+      | 'push'
+      | 'conflict-revert'
+      | 'pull-diverged'
     branch?: string
     start?: string
     path?: string
@@ -143,6 +155,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
   const [busy, setBusy] = React.useState(false)
   const [refreshing, setRefreshing] = React.useState(false)
   const [opening, setOpening] = React.useState(false)
+  const [fetching, setFetching] = React.useState(false)
+  const [pulling, setPulling] = React.useState(false)
   const [actionError, setActionError] = React.useState('')
   const [message, setMessage] = React.useState('')
   const [toast, setToast] = React.useState('')
@@ -969,6 +983,60 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
     [loadRefs, refreshAfterConflict, repoPath, showToast, t],
   )
 
+  /** Fetch only: updates ahead/behind and remote-tracking refs, never the tree. */
+  const fetchNow = React.useCallback(
+    async (options?: { silent?: boolean }) => {
+      setFetching(true)
+      try {
+        const result = await fetchRemote(repoPath || undefined)
+        if (!result.ok) throw new Error(result.error || t('fetchFailed'))
+        await loadStatus({ silent: true })
+        await loadRefs()
+        if (!options?.silent) showToast(t('fetched') + (result.remote ? ' · ' + result.remote : ''))
+      } catch (error) {
+        if (!options?.silent) {
+          const text = error instanceof Error ? error.message : String(error)
+          setActionError(text)
+          showToast(text)
+        }
+      } finally {
+        setFetching(false)
+      }
+    },
+    [loadRefs, loadStatus, repoPath, showToast, t],
+  )
+
+  /** Pull the current branch: fast-forward, or merge when the user asks for it. */
+  const pullNow = React.useCallback(
+    async (mode: 'ff-only' | 'merge') => {
+      setPulling(true)
+      setActionError('')
+      try {
+        const result = await pullBranch(mode, repoPath || undefined)
+        if (!result.ok) {
+          if (result.code === 'diverged' && mode === 'ff-only') {
+            setDialogError('')
+            setDialog({ kind: 'pull-diverged' })
+            return
+          }
+          throw new Error(result.error || t('pullFailed'))
+        }
+        closeDialog()
+        const count = result.pulled ?? 0
+        showToast(count > 0 ? t('pulled') + ' · ' + String(count) + ' ' + t('commitsUnit') : t('pullUpToDate'))
+        await afterPush()
+      } catch (error) {
+        const text = error instanceof Error ? error.message : String(error)
+        setActionError(text)
+        showToast(text)
+        await loadStatus({ silent: true })
+      } finally {
+        setPulling(false)
+      }
+    },
+    [afterPush, closeDialog, loadStatus, repoPath, showToast, t],
+  )
+
   const commit = React.useCallback(async () => {
     const staged = status?.counts?.staged ?? 0
     const conflicts = status?.counts?.conflicted ?? 0
@@ -1029,6 +1097,23 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null
   const truncated = status?.truncated === true
   const canPush = (status?.remotes?.length ?? 0) > 0
+  const canFetch = canPush
+
+  // Fresh ahead/behind numbers on open / repository switch, without nagging:
+  // the automatic fetch stays silent, manual ones report.
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const result = await fetchRemote(repoPath || undefined).catch(() => null)
+      if (cancelled || !result || !result.ok) return
+      await loadStatus({ silent: true })
+      await loadRefs()
+    })()
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [repoPath])
 
   const autoSelectRef = React.useRef('')
   React.useEffect(() => {
@@ -1156,6 +1241,12 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
       onOpen: (target: OpenTarget) => void openLocalAction(target),
       onSelectWorkspace: switchWorkspace,
       canPush,
+      canFetch,
+      hasUpstream: Boolean(status?.upstream),
+      fetching,
+      pulling,
+      onFetch: () => void fetchNow(),
+      onPull: () => void pullNow('ff-only'),
       onPush: () => {
         setDialogError('')
         setDialog({ kind: 'push' })
@@ -1273,6 +1364,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
               t('pushBody')
             : (status?.branch || '—') + ' · ' + t('pushFirst') + ' · ' + t('pushBody'),
           submitLabel: t('push'),
+          tone: 'primary',
           busy: dialogBusy,
           error: dialogError,
           t,
@@ -1280,11 +1372,30 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
           onConfirm: () => void submitPush(),
         })
       : null,
+    dialog?.kind === 'pull-diverged'
+      ? h(ConfirmDialog, {
+          title: t('pullDivergedTitle'),
+          body:
+            (status?.branch || '—') +
+            ' ↔ ' +
+            (status?.upstream || 'origin') +
+            ' · ' +
+            t('pullDivergedBody'),
+          submitLabel: t('pullMerge'),
+          tone: 'primary',
+          busy: pulling,
+          error: dialogError,
+          t,
+          onCancel: closeDialog,
+          onConfirm: () => void pullNow('merge'),
+        })
+      : null,
     dialog?.kind === 'merge'
       ? h(ConfirmDialog, {
           title: t('mergeTitle'),
           body: (dialog.branch ?? '') + ' — ' + t('mergeBody') + ' (' + (status?.branch || '—') + ')',
           submitLabel: t('mergeIntoCurrent'),
+          tone: 'primary',
           busy: dialogBusy,
           error: dialogError,
           t,

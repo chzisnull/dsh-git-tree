@@ -37,6 +37,7 @@ import { REF_ARGS, parseRefs } from './refs.js'
 import { openArgv } from './open.js'
 import { resolveCwd, safeRepoPath, workspaceRootOf } from './paths.js'
 import { GitError, RequestError } from './errors.js'
+import { mapRemoteFailure, resolvePullTarget, splitUpstream } from './remote.js'
 import {
   hasConflictMarkers,
   isUnmerged,
@@ -481,9 +482,9 @@ export async function handlePush(ctx, request) {
   let argv
   let remote = ''
   if (upstream) {
-    const separator = upstream.indexOf('/')
-    remote = separator === -1 ? upstream : upstream.slice(0, separator)
-    const remoteBranch = separator === -1 ? current : upstream.slice(separator + 1)
+    const parsed = splitUpstream(upstream)
+    remote = parsed ? parsed.remote : upstream
+    const remoteBranch = parsed ? parsed.branch : current
     // Explicit remote and refspec: never let push.default or a remote-level
     // push refspec decide what gets pushed.
     argv = ['push', remote, current + ':' + remoteBranch]
@@ -509,6 +510,113 @@ export async function handlePush(ctx, request) {
   }
 
   return json({ ok: true, branch: current, upstream: upstream || remote + '/' + current })
+}
+
+/** How many commits one revision is ahead of another, in best-effort terms. */
+async function countCommits(subprocess, cwd, range) {
+  try {
+    const out = await git(subprocess, ['rev-list', '--count', range], cwd, { maxBytes: 8 * 1024 })
+    return Number(out.trim()) || 0
+  } catch {
+    return 0
+  }
+}
+
+/** True when `<remote>/<branch>` exists as a remote-tracking ref. */
+async function hasRemoteBranch(subprocess, cwd, remote, branch) {
+  try {
+    await git(subprocess, ['rev-parse', '--verify', '--quiet', 'refs/remotes/' + remote + '/' + branch], cwd, {
+      maxBytes: 8 * 1024,
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Fetch the remote this branch tracks (origin when it tracks nothing), pruning
+ * deleted remote branches so the ahead/behind numbers stay honest. Never
+ * touches the working tree.
+ */
+export async function handleFetch(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  await readJsonBody(request)
+  const subprocess = subprocessOf(ctx)
+
+  const remotes = await readRemotes(subprocess, cwd)
+  if (remotes.length === 0) throw new RequestError('当前仓库没有配置远端', 409, 'no-remote')
+  const parsed = splitUpstream(await readUpstream(subprocess, cwd))
+  const remote =
+    parsed && remotes.includes(parsed.remote) ? parsed.remote : remotes.includes('origin') ? 'origin' : remotes[0]
+
+  try {
+    await git(subprocess, ['fetch', remote, '--prune'], cwd, {
+      maxBytes: MAX_PUSH_BYTES,
+      timeoutMs: GIT_PUSH_TIMEOUT_MS,
+    })
+  } catch (error) {
+    const mapped = mapRemoteFailure('fetch', error instanceof Error ? error.message : String(error))
+    if (mapped) throw new RequestError(mapped.reason, 409, mapped.code)
+    throw error
+  }
+  return json({ ok: true, remote })
+}
+
+/**
+ * Fetch, then fast-forward the current branch (or merge, when the caller
+ * explicitly asks for it because fast-forwarding is impossible).
+ */
+export async function handlePull(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const mode = body.mode === 'merge' ? 'merge' : 'ff-only'
+  const subprocess = subprocessOf(ctx)
+
+  const current = await currentBranchOf(subprocess, cwd)
+  if (current === '') throw new RequestError('当前处于分离头指针状态，无法拉取', 409, 'detached-head')
+
+  const remotes = await readRemotes(subprocess, cwd)
+  const originBranch = remotes.includes('origin') && (await hasRemoteBranch(subprocess, cwd, 'origin', current))
+  const target = resolvePullTarget({
+    upstream: await readUpstream(subprocess, cwd),
+    current,
+    remotes,
+    originBranch,
+  })
+  if (!target.ok) throw new RequestError(target.reason, 409, target.code)
+
+  const startOid = (await git(subprocess, ['rev-parse', 'HEAD'], cwd, { maxBytes: 8 * 1024 })).trim()
+  try {
+    await git(subprocess, ['fetch', target.remote, '--prune'], cwd, {
+      maxBytes: MAX_PUSH_BYTES,
+      timeoutMs: GIT_PUSH_TIMEOUT_MS,
+    })
+  } catch (error) {
+    const mapped = mapRemoteFailure('fetch', error instanceof Error ? error.message : String(error))
+    if (mapped) throw new RequestError(mapped.reason, 409, mapped.code)
+    throw error
+  }
+
+  const remoteRef = target.remote + '/' + target.remoteBranch
+  const argv = mode === 'merge' ? ['merge', '--no-edit', remoteRef] : ['merge', '--ff-only', remoteRef]
+  try {
+    await git(subprocess, argv, cwd, { maxBytes: MAX_DIFF_BYTES })
+  } catch (error) {
+    const mapped = mapRemoteFailure(mode, error instanceof Error ? error.message : String(error))
+    if (mapped) throw new RequestError(mapped.reason, 409, mapped.code)
+    throw error
+  }
+
+  const pulled = await countCommits(subprocess, cwd, startOid + '..HEAD')
+  return json({
+    ok: true,
+    branch: current,
+    upstream: remoteRef,
+    mode,
+    pulled,
+    viaUpstream: target.viaUpstream,
+  })
 }
 
 export async function handleRefs(ctx, request) {

@@ -73,6 +73,18 @@ var EN = {
   mergeBody: "will be merged into the current branch. Conflicts, if any, stay in the change list.",
   mergeSelfHint: "The current branch cannot merge into itself",
   merged: "Merged",
+  fetch: "Fetch",
+  fetching: "Fetching\u2026",
+  fetched: "Remote updated",
+  fetchFailed: "Fetch failed",
+  pull: "Pull",
+  pulling: "Pulling\u2026",
+  pulled: "Pulled",
+  pullFailed: "Pull failed",
+  pullUpToDate: "Already up to date",
+  pullDivergedTitle: "Branches diverged",
+  pullDivergedBody: "fast-forward is impossible; merge the remote branch into this one?",
+  pullMerge: "Merge and pull",
   push: "Push",
   pushTitle: "Push branch",
   pushBody: "will be pushed to its upstream. Nothing is forced.",
@@ -251,6 +263,18 @@ var ZH = {
   mergeBody: "\u5C06\u5408\u5E76\u5230\u5F53\u524D\u5206\u652F\uFF1B\u82E5\u6709\u51B2\u7A81\uFF0C\u51B2\u7A81\u6587\u4EF6\u4F1A\u7559\u5728\u6539\u52A8\u5217\u8868\u91CC\u3002",
   mergeSelfHint: "\u5F53\u524D\u5206\u652F\u4E0D\u80FD\u5408\u5E76\u5230\u81EA\u8EAB",
   merged: "\u5DF2\u5408\u5E76",
+  fetch: "\u83B7\u53D6",
+  fetching: "\u83B7\u53D6\u4E2D\u2026",
+  fetched: "\u5DF2\u83B7\u53D6\u8FDC\u7AEF\u66F4\u65B0",
+  fetchFailed: "\u83B7\u53D6\u5931\u8D25",
+  pull: "\u62C9\u53D6",
+  pulling: "\u62C9\u53D6\u4E2D\u2026",
+  pulled: "\u5DF2\u62C9\u53D6",
+  pullFailed: "\u62C9\u53D6\u5931\u8D25",
+  pullUpToDate: "\u5DF2\u662F\u6700\u65B0",
+  pullDivergedTitle: "\u672C\u5730\u4E0E\u8FDC\u7AEF\u5DF2\u5206\u53C9",
+  pullDivergedBody: "\u65E0\u6CD5\u5FEB\u8FDB\uFF1B\u8981\u628A\u8FDC\u7AEF\u5206\u652F\u5408\u5E76\u5230\u5F53\u524D\u5206\u652F\u5417\uFF1F",
+  pullMerge: "\u4EE5\u5408\u5E76\u65B9\u5F0F\u62C9\u53D6",
   push: "\u63A8\u9001",
   pushTitle: "\u63A8\u9001\u5206\u652F",
   pushBody: "\u5C06\u63A8\u9001\u5230\u5B83\u7684 upstream\uFF0C\u4E0D\u4F1A force\u3002",
@@ -462,6 +486,10 @@ var CSS = `
 .dgt-iconbtn:hover:not(:disabled){background:var(--dgt-line-soft);color:var(--dsw-alias-label-primary);}
 .dgt-iconbtn:disabled{color:var(--dsw-alias-label-caption);cursor:default;}
 .dgt-iconbtn[data-busy='true'] svg{animation:dgt-spin .9s linear infinite;}
+.dgt-iconbtn{position:relative;}
+.dgt-iconbtn-count{position:absolute;top:-3px;right:-3px;min-width:14px;height:14px;padding:0 3px;
+  border-radius:999px;background:var(--dgt-warn);color:var(--dgt-card);font-size:9px;line-height:14px;
+  text-align:center;font-weight:600;}
 @keyframes dgt-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.dgt-iconbtn[data-busy='true'] svg{animation:none}}
 
@@ -874,6 +902,8 @@ var DISCARD_ROUTE = "api/git-tree/discard";
 var REMOVE_ROUTE = "api/git-tree/remove";
 var MERGE_ROUTE = "api/git-tree/merge";
 var PUSH_ROUTE = "api/git-tree/push";
+var FETCH_ROUTE = "api/git-tree/fetch";
+var PULL_ROUTE = "api/git-tree/pull";
 var BRANCH_CREATE_ROUTE = "api/git-tree/branch/create";
 var BRANCH_RENAME_ROUTE = "api/git-tree/branch/rename";
 var BRANCH_DELETE_ROUTE = "api/git-tree/branch/delete";
@@ -928,6 +958,12 @@ function fetchCommitInfo(params, signal) {
 }
 function fetchHistory(params, signal) {
   return getJson(HISTORY_ROUTE, params, signal);
+}
+function fetchRemote(cwd) {
+  return postJson(FETCH_ROUTE + query({ cwd }), {});
+}
+function pullBranch(mode, cwd) {
+  return postJson(PULL_ROUTE + query({ cwd }), { mode });
 }
 function pushBranch(cwd) {
   return postJson(PUSH_ROUTE + query({ cwd }), {});
@@ -1056,6 +1092,21 @@ function CommitIcon() {
   return svg([
     h("circle", { cx: 8, cy: 8, r: 4.2, fill: "none", stroke: "currentColor", strokeWidth: 1.3 }),
     h("path", { d: "M8 1.4v2.4M8 12.2v2.4", fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round" })
+  ]);
+}
+function FetchIcon() {
+  return svg([
+    h("path", { d: "M13.2 5.6a5.2 5.2 0 0 0-8.9-1.2", fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round" }),
+    h("path", { d: "M2.6 2.3v3h3", fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round", strokeLinejoin: "round" }),
+    h("path", { d: "M2.8 10.4a5.2 5.2 0 0 0 8.9 1.2", fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round" }),
+    h("path", { d: "M13.4 13.7v-3h-3", fill: "none", stroke: "currentColor", strokeWidth: 1.3, strokeLinecap: "round", strokeLinejoin: "round" })
+  ]);
+}
+function PullIcon() {
+  return svg([
+    h("path", { d: "M8 2.6v7.2", fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round" }),
+    h("path", { d: "M4.8 6.6 8 9.8l3.2-3.2", fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round", strokeLinejoin: "round" }),
+    h("path", { d: "M3 13.2h10", fill: "none", stroke: "currentColor", strokeWidth: 1.4, strokeLinecap: "round" })
   ]);
 }
 function PushIcon() {
@@ -1253,6 +1304,33 @@ function TopBar(props) {
     h(
       "div",
       { className: "dgt-actions" },
+      h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-iconbtn",
+          title: props.canFetch ? t("fetch") : t("pushNoRemote"),
+          "aria-label": t("fetch"),
+          "data-busy": props.fetching || void 0,
+          disabled: !props.canFetch || props.busy || props.fetching || props.pulling,
+          onClick: props.onFetch
+        },
+        h(FetchIcon)
+      ),
+      h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-iconbtn",
+          title: !props.canFetch ? t("pushNoRemote") : props.hasUpstream && behind === 0 ? t("pullUpToDate") : t("pull") + (behind > 0 ? " \xB7 \u2193" + String(behind) : ""),
+          "aria-label": t("pull") + " " + branch,
+          "data-busy": props.pulling || void 0,
+          disabled: !props.canFetch || props.hasUpstream && behind === 0 || props.busy || props.pulling || props.fetching,
+          onClick: props.onPull
+        },
+        h(PullIcon),
+        behind > 0 ? h("span", { className: "dgt-iconbtn-count" }, String(behind)) : null
+      ),
       h(
         "button",
         {
@@ -2519,7 +2597,12 @@ function ConfirmDialog(props) {
         h("button", { type: "button", className: "dgt-button", onClick: props.onCancel }, props.t("cancel")),
         h(
           "button",
-          { type: "button", className: "dgt-primary dgt-danger", disabled: props.busy, onClick: props.onConfirm },
+          {
+            type: "button",
+            className: (props.tone ?? "danger") === "primary" ? "dgt-primary" : "dgt-primary dgt-danger",
+            disabled: props.busy,
+            onClick: props.onConfirm
+          },
           props.submitLabel
         )
       )
@@ -2713,6 +2796,8 @@ function Workspace(props) {
   const [busy, setBusy] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
   const [opening, setOpening] = React.useState(false);
+  const [fetching, setFetching] = React.useState(false);
+  const [pulling, setPulling] = React.useState(false);
   const [actionError, setActionError] = React.useState("");
   const [message, setMessage] = React.useState("");
   const [toast, setToast] = React.useState("");
@@ -3473,6 +3558,56 @@ function Workspace(props) {
     },
     [loadRefs, refreshAfterConflict, repoPath, showToast, t]
   );
+  const fetchNow = React.useCallback(
+    async (options) => {
+      setFetching(true);
+      try {
+        const result = await fetchRemote(repoPath || void 0);
+        if (!result.ok) throw new Error(result.error || t("fetchFailed"));
+        await loadStatus({ silent: true });
+        await loadRefs();
+        if (!options?.silent) showToast(t("fetched") + (result.remote ? " \xB7 " + result.remote : ""));
+      } catch (error) {
+        if (!options?.silent) {
+          const text = error instanceof Error ? error.message : String(error);
+          setActionError(text);
+          showToast(text);
+        }
+      } finally {
+        setFetching(false);
+      }
+    },
+    [loadRefs, loadStatus, repoPath, showToast, t]
+  );
+  const pullNow = React.useCallback(
+    async (mode) => {
+      setPulling(true);
+      setActionError("");
+      try {
+        const result = await pullBranch(mode, repoPath || void 0);
+        if (!result.ok) {
+          if (result.code === "diverged" && mode === "ff-only") {
+            setDialogError("");
+            setDialog({ kind: "pull-diverged" });
+            return;
+          }
+          throw new Error(result.error || t("pullFailed"));
+        }
+        closeDialog();
+        const count = result.pulled ?? 0;
+        showToast(count > 0 ? t("pulled") + " \xB7 " + String(count) + " " + t("commitsUnit") : t("pullUpToDate"));
+        await afterPush();
+      } catch (error) {
+        const text = error instanceof Error ? error.message : String(error);
+        setActionError(text);
+        showToast(text);
+        await loadStatus({ silent: true });
+      } finally {
+        setPulling(false);
+      }
+    },
+    [afterPush, closeDialog, loadStatus, repoPath, showToast, t]
+  );
   const commit = React.useCallback(async () => {
     const staged = status?.counts?.staged ?? 0;
     const conflicts = status?.counts?.conflicted ?? 0;
@@ -3528,6 +3663,19 @@ function Workspace(props) {
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null;
   const truncated = status?.truncated === true;
   const canPush = (status?.remotes?.length ?? 0) > 0;
+  const canFetch = canPush;
+  React.useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const result = await fetchRemote(repoPath || void 0).catch(() => null);
+      if (cancelled || !result || !result.ok) return;
+      await loadStatus({ silent: true });
+      await loadRefs();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath]);
   const autoSelectRef = React.useRef("");
   React.useEffect(() => {
     if (view !== "status" || status === null) return;
@@ -3641,6 +3789,12 @@ function Workspace(props) {
       onOpen: (target) => void openLocalAction(target),
       onSelectWorkspace: switchWorkspace,
       canPush,
+      canFetch,
+      hasUpstream: Boolean(status?.upstream),
+      fetching,
+      pulling,
+      onFetch: () => void fetchNow(),
+      onPull: () => void pullNow("ff-only"),
       onPush: () => {
         setDialogError("");
         setDialog({ kind: "push" });
@@ -3734,16 +3888,29 @@ function Workspace(props) {
       title: t("pushTitle"),
       body: status?.upstream ? (status?.branch || "\u2014") + " \u2192 " + status.upstream + " \xB7 " + String(status?.ahead ?? 0) + " " + t("ahead") + " \xB7 " + t("pushBody") : (status?.branch || "\u2014") + " \xB7 " + t("pushFirst") + " \xB7 " + t("pushBody"),
       submitLabel: t("push"),
+      tone: "primary",
       busy: dialogBusy,
       error: dialogError,
       t,
       onCancel: closeDialog,
       onConfirm: () => void submitPush()
     }) : null,
+    dialog?.kind === "pull-diverged" ? h(ConfirmDialog, {
+      title: t("pullDivergedTitle"),
+      body: (status?.branch || "\u2014") + " \u2194 " + (status?.upstream || "origin") + " \xB7 " + t("pullDivergedBody"),
+      submitLabel: t("pullMerge"),
+      tone: "primary",
+      busy: pulling,
+      error: dialogError,
+      t,
+      onCancel: closeDialog,
+      onConfirm: () => void pullNow("merge")
+    }) : null,
     dialog?.kind === "merge" ? h(ConfirmDialog, {
       title: t("mergeTitle"),
       body: (dialog.branch ?? "") + " \u2014 " + t("mergeBody") + " (" + (status?.branch || "\u2014") + ")",
       submitLabel: t("mergeIntoCurrent"),
+      tone: "primary",
       busy: dialogBusy,
       error: dialogError,
       t,

@@ -229,6 +229,10 @@ export interface MutationPayload {
   ok: boolean
   error?: string
   code?: string
+  remote?: string
+  mode?: string
+  pulled?: number
+  viaUpstream?: boolean
   sha?: string
   shortSha?: string
   subject?: string

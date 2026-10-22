@@ -65,6 +65,8 @@ export function ConfirmDialog(props: {
   busy: boolean
   error: string
   t: Translate
+  /** Destructive confirmations stay red; network/history ones read as primary. */
+  tone?: 'danger' | 'primary'
   onCancel: () => void
   onConfirm: () => void
 }): any {
@@ -83,7 +85,12 @@ export function ConfirmDialog(props: {
         h('button', { type: 'button', className: 'dgt-button', onClick: props.onCancel }, props.t('cancel')),
         h(
           'button',
-          { type: 'button', className: 'dgt-primary dgt-danger', disabled: props.busy, onClick: props.onConfirm },
+          {
+            type: 'button',
+            className: (props.tone ?? 'danger') === 'primary' ? 'dgt-primary' : 'dgt-primary dgt-danger',
+            disabled: props.busy,
+            onClick: props.onConfirm,
+          },
           props.submitLabel,
         ),
       ),

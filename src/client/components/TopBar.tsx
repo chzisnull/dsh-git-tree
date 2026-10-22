@@ -7,7 +7,7 @@ import { h, React } from '../react'
 import type { GitStatusPayload, OpenTarget, Translate, WorkspaceRecord } from '../types'
 import { lastSegment } from '../model'
 import { Chip } from './atoms'
-import { CommitIcon, FolderIcon, PushIcon, RefreshIcon, TerminalIcon } from '../icons'
+import { CommitIcon, FetchIcon, FolderIcon, PullIcon, PushIcon, RefreshIcon, TerminalIcon } from '../icons'
 import { usePopover } from '../menu'
 
 export function TopBar(props: {
@@ -21,6 +21,12 @@ export function TopBar(props: {
   onOpen: (target: OpenTarget) => void
   onCommitFocus: () => void
   onSelectWorkspace: (path: string) => void
+  canFetch: boolean
+  hasUpstream: boolean
+  fetching: boolean
+  pulling: boolean
+  onFetch: () => void
+  onPull: () => void
 }): any {
   const { status, t } = props
   const popover = usePopover()
@@ -113,6 +119,38 @@ export function TopBar(props: {
     h(
       'div',
       { className: 'dgt-actions' },
+      h(
+        'button',
+        {
+          type: 'button',
+          className: 'dgt-iconbtn',
+          title: props.canFetch ? t('fetch') : t('pushNoRemote'),
+          'aria-label': t('fetch'),
+          'data-busy': props.fetching || undefined,
+          disabled: !props.canFetch || props.busy || props.fetching || props.pulling,
+          onClick: props.onFetch,
+        },
+        h(FetchIcon),
+      ),
+      h(
+        'button',
+        {
+          type: 'button',
+          className: 'dgt-iconbtn',
+          title: !props.canFetch
+            ? t('pushNoRemote')
+            : props.hasUpstream && behind === 0
+              ? t('pullUpToDate')
+              : t('pull') + (behind > 0 ? ' · ↓' + String(behind) : ''),
+          'aria-label': t('pull') + ' ' + branch,
+          'data-busy': props.pulling || undefined,
+          disabled:
+            !props.canFetch || (props.hasUpstream && behind === 0) || props.busy || props.pulling || props.fetching,
+          onClick: props.onPull,
+        },
+        h(PullIcon),
+        behind > 0 ? h('span', { className: 'dgt-iconbtn-count' }, String(behind)) : null,
+      ),
       h(
         'button',
         {

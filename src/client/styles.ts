@@ -73,6 +73,10 @@ export const CSS = `
 .dgt-iconbtn:hover:not(:disabled){background:var(--dgt-line-soft);color:var(--dsw-alias-label-primary);}
 .dgt-iconbtn:disabled{color:var(--dsw-alias-label-caption);cursor:default;}
 .dgt-iconbtn[data-busy='true'] svg{animation:dgt-spin .9s linear infinite;}
+.dgt-iconbtn{position:relative;}
+.dgt-iconbtn-count{position:absolute;top:-3px;right:-3px;min-width:14px;height:14px;padding:0 3px;
+  border-radius:999px;background:var(--dgt-warn);color:var(--dgt-card);font-size:9px;line-height:14px;
+  text-align:center;font-weight:600;}
 @keyframes dgt-spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.dgt-iconbtn[data-busy='true'] svg{animation:none}}
 

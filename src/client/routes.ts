@@ -28,6 +28,8 @@ const DISCARD_ROUTE = 'api/git-tree/discard'
 const REMOVE_ROUTE = 'api/git-tree/remove'
 const MERGE_ROUTE = 'api/git-tree/merge'
 const PUSH_ROUTE = 'api/git-tree/push'
+const FETCH_ROUTE = 'api/git-tree/fetch'
+const PULL_ROUTE = 'api/git-tree/pull'
 const BRANCH_CREATE_ROUTE = 'api/git-tree/branch/create'
 const BRANCH_RENAME_ROUTE = 'api/git-tree/branch/rename'
 const BRANCH_DELETE_ROUTE = 'api/git-tree/branch/delete'
@@ -104,6 +106,15 @@ export function fetchHistory(
   signal?: AbortSignal,
 ): Promise<HistoryPayload> {
   return getJson<HistoryPayload>(HISTORY_ROUTE, params, signal)
+}
+
+export function fetchRemote(cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(FETCH_ROUTE + query({ cwd }), {})
+}
+
+/** Fast-forward the current branch; `mode: 'merge'` is only for a diverged one. */
+export function pullBranch(mode: 'ff-only' | 'merge', cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(PULL_ROUTE + query({ cwd }), { mode })
 }
 
 export function pushBranch(cwd?: string): Promise<MutationPayload> {
