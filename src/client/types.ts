@@ -141,15 +141,44 @@ export interface DiffFile {
   hunks: DiffHunk[]
 }
 
+/** One line of a conflicted working-tree file. */
+export interface ConflictLine {
+  kind: 'context' | 'ours' | 'theirs' | 'base' | 'marker-start' | 'marker-base' | 'marker-sep' | 'marker-end'
+  text: string
+}
+
+export interface ConflictPayload {
+  lines: ConflictLine[]
+  blocks: number
+  ours: number
+  theirs: number
+  base: number
+  labels: { ours: string; theirs: string }
+}
+
 export interface DiffPayload {
   ok: boolean
   path?: string
   side?: EntrySide
   staged?: boolean
   binary?: boolean
+  conflicted?: boolean
+  conflict?: ConflictPayload
   stats?: { additions: number; deletions: number }
   files?: DiffFile[]
   text?: string
+  error?: string
+  code?: string
+}
+
+/** One model answer for a conflicted file, with the preview diff. */
+export interface ConflictResolvePayload {
+  ok: boolean
+  path?: string
+  content?: string
+  provider?: string
+  model?: string
+  diff?: { files?: DiffFile[]; stats?: { additions: number; deletions: number }; text?: string }
   error?: string
   code?: string
 }

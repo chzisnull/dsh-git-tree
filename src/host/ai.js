@@ -19,6 +19,15 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { currentBranchOf, git, subprocessOf } from './git.js'
+import { parseUnifiedDiff } from './diff.js'
+import {
+  MAX_CONFLICT_PROMPT_BYTES,
+  diffAgainstProposal,
+  parseConflictText,
+  readConflictFile,
+  requireUnmerged,
+  validateResolvedText,
+} from './conflict.js'
 import { RequestError } from './errors.js'
 import { resolveCwd, safeRepoPath } from './paths.js'
 import { json, readJsonBody } from './http.js'
@@ -31,6 +40,8 @@ export const MAX_AI_FILES = 60
 export const MAX_AI_MESSAGE_CHARS = 4000
 /** Output budget for the utility call. */
 export const AI_MAX_TOKENS = 512
+/** A whole resolved file needs a much larger budget than a commit message. */
+export const AI_CONFLICT_MAX_TOKENS = 8192
 /** A commit message should not take longer than this. */
 export const AI_TIMEOUT_MS = 60_000
 
@@ -355,36 +366,22 @@ function repoNameOf(cwd) {
   return segments[segments.length - 1] || cwd
 }
 
-/**
- * Generate one commit message for the selected files.
- *
- * Body: `{ side: 'staged'|'unstaged', files: [{ path, status }], locale }`.
- * The model route is the saved selection, else the DSH default Agent model.
- */
-export async function handleGenerateCommitMessage(ctx, request) {
-  const url = new URL(request.url)
-  const cwd = resolveCwd(ctx, url.searchParams.get('cwd') || '')
-  const body = await readJsonBody(request)
-  const side = body.side === 'staged' ? 'staged' : 'unstaged'
-  const files = selectedFiles(body.files)
-  const locale = typeof body.locale === 'string' ? body.locale : ''
 
+/**
+ * Resolve the model once (saved route, else the DSH default) and stream one
+ * text answer. Both AI features share this so the route choice and the failure
+ * vocabulary cannot drift apart.
+ */
+async function generateWithRoute(ctx, { system, prompt, maxTokens, signal }) {
   const llm = llmOf(ctx)
   const { groups, failures } = await readModelGroups(llm)
   const defaultRoute = defaultRouteOf(ctx)
   const saved = readAiSettings()
   const route = routeOf(saved, groups, failures) ?? routeOf(defaultRoute, groups, failures)
   if (!route) {
-    // A default that the adapters no longer advertise is a configuration drift,
-    // not a missing choice; say which one to fix.
     if (saved) throw new RequestError('已保存的模型不在当前模型列表里，重新选一个', 409, 'unknown-model')
     throw new RequestError('还没有选择生成提交信息的模型', 409, 'no-model')
   }
-
-  const subprocess = subprocessOf(ctx)
-  const branch = await currentBranchOf(subprocess, cwd)
-  const diff = await readSelectionDiff(subprocess, cwd, side, files)
-  const prompt = buildCommitPrompt({ repoName: repoNameOf(cwd), branch, side, files, diff, locale })
 
   const messages = [
     {
@@ -397,14 +394,13 @@ export async function handleGenerateCommitMessage(ctx, request) {
 
   let text = ''
   let failure = null
-  const signal = deadlineSignal(request.signal, AI_TIMEOUT_MS)
   try {
     const stream = llm.stream({
       provider: route.provider,
       model: route.model,
       messages,
-      system: systemPrompt(locale),
-      maxTokens: AI_MAX_TOKENS,
+      system,
+      maxTokens,
       ...(signal ? { signal } : {}),
     })
     for await (const chunk of stream) {
@@ -427,10 +423,121 @@ export async function handleGenerateCommitMessage(ctx, request) {
   if (failure && failure.kind === 'tool-calls') {
     throw new RequestError('该模型想调用工具，换一个模型再试', 409, 'ai-tool-calls')
   }
+  return { text, provider: route.provider, model: route.model }
+}
+
+/**
+ * Generate one commit message for the selected files.
+ *
+ * Body: `{ side: 'staged'|'unstaged', files: [{ path, status }], locale }`.
+ * The model route is the saved selection, else the DSH default Agent model.
+ */
+export async function handleGenerateCommitMessage(ctx, request) {
+  const url = new URL(request.url)
+  const cwd = resolveCwd(ctx, url.searchParams.get('cwd') || '')
+  const body = await readJsonBody(request)
+  const side = body.side === 'staged' ? 'staged' : 'unstaged'
+  const files = selectedFiles(body.files)
+  const locale = typeof body.locale === 'string' ? body.locale : ''
+
+  const subprocess = subprocessOf(ctx)
+  const branch = await currentBranchOf(subprocess, cwd)
+  const diff = await readSelectionDiff(subprocess, cwd, side, files)
+  const prompt = buildCommitPrompt({ repoName: repoNameOf(cwd), branch, side, files, diff, locale })
+
+  const { text, provider, model } = await generateWithRoute(ctx, {
+    system: systemPrompt(locale),
+    prompt,
+    maxTokens: AI_MAX_TOKENS,
+    signal: deadlineSignal(request.signal, AI_TIMEOUT_MS),
+  })
 
   const message = normaliseGeneratedMessage(text)
   if (!message) {
     throw new RequestError('模型没有返回可用的提交信息', 409, 'ai-empty')
   }
-  return json({ ok: true, message, provider: route.provider, model: route.model })
+  return json({ ok: true, message, provider, model })
+}
+
+
+// ── merge-conflict resolution ──────────────────────────────────────────────
+
+/** Instruction for the conflict call: merge the blocks, return the whole file. */
+export function conflictSystemPrompt() {
+  return [
+    '你是解决 Git 合并冲突的工程师。用户会给你一个处于冲突状态的文件，',
+    '里面用 <<<<<<< / ||||||| / ======= / >>>>>>> 标出双方的内容。',
+    '把它合并成一份完整文件：删掉所有标记行，冲突处按语义合并，保留双方都需要的内容。',
+    '只输出合并后的完整文件内容：不要解释，不要代码块围栏，不要省略号，不要保留任何冲突标记。',
+    '未冲突的部分必须原样保留，包括缩进、换行和注释。',
+  ].join('\n')
+}
+
+/** Frame the conflicted file for the model, with the marker labels it carries. */
+export function buildConflictPrompt({ path, branch, text, labels }) {
+  return [
+    '仓库文件：' + path,
+    '当前分支（ours）：' + (branch || 'HEAD'),
+    '合入的一侧（theirs）：' + (labels && labels.theirs ? labels.theirs : '—'),
+    '',
+    '冲突文件内容：',
+    '<<<FILE',
+    text.replace(/\n$/, ''),
+    'FILE>>>',
+  ].join('\n')
+}
+
+/** Keep the model's file verbatim apart from a fenced wrapper and blank edges. */
+export function normaliseResolvedFile(text) {
+  let value = String(text ?? '').replace(/\r\n?/g, '\n')
+  const fenced = /^\s*```[a-zA-Z0-9_-]*\n([\s\S]*?)\n?```\s*$/.exec(value)
+  if (fenced) value = fenced[1]
+  value = value.replace(/^\n+/, '').replace(/\s+$/, '')
+  return value === '' ? '' : value + '\n'
+}
+
+/**
+ * Ask the selected model to merge one conflicted file. Nothing is written:
+ * the answer comes back with a diff against the current conflicted file so the
+ * panel can show a preview first. `POST /api/git-tree/conflict/apply` writes it.
+ */
+export async function handleConflictResolve(ctx, request) {
+  const url = new URL(request.url)
+  const cwd = resolveCwd(ctx, url.searchParams.get('cwd') || '')
+  const body = await readJsonBody(request)
+  const path = safeRepoPath(body.path)
+
+  const subprocess = subprocessOf(ctx)
+  await requireUnmerged(subprocess, cwd, path)
+  const file = readConflictFile(cwd, path)
+  if (Buffer.byteLength(file.text, 'utf8') > MAX_CONFLICT_PROMPT_BYTES) {
+    throw new RequestError(
+      '冲突文件超过 ' + String(Math.round(MAX_CONFLICT_PROMPT_BYTES / 1024)) + ' KB，先手动缩小再交给模型',
+      409,
+      'file-too-large',
+    )
+  }
+
+  const parsed = parseConflictText(file.text)
+  const branch = await currentBranchOf(subprocess, cwd)
+  const { text, provider, model } = await generateWithRoute(ctx, {
+    system: conflictSystemPrompt(),
+    prompt: buildConflictPrompt({ path, branch, text: file.text, labels: parsed.labels }),
+    maxTokens: AI_CONFLICT_MAX_TOKENS,
+    signal: deadlineSignal(request.signal, AI_TIMEOUT_MS),
+  })
+
+  const checked = validateResolvedText(normaliseResolvedFile(text))
+  if (!checked.ok) throw new RequestError(checked.reason, 409, checked.code)
+
+  const diffText = await diffAgainstProposal(subprocess, cwd, path, checked.text)
+  const diff = parseUnifiedDiff(diffText)
+  return json({
+    ok: true,
+    path,
+    content: checked.text,
+    provider,
+    model,
+    diff: { files: diff.files, stats: diff.stats, text: diffText },
+  })
 }

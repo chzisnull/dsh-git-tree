@@ -23,8 +23,12 @@ import {
   checkoutBranch,
   commitChanges,
   discardPaths,
+  applyConflict,
   generateCommitMessage,
+  markConflictResolved,
   mergeBranch,
+  resolveConflict,
+  revertConflict,
   pushBranch,
   createBranch,
   deleteBranch,
@@ -47,7 +51,7 @@ import { TopBar } from './TopBar'
 import { RefRail } from './RefRail'
 import { StatusView } from './views/StatusView'
 import { HistoryView } from './views/HistoryView'
-import { ConfirmDialog, PromptDialog } from './Dialogs'
+import { ConflictDialog, ConfirmDialog, PromptDialog } from './Dialogs'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuEntry, ContextMenuState } from './ContextMenu'
 import type { ViewKind } from '../types'
@@ -100,7 +104,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
   const [commitFileDiffLoading, setCommitFileDiffLoading] = React.useState(false)
 
   const [dialog, setDialog] = React.useState<{
-    kind: 'create' | 'rename' | 'delete' | 'discard' | 'remove' | 'remove-untracked' | 'merge' | 'push'
+    kind: 'create' | 'rename' | 'delete' | 'discard' | 'remove' | 'remove-untracked' | 'merge' | 'push' | 'conflict-revert'
     branch?: string
     start?: string
     path?: string
@@ -120,6 +124,16 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
   const [aiModels, setAiModels] = React.useState<AiModelsPayload | null>(null)
   const [aiLoading, setAiLoading] = React.useState(false)
   const [aiBusy, setAiBusy] = React.useState(false)
+  // Conflict resolution: the model's answer is previewed, never auto-written.
+  const [conflictResolve, setConflictResolve] = React.useState<{
+    path: string
+    content: string
+    diff: DiffPayload | null
+    provider: string
+    model: string
+  } | null>(null)
+  const [conflictBusy, setConflictBusy] = React.useState('')
+  const [conflictError, setConflictError] = React.useState('')
   const [dialogBusy, setDialogBusy] = React.useState(false)
   const [dialogError, setDialogError] = React.useState('')
   const [statusError, setStatusError] = React.useState('')
@@ -858,6 +872,103 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
     [repoPath, showToast, t],
   )
 
+  /** Ask the model to merge one conflicted file; nothing is written yet. */
+  const resolveConflictWithAi = React.useCallback(
+    async (path: string) => {
+      setConflictBusy('resolve')
+      setActionError('')
+      setConflictError('')
+      try {
+        const result = await resolveConflict(path, repoPath || undefined)
+        if (!result.ok || typeof result.content !== 'string') {
+          throw new Error(result.error || t('aiResolveFailed'))
+        }
+        setConflictResolve({
+          path,
+          content: result.content,
+          diff: { ok: true, files: result.diff?.files, stats: result.diff?.stats },
+          provider: result.provider || '',
+          model: result.model || '',
+        })
+      } catch (error) {
+        const text = error instanceof Error ? error.message : String(error)
+        setActionError(text)
+        showToast(text)
+      } finally {
+        setConflictBusy('')
+      }
+    },
+    [repoPath, showToast, t],
+  )
+
+  const refreshAfterConflict = React.useCallback(
+    async (path: string) => {
+      await loadStatus({ silent: true })
+      const next = await fetchStatus(repoPath || undefined)
+      if (next.ok) setStatus(next)
+      const updated = next.ok ? findEntry(next, path) : null
+      if (updated) await openDiff(updated, 'conflicted')
+    },
+    [openDiff, repoPath, loadStatus],
+  )
+
+  const applyConflictResolution = React.useCallback(async () => {
+    const pending = conflictResolve
+    if (!pending) return
+    setConflictBusy('apply')
+    setConflictError('')
+    try {
+      const result = await applyConflict(pending.path, pending.content, repoPath || undefined)
+      if (!result.ok) throw new Error(result.error || t('conflictApplyFailed'))
+      setConflictResolve(null)
+      showToast(t('resolutionApplied') + ' · ' + pending.path)
+      await refreshAfterConflict(pending.path)
+      await loadRefs()
+    } catch (error) {
+      setConflictError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setConflictBusy('')
+    }
+  }, [conflictResolve, loadRefs, refreshAfterConflict, repoPath, showToast, t])
+
+  const submitConflictRevert = React.useCallback(async () => {
+    const path = dialog?.path ?? ''
+    setDialogBusy(true)
+    setDialogError('')
+    try {
+      const result = await revertConflict(path, repoPath || undefined)
+      if (!result.ok) throw new Error(result.error || t('conflictRevertFailed'))
+      closeDialog()
+      showToast(t('conflictReverted') + ' · ' + path)
+      await refreshAfterConflict(path)
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setDialogBusy(false)
+    }
+  }, [closeDialog, dialog?.path, refreshAfterConflict, repoPath, showToast, t])
+
+  const markResolved = React.useCallback(
+    async (path: string) => {
+      setConflictBusy('mark')
+      setActionError('')
+      try {
+        const result = await markConflictResolved(path, repoPath || undefined)
+        if (!result.ok) throw new Error(result.error || t('markResolvedFailed'))
+        showToast(t('resolvedMarked') + ' · ' + path)
+        await refreshAfterConflict(path)
+        await loadRefs()
+      } catch (error) {
+        const text = error instanceof Error ? error.message : String(error)
+        setActionError(text)
+        showToast(text)
+      } finally {
+        setConflictBusy('')
+      }
+    },
+    [loadRefs, refreshAfterConflict, repoPath, showToast, t],
+  )
+
   const commit = React.useCallback(async () => {
     const staged = status?.counts?.staged ?? 0
     const conflicts = status?.counts?.conflicted ?? 0
@@ -1003,6 +1114,20 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
           commitInputRef: commitInput,
           commitCollapsed,
           onToggleCommitCollapsed: () => setCommitFold(!commitCollapsed),
+          conflict: {
+            busy: conflictBusy !== '',
+            onResolve: () => {
+              if (selected) void resolveConflictWithAi(selected.path)
+            },
+            onRevert: () => {
+              if (!selected) return
+              setDialogError('')
+              setDialog({ kind: 'conflict-revert', path: selected.path })
+            },
+            onMarkResolved: () => {
+              if (selected) void markResolved(selected.path)
+            },
+          },
           onSelect: (entry: GitFileEntry, side: EntrySide) => void openDiff(entry, side),
           onToggle: (entry: GitFileEntry, side: EntrySide) => void toggle(entry, side),
           onCopyPath: copyPath,
@@ -1115,6 +1240,23 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
           onConfirm: () => void submitDelete(),
         })
       : null,
+    conflictResolve
+      ? h(ConflictDialog, {
+          path: conflictResolve.path,
+          content: conflictResolve.content,
+          diff: conflictResolve.diff,
+          provider: conflictResolve.provider,
+          model: conflictResolve.model,
+          busy: conflictBusy === 'apply',
+          error: conflictError,
+          t,
+          onCancel: () => {
+            setConflictResolve(null)
+            setConflictError('')
+          },
+          onApply: () => void applyConflictResolution(),
+        })
+      : null,
     contextMenu ? h(ContextMenu, { state: contextMenu, onClose: () => setContextMenu(null) }) : null,
     dialog?.kind === 'push'
       ? h(ConfirmDialog, {
@@ -1160,6 +1302,18 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
           t,
           onCancel: closeDialog,
           onConfirm: () => void submitDiscard(),
+        })
+      : null,
+    dialog?.kind === 'conflict-revert'
+      ? h(ConfirmDialog, {
+          title: t('revertConflictTitle'),
+          body: (dialog.path ?? '') + ' — ' + t('revertConflictBody'),
+          submitLabel: t('revertConflict'),
+          busy: dialogBusy,
+          error: dialogError,
+          t,
+          onCancel: closeDialog,
+          onConfirm: () => void submitConflictRevert(),
         })
       : null,
     dialog?.kind === 'remove' || dialog?.kind === 'remove-untracked'

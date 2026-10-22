@@ -177,6 +177,27 @@ var EN = {
   aiModel: "Commit message model",
   aiModelTip: "Choose the DSH model that writes the commit message",
   aiNoModel: "Choose model",
+  conflictBlocks: "conflict blocks",
+  conflictClean: "no markers left",
+  conflictLines: "lines",
+  aiResolve: "Resolve with AI",
+  aiResolving: "Merging\u2026",
+  aiResolveTip: "Let the selected model merge this file; you review the result first",
+  aiResolveFailed: "Could not resolve this conflict",
+  markResolved: "Mark resolved",
+  markResolvedHint: "Conflict markers are still in the file",
+  revertConflict: "Restore conflict",
+  revertConflictTitle: "Restore the conflict",
+  revertConflictBody: "The resolved content is thrown away and the conflict markers come back. This cannot be undone.",
+  conflictRevertFailed: "Could not restore the conflict",
+  conflictApplyFailed: "Could not write the resolution",
+  resolutionApplied: "Resolution applied",
+  resolvedMarked: "Marked as resolved",
+  markResolvedFailed: "Could not mark the file resolved",
+  conflictReverted: "Conflict restored",
+  conflictPreviewTitle: "AI resolution preview",
+  conflictPreviewHint: "Applying writes the file. You can still restore the conflict afterwards.",
+  applyResolution: "Apply",
   aiNoModelTip: "No model available \u2014 pick one from the DSH model list",
   aiNoChanges: "Nothing to summarize yet",
   aiFromStaged: "Write from the staged files",
@@ -334,6 +355,27 @@ var ZH = {
   aiModel: "\u63D0\u4EA4\u4FE1\u606F\u6A21\u578B",
   aiModelTip: "\u9009\u62E9\u751F\u6210\u63D0\u4EA4\u4FE1\u606F\u7528\u7684 DSH \u6A21\u578B",
   aiNoModel: "\u9009\u62E9\u6A21\u578B",
+  conflictBlocks: "\u5904\u51B2\u7A81",
+  conflictClean: "\u51B2\u7A81\u6807\u8BB0\u5DF2\u6E05\u7A7A",
+  conflictLines: "\u884C",
+  aiResolve: "AI \u89E3\u51B3",
+  aiResolving: "\u5408\u5E76\u4E2D\u2026",
+  aiResolveTip: "\u8BA9\u5F53\u524D\u6A21\u578B\u5408\u5E76\u8FD9\u4E2A\u6587\u4EF6\uFF0C\u5148\u770B\u9884\u89C8\u518D\u51B3\u5B9A\u662F\u5426\u5199\u5165",
+  aiResolveFailed: "AI \u89E3\u51B3\u51B2\u7A81\u5931\u8D25",
+  markResolved: "\u6807\u8BB0\u4E3A\u5DF2\u89E3\u51B3",
+  markResolvedHint: "\u6587\u4EF6\u91CC\u8FD8\u6709\u51B2\u7A81\u6807\u8BB0",
+  revertConflict: "\u8FD8\u539F\u51B2\u7A81",
+  revertConflictTitle: "\u8FD8\u539F\u51B2\u7A81",
+  revertConflictBody: "\u5DF2\u5199\u5165\u7684\u89E3\u51B3\u7ED3\u679C\u4F1A\u88AB\u4E22\u5F03\uFF0C\u51B2\u7A81\u6807\u8BB0\u4F1A\u56DE\u6765\uFF0C\u4E14\u65E0\u6CD5\u64A4\u9500\u3002",
+  conflictRevertFailed: "\u8FD8\u539F\u51B2\u7A81\u5931\u8D25",
+  conflictApplyFailed: "\u5199\u5165\u89E3\u51B3\u7ED3\u679C\u5931\u8D25",
+  resolutionApplied: "\u5DF2\u5199\u5165\u89E3\u51B3\u7ED3\u679C",
+  resolvedMarked: "\u5DF2\u6807\u8BB0\u4E3A\u5DF2\u89E3\u51B3",
+  markResolvedFailed: "\u6807\u8BB0\u5DF2\u89E3\u51B3\u5931\u8D25",
+  conflictReverted: "\u5DF2\u8FD8\u539F\u51B2\u7A81",
+  conflictPreviewTitle: "AI \u89E3\u51B3\u7ED3\u679C\u9884\u89C8",
+  conflictPreviewHint: "\u70B9\u300C\u5E94\u7528\u300D\u624D\u4F1A\u5199\u8FDB\u6587\u4EF6\uFF1B\u4E4B\u540E\u4ECD\u7136\u53EF\u4EE5\u300C\u8FD8\u539F\u51B2\u7A81\u300D\u3002",
+  applyResolution: "\u5E94\u7528",
   aiNoModelTip: "\u8FD8\u6CA1\u6709\u53EF\u7528\u6A21\u578B\uFF0C\u4ECE DSH \u6A21\u578B\u5217\u8868\u91CC\u9009\u4E00\u4E2A",
   aiNoChanges: "\u8FD8\u6CA1\u6709\u53EF\u603B\u7ED3\u7684\u6539\u52A8",
   aiFromStaged: "\u4F9D\u636E\u5DF2\u6682\u5B58\u7684\u6587\u4EF6\u751F\u6210",
@@ -679,6 +721,47 @@ var CSS = `
 .dgt-commit-check[data-disabled]{opacity:.75;cursor:default;}
 .dgt-commit-check em{font-style:normal;color:var(--dsw-alias-label-tertiary);font-size:10.5px;}
 
+/* Conflict pane: marker blocks, ours/theirs tints, resolve actions */
+.dgt-conflict{display:flex;flex-direction:column;min-height:0;}
+.dgt-conflict-head{display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid var(--dgt-line-soft);
+  background:color-mix(in srgb, var(--dgt-warn) 8%, var(--dgt-card));flex:0 0 auto;}
+.dgt-conflict-count{font-size:11px;font-weight:600;border-radius:999px;padding:2px 9px;
+  background:color-mix(in srgb, var(--dgt-warn) 16%, transparent);color:var(--dgt-warn);}
+.dgt-conflict-count[data-tone='ok']{background:color-mix(in srgb, var(--dgt-ok) 16%, transparent);color:var(--dgt-ok);}
+.dgt-conflict-meta{font-size:10.5px;color:var(--dsw-alias-label-tertiary);}
+.dgt-cfline{display:grid;grid-template-columns:52px 1fr;align-items:baseline;min-height:19px;
+  font:12px/19px var(--ds-font-family-code);white-space:pre-wrap;overflow-wrap:anywhere;}
+.dgt-cfline-no{font-size:10px;color:var(--dsw-alias-label-caption);text-align:right;padding-right:10px;
+  border-right:1px solid var(--dgt-line-soft);user-select:none;}
+.dgt-cfline-text{padding:0 12px;color:var(--dsw-alias-label-primary);}
+.dgt-cfline[data-kind='ours']{background:color-mix(in srgb, var(--dgt-accent) 10%, transparent);}
+.dgt-cfline[data-kind='theirs']{background:color-mix(in srgb, var(--dgt-warn) 12%, transparent);}
+.dgt-cfline[data-kind='base']{background:color-mix(in srgb, var(--dsw-alias-label-tertiary) 10%, transparent);}
+.dgt-cfline[data-kind='marker-start'],
+.dgt-cfline[data-kind='marker-sep'],
+.dgt-cfline[data-kind='marker-end'],
+.dgt-cfline[data-kind='marker-base']{background:color-mix(in srgb, var(--dgt-warn) 22%, var(--dgt-card));
+  color:var(--dgt-warn);font-weight:600;}
+.dgt-cfline[data-kind='marker-start'] .dgt-cfline-text,
+.dgt-cfline[data-kind='marker-sep'] .dgt-cfline-text,
+.dgt-cfline[data-kind='marker-end'] .dgt-cfline-text,
+.dgt-cfline[data-kind='marker-base'] .dgt-cfline-text{color:var(--dgt-warn);}
+.dgt-conflict-actions{display:flex;align-items:center;gap:6px;margin-left:auto;}
+.dgt-diff-action[data-kind='ai']{border-color:color-mix(in srgb, var(--dgt-accent) 40%, var(--dgt-line));
+  background:var(--dgt-accent-soft);color:var(--dgt-accent-strong);}
+.dgt-diff-action[data-kind='ai']:disabled{opacity:.55;}
+.dgt-diff-action[data-kind='ghost']{background:transparent;color:var(--dsw-alias-label-secondary);}
+/* Resolution preview dialog */
+.dgt-dialog.dgt-conflict-dialog{box-sizing:border-box;width:min(880px,92vw);max-height:86vh;}
+.dgt-conflict-dialog-meta{display:flex;align-items:center;gap:12px;min-width:0;}
+.dgt-conflict-dialog-model{font-size:10.5px;color:var(--dsw-alias-label-tertiary);
+  padding:2px 8px;border-radius:999px;background:var(--dgt-line-soft);}
+.dgt-conflict-dialog-body{margin-top:2px;max-height:56vh;overflow:auto;border:1px solid var(--dgt-line);
+  border-radius:10px;background:var(--dgt-page);scrollbar-width:thin;}
+.dgt-conflict-dialog-body .dgt-file-block{min-width:max-content;}
+.dgt-conflict-dialog-text{margin:0;padding:12px 14px;font:12px/19px var(--ds-font-family-code);
+  color:var(--dsw-alias-label-primary);white-space:pre-wrap;overflow-wrap:anywhere;}
+
 /* AI commit message: one quiet action plus the model chip it calls */
 .dgt-ai{position:relative;display:flex;align-items:center;gap:4px;}
 .dgt-ai-generate{appearance:none;display:inline-flex;align-items:center;gap:4px;height:23px;padding:0 9px;
@@ -801,6 +884,10 @@ var OPEN_ROUTE = "api/git-tree/open";
 var AI_MODELS_ROUTE = "api/git-tree/ai/models";
 var AI_MODEL_ROUTE = "api/git-tree/ai/model";
 var COMMIT_MESSAGE_ROUTE = "api/git-tree/commit-message";
+var CONFLICT_RESOLVE_ROUTE = "api/git-tree/conflict/resolve";
+var CONFLICT_APPLY_ROUTE = "api/git-tree/conflict/apply";
+var CONFLICT_REVERT_ROUTE = "api/git-tree/conflict/revert";
+var CONFLICT_MARK_ROUTE = "api/git-tree/conflict/mark-resolved";
 function query(params) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) if (value !== void 0 && value !== "") search.set(key, value);
@@ -886,6 +973,18 @@ function saveAiModel(provider, model) {
 }
 function generateCommitMessage(input, cwd) {
   return postJson(COMMIT_MESSAGE_ROUTE + query({ cwd }), input);
+}
+function resolveConflict(path, cwd) {
+  return postJson(CONFLICT_RESOLVE_ROUTE + query({ cwd }), { path });
+}
+function applyConflict(path, content, cwd) {
+  return postJson(CONFLICT_APPLY_ROUTE + query({ cwd }), { path, content });
+}
+function revertConflict(path, cwd) {
+  return postJson(CONFLICT_REVERT_ROUTE + query({ cwd }), { path });
+}
+function markConflictResolved(path, cwd) {
+  return postJson(CONFLICT_MARK_ROUTE + query({ cwd }), { path });
 }
 
 // src/client/model.ts
@@ -1650,13 +1749,46 @@ function DiffFileBlock(props) {
     )
   );
 }
+function ConflictLineRow(props) {
+  const line = props.line;
+  return h(
+    "div",
+    { className: "dgt-cfline", "data-kind": line.kind },
+    h("span", { className: "dgt-cfline-no" }, String(props.index + 1)),
+    h("span", { className: "dgt-cfline-text" }, line.text === "" ? " " : line.text)
+  );
+}
+function ConflictBody(props) {
+  const conflict = props.conflict;
+  return h(
+    "div",
+    { className: "dgt-conflict" },
+    h(
+      "div",
+      { className: "dgt-conflict-head" },
+      h(
+        "span",
+        { className: "dgt-conflict-count", "data-tone": conflict.blocks > 0 ? "warn" : "ok" },
+        conflict.blocks > 0 ? String(conflict.blocks) + " " + props.t("conflictBlocks") : props.t("conflictClean")
+      ),
+      h(
+        "span",
+        { className: "dgt-conflict-meta" },
+        (conflict.labels.ours || "ours") + " " + String(conflict.ours) + " " + props.t("conflictLines") + " \xB7 " + (conflict.labels.theirs || "theirs") + " " + String(conflict.theirs) + " " + props.t("conflictLines")
+      )
+    ),
+    conflict.lines.map((line, index) => h(ConflictLineRow, { key: "cf:" + String(index), line, index }))
+  );
+}
 function DiffView(props) {
   const { selected, diff, loading, t } = props;
   const entry = selected?.entry ?? null;
   const side = selected?.side ?? "unstaged";
   const stats = diff?.stats;
-  const canAct = entry !== null && !entry.conflicted;
+  const conflicted = entry !== null && entry.conflicted;
   const actionLabel = side === "staged" ? t("unstageFile") : t("stageFile");
+  const conflict = diff?.conflict;
+  const markersLeft = conflict ? conflict.blocks > 0 : true;
   return h(
     "section",
     { className: "dgt-diff", "aria-label": t("code") },
@@ -1671,7 +1803,45 @@ function DiffView(props) {
         h("span", { className: "dgt-stat-add" }, "+" + String(stats.additions)),
         h("span", { className: "dgt-stat-del" }, "\u2212" + String(stats.deletions))
       ) : null,
-      canAct ? h(
+      conflicted ? h(
+        "div",
+        { className: "dgt-conflict-actions" },
+        h(
+          "button",
+          {
+            type: "button",
+            className: "dgt-diff-action",
+            "data-kind": "ai",
+            disabled: props.conflict.busy,
+            title: t("aiResolveTip"),
+            onClick: props.conflict.onResolve
+          },
+          props.conflict.busy ? t("aiResolving") : t("aiResolve")
+        ),
+        h(
+          "button",
+          {
+            type: "button",
+            className: "dgt-diff-action",
+            "data-kind": "ghost",
+            disabled: props.conflict.busy || markersLeft,
+            onClick: props.conflict.onMarkResolved,
+            title: markersLeft ? t("markResolvedHint") : void 0
+          },
+          t("markResolved")
+        ),
+        h(
+          "button",
+          {
+            type: "button",
+            className: "dgt-diff-action",
+            "data-kind": "ghost",
+            disabled: props.conflict.busy,
+            onClick: props.conflict.onRevert
+          },
+          t("revertConflict")
+        )
+      ) : h(
         "button",
         {
           type: "button",
@@ -1680,12 +1850,12 @@ function DiffView(props) {
           onClick: props.onToggleFile
         },
         actionLabel
-      ) : null
+      )
     ),
     h(
       "div",
       { className: "dgt-diff-body" },
-      entry === null ? h("div", { className: "dgt-empty" }, props.hasChanges ? t("noFileSelected") : t("nothingHint")) : loading ? h("div", { className: "dgt-empty" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-empty" }, diff.error || t("diffFailed")) : diff && diff.binary ? h("div", { className: "dgt-empty" }, t("binaryFile")) : diff && diff.files && diff.files.length > 0 ? diff.files.map((file, index) => h(DiffFileBlock, { key: "file:" + String(index), file, t })) : h(
+      entry === null ? h("div", { className: "dgt-empty" }, props.hasChanges ? t("noFileSelected") : t("nothingHint")) : loading ? h("div", { className: "dgt-empty" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-empty" }, diff.error || t("diffFailed")) : diff && diff.conflicted && diff.conflict ? h(ConflictBody, { conflict: diff.conflict, t }) : diff && diff.binary ? h("div", { className: "dgt-empty" }, t("binaryFile")) : diff && diff.files && diff.files.length > 0 ? diff.files.map((file, index) => h(DiffFileBlock, { key: "file:" + String(index), file, t })) : h(
         "div",
         { className: "dgt-empty" },
         entry.kind === "untracked" ? t("untrackedNoDiff") : t("noDiff")
@@ -1960,7 +2130,8 @@ function StatusView(props) {
           t,
           onToggleFile: () => {
             if (props.diffSelection) props.onToggle(props.diffSelection.entry, props.diffSelection.side);
-          }
+          },
+          conflict: props.conflict
         }),
         h(CommitBox, {
           status: props.status,
@@ -2355,6 +2526,57 @@ function ConfirmDialog(props) {
     )
   );
 }
+function ConflictDialog(props) {
+  const stats = props.diff?.stats;
+  const files = props.diff?.files ?? [];
+  return h(
+    "div",
+    { className: "dgt-overlay", role: "presentation", onClick: props.busy ? void 0 : props.onCancel },
+    h(
+      "div",
+      {
+        className: "dgt-dialog dgt-conflict-dialog",
+        role: "dialog",
+        "aria-modal": "true",
+        onClick: (event) => event.stopPropagation()
+      },
+      h("div", { className: "dgt-dialog-title" }, props.t("conflictPreviewTitle")),
+      h(
+        "div",
+        { className: "dgt-conflict-dialog-meta" },
+        h("span", { className: "dgt-dialog-label" }, props.path),
+        props.model !== "" ? h("span", { className: "dgt-conflict-dialog-model" }, props.provider + " / " + props.model) : null,
+        stats ? h(
+          "span",
+          { className: "dgt-stats" },
+          h("span", { className: "dgt-stat-add" }, "+" + String(stats.additions)),
+          h("span", { className: "dgt-stat-del" }, "\u2212" + String(stats.deletions))
+        ) : null
+      ),
+      h(
+        "div",
+        { className: "dgt-conflict-dialog-body" },
+        files.length > 0 ? files.map((file, index) => h(DiffFileBlock, { key: "cf:" + String(index), file, t: props.t })) : h("pre", { className: "dgt-conflict-dialog-text" }, props.content)
+      ),
+      h("div", { className: "dgt-dialog-label" }, props.t("conflictPreviewHint")),
+      props.error !== "" ? h("div", { className: "dgt-dialog-error" }, props.error) : null,
+      h(
+        "div",
+        { className: "dgt-dialog-actions" },
+        h(
+          "button",
+          { type: "button", className: "dgt-button", disabled: props.busy, onClick: props.onCancel },
+          props.t("cancel")
+        ),
+        h(
+          "button",
+          { type: "button", className: "dgt-primary", disabled: props.busy, onClick: props.onApply },
+          props.busy ? props.t("loading") : props.t("applyResolution")
+        )
+      )
+    )
+  );
+}
 
 // src/client/components/ContextMenu.tsx
 function ContextMenu(props) {
@@ -2479,6 +2701,9 @@ function Workspace(props) {
   const [aiModels, setAiModels] = React.useState(null);
   const [aiLoading, setAiLoading] = React.useState(false);
   const [aiBusy, setAiBusy] = React.useState(false);
+  const [conflictResolve, setConflictResolve] = React.useState(null);
+  const [conflictBusy, setConflictBusy] = React.useState("");
+  const [conflictError, setConflictError] = React.useState("");
   const [dialogBusy, setDialogBusy] = React.useState(false);
   const [dialogError, setDialogError] = React.useState("");
   const [statusError, setStatusError] = React.useState("");
@@ -3157,6 +3382,97 @@ function Workspace(props) {
     },
     [repoPath, showToast, t]
   );
+  const resolveConflictWithAi = React.useCallback(
+    async (path) => {
+      setConflictBusy("resolve");
+      setActionError("");
+      setConflictError("");
+      try {
+        const result = await resolveConflict(path, repoPath || void 0);
+        if (!result.ok || typeof result.content !== "string") {
+          throw new Error(result.error || t("aiResolveFailed"));
+        }
+        setConflictResolve({
+          path,
+          content: result.content,
+          diff: { ok: true, files: result.diff?.files, stats: result.diff?.stats },
+          provider: result.provider || "",
+          model: result.model || ""
+        });
+      } catch (error) {
+        const text = error instanceof Error ? error.message : String(error);
+        setActionError(text);
+        showToast(text);
+      } finally {
+        setConflictBusy("");
+      }
+    },
+    [repoPath, showToast, t]
+  );
+  const refreshAfterConflict = React.useCallback(
+    async (path) => {
+      await loadStatus({ silent: true });
+      const next = await fetchStatus(repoPath || void 0);
+      if (next.ok) setStatus(next);
+      const updated = next.ok ? findEntry(next, path) : null;
+      if (updated) await openDiff(updated, "conflicted");
+    },
+    [openDiff, repoPath, loadStatus]
+  );
+  const applyConflictResolution = React.useCallback(async () => {
+    const pending = conflictResolve;
+    if (!pending) return;
+    setConflictBusy("apply");
+    setConflictError("");
+    try {
+      const result = await applyConflict(pending.path, pending.content, repoPath || void 0);
+      if (!result.ok) throw new Error(result.error || t("conflictApplyFailed"));
+      setConflictResolve(null);
+      showToast(t("resolutionApplied") + " \xB7 " + pending.path);
+      await refreshAfterConflict(pending.path);
+      await loadRefs();
+    } catch (error) {
+      setConflictError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setConflictBusy("");
+    }
+  }, [conflictResolve, loadRefs, refreshAfterConflict, repoPath, showToast, t]);
+  const submitConflictRevert = React.useCallback(async () => {
+    const path = dialog?.path ?? "";
+    setDialogBusy(true);
+    setDialogError("");
+    try {
+      const result = await revertConflict(path, repoPath || void 0);
+      if (!result.ok) throw new Error(result.error || t("conflictRevertFailed"));
+      closeDialog();
+      showToast(t("conflictReverted") + " \xB7 " + path);
+      await refreshAfterConflict(path);
+    } catch (error) {
+      setDialogError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setDialogBusy(false);
+    }
+  }, [closeDialog, dialog?.path, refreshAfterConflict, repoPath, showToast, t]);
+  const markResolved = React.useCallback(
+    async (path) => {
+      setConflictBusy("mark");
+      setActionError("");
+      try {
+        const result = await markConflictResolved(path, repoPath || void 0);
+        if (!result.ok) throw new Error(result.error || t("markResolvedFailed"));
+        showToast(t("resolvedMarked") + " \xB7 " + path);
+        await refreshAfterConflict(path);
+        await loadRefs();
+      } catch (error) {
+        const text = error instanceof Error ? error.message : String(error);
+        setActionError(text);
+        showToast(text);
+      } finally {
+        setConflictBusy("");
+      }
+    },
+    [loadRefs, refreshAfterConflict, repoPath, showToast, t]
+  );
   const commit = React.useCallback(async () => {
     const staged = status?.counts?.staged ?? 0;
     const conflicts = status?.counts?.conflicted ?? 0;
@@ -3284,6 +3600,20 @@ function Workspace(props) {
           commitInputRef: commitInput,
           commitCollapsed,
           onToggleCommitCollapsed: () => setCommitFold(!commitCollapsed),
+          conflict: {
+            busy: conflictBusy !== "",
+            onResolve: () => {
+              if (selected) void resolveConflictWithAi(selected.path);
+            },
+            onRevert: () => {
+              if (!selected) return;
+              setDialogError("");
+              setDialog({ kind: "conflict-revert", path: selected.path });
+            },
+            onMarkResolved: () => {
+              if (selected) void markResolved(selected.path);
+            }
+          },
           onSelect: (entry, side) => void openDiff(entry, side),
           onToggle: (entry, side) => void toggle(entry, side),
           onCopyPath: copyPath,
@@ -3384,6 +3714,21 @@ function Workspace(props) {
       onCancel: closeDialog,
       onConfirm: () => void submitDelete()
     }) : null,
+    conflictResolve ? h(ConflictDialog, {
+      path: conflictResolve.path,
+      content: conflictResolve.content,
+      diff: conflictResolve.diff,
+      provider: conflictResolve.provider,
+      model: conflictResolve.model,
+      busy: conflictBusy === "apply",
+      error: conflictError,
+      t,
+      onCancel: () => {
+        setConflictResolve(null);
+        setConflictError("");
+      },
+      onApply: () => void applyConflictResolution()
+    }) : null,
     contextMenu ? h(ContextMenu, { state: contextMenu, onClose: () => setContextMenu(null) }) : null,
     dialog?.kind === "push" ? h(ConfirmDialog, {
       title: t("pushTitle"),
@@ -3414,6 +3759,16 @@ function Workspace(props) {
       t,
       onCancel: closeDialog,
       onConfirm: () => void submitDiscard()
+    }) : null,
+    dialog?.kind === "conflict-revert" ? h(ConfirmDialog, {
+      title: t("revertConflictTitle"),
+      body: (dialog.path ?? "") + " \u2014 " + t("revertConflictBody"),
+      submitLabel: t("revertConflict"),
+      busy: dialogBusy,
+      error: dialogError,
+      t,
+      onCancel: closeDialog,
+      onConfirm: () => void submitConflictRevert()
     }) : null,
     dialog?.kind === "remove" || dialog?.kind === "remove-untracked" ? h(ConfirmDialog, {
       title: t("removeTitle"),

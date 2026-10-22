@@ -10,7 +10,7 @@
 
 `35 秒介绍片（mp4，3.6 MB）` · [`海报`](docs/media/poster.png)
 
-## 0.7.3 能做什么
+## 0.8.0 能做什么
 
 这一版是**本地 Git 工作台**：文件状态、历史、搜索、本地分支——读改动、暂存、提交、切分支、看任意一次提交，全在面板里完成，支持推送当前分支，也可以让 DSH 里的模型来写提交信息。fetch / pull、远程分支和远端管理还没有做。
 
@@ -28,6 +28,7 @@
 - **推送**：把当前分支推到它的 upstream（首次推送自动建立跟踪）。永不 force；认证失败和非快进会被翻译成可读的下一步提示。
 - **提交并推送**：提交卡片里的复选框，提交成功后立即推送；推送失败不会回滚提交。
 - **提交区可折叠**：折叠后只剩一条——作者、分支、暂存数、提交信息首行——把空间还给 diff。两种状态下右上角都是带文字的「收起 / 展开」按钮，点这条也能切换；折叠状态跨刷新记住，改动行右键「提交…」时会先自动展开并聚焦输入框。
+- **冲突视图 + AI 解决冲突**：冲突文件右侧显示工作区里带 `<<<<<<<` 标记的内容（ours 蓝色、theirs 琥珀色逐行高亮），不再是「该文件没有差异」；「AI 解决」让当前模型合并这一个文件，结果以 diff 预览，点「应用」才写盘。写盘后可一键「还原冲突」（`git checkout --merge`），「标记为已解决」（`git add`）是单独的、需要你点的步骤——应用不会自动暂存。
 - **AI 生成提交信息**：提交卡片里的 ✨ 按钮，按这次提交会包含的文件（有暂存就用暂存，没有就用全部改动）的 diff 生成提交信息；旁边的模型按钮从 DSH 的实时模型列表（所有已注册提供方，分组展示）里挑模型。选择按 DSH home 记住，调用本身走 DSH 自己的 `llm` 服务，插件里不另配一套 provider。它只把文字填进输入框——仍然由你检查、点提交。所选文件的 diff 会发给你选中的模型。
 - **本地动作**：在 Finder 中显示、在终端打开（macOS）。
 - **实时**：面板可见时每 2 秒刷新，写操作后立即刷新。
@@ -35,7 +36,7 @@
 
 ## 状态
 
-| 能力 | 0.7.3 |
+| 能力 | 0.8.0 |
 | --- | --- |
 | `main` 面板 + 侧栏入口 | 已完成 |
 | 仓库切换（DSH workspaces） | 已完成 |
@@ -51,11 +52,12 @@
 | 分支新建 / 重命名 / 删除 | 已完成 |
 | 右键操作 + 放弃更改 / 删除文件 | 已完成 |
 | 推送 / 提交并推送 | 已完成 |
+| 冲突视图 + AI 解决冲突 | 已完成 |
 | Finder / 终端 | 已完成 |
 | 自动刷新 | 已完成 |
 | 推送当前分支 | 已完成 |
 | fetch / pull / 远程分支 / 远端管理 | 未做 |
-| 合并 / 变基 / 贮藏 / 冲突 UI | 不做 |
+| 变基 / 贮藏 / 手工三栏合并编辑器 | 不做 |
 | 大仓库虚拟滚动 | 不做（按决定取消） |
 | 与 Agent 共用操作 | 未做 |
 
@@ -100,6 +102,10 @@ POST /api/git-tree/stage               → { paths[] }
 POST /api/git-tree/unstage             → { paths[] }
 POST /api/git-tree/commit              → { message } → { sha, shortSha, subject }
 POST /api/git-tree/commit-message      → { side, files[] } → { message }（一次模型调用）
+POST /api/git-tree/conflict/resolve    → { path } → { content, diff }（只预览，不写盘）
+POST /api/git-tree/conflict/apply      → { path, content } → 写入工作区文件
+POST /api/git-tree/conflict/revert     → { path } → git checkout --merge
+POST /api/git-tree/conflict/mark-resolved → { path } → git add（有标记时拒绝）
 POST /api/git-tree/ai/model            → { provider, model } → 记住选择
 POST /api/git-tree/checkout            → { branch } → 脏工作区拒绝
 POST /api/git-tree/branch/create|rename|delete

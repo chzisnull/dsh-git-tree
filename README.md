@@ -12,7 +12,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.7.3 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
+Version 0.8.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Repository switcher** in the toolbar: pick any workspace registered in DSH; every route then runs against that repository.
@@ -28,6 +28,7 @@ Version 0.7.3 is the **local workbench slice**: file status, history, search and
 - **Push**: push the current branch to its upstream (setting the upstream on first push). Never forces; authentication and non-fast-forward failures are translated into readable next steps.
 - **Commit and push**: a checkbox in the commit card pushes right after a successful commit. A failed push never rolls the commit back.
 - **Foldable commit card**: the card folds to one strip — author, branch, staged count and the first line of the message — so the diff gets the space back. The Fold/Unfold pill sits at the right of the metadata row in both states; clicking the strip unfolds too, and the fold is remembered across reloads. A row action that opens the message box unfolds it first.
+- **Conflict view and AI resolution**: a conflicted file shows the working-tree copy with its `<<<<<<<` markers rendered line by line (ours tinted blue, theirs amber) instead of an empty "no differences" pane. "Resolve with AI" asks the selected DSH model to merge that one file, previews the result as a diff, and writes it only after Apply. The conflict can be restored with one action (`git checkout --merge`), and "Mark resolved" (`git add`) is a separate, deliberate step — applying never stages.
 - **AI commit message**: the ✨ button in the commit card writes the message from the diff of the files that commit would include — the staged rows when there are any, otherwise every working-tree row — and the model chip picks which DSH model does it. The picker is the live DSH model catalog (every registered provider, grouped), the choice is remembered per DSH home, and the call itself goes through DSH's own `llm` service; there is no second provider configuration in this plugin. It only fills the text box: you still review and press Commit. The diff of the selected files is sent to the model you chose.
 - **Local actions**: reveal the repository in Finder or open it in Terminal (macOS).
 - **Live**: the panel polls status every 2s while visible and refetches immediately after a write.
@@ -35,7 +36,7 @@ Version 0.7.3 is the **local workbench slice**: file status, history, search and
 
 ## Status
 
-| Area | 0.7.3 |
+| Area | 0.8.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | repository switcher (DSH workspaces) | done |
@@ -57,7 +58,8 @@ Version 0.7.3 is the **local workbench slice**: file status, history, search and
 | push current branch | done |
 | fetch / pull / remote branches / remote management | not yet |
 | merge into current branch | done |
-| rebase / stash / conflict-resolution UI | not yet |
+| conflict view + AI conflict resolution | done |
+| rebase / stash / manual 3-way merge editor | not yet |
 | large-repo virtualisation | not planned |
 | agent-shared operations | not yet |
 
@@ -102,6 +104,10 @@ POST /api/git-tree/stage                   → { paths[] }
 POST /api/git-tree/unstage                 → { paths[] }
 POST /api/git-tree/commit                  → { message } → { sha, shortSha, subject }
 POST /api/git-tree/commit-message          → { side, files[] } → { message } (one model call)
+POST /api/git-tree/conflict/resolve        → { path } → { content, diff } (preview only, no write)
+POST /api/git-tree/conflict/apply          → { path, content } → writes the working-tree file
+POST /api/git-tree/conflict/revert         → { path } → git checkout --merge
+POST /api/git-tree/conflict/mark-resolved  → { path } → git add (refused while markers remain)
 POST /api/git-tree/ai/model                → { provider, model } → remembered choice
 POST /api/git-tree/checkout                → { branch } → refuses a dirty work tree
 POST /api/git-tree/branch/create|rename|delete

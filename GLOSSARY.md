@@ -119,3 +119,11 @@ _Avoid_: AI model, generator
 **AI commit message** (AI 生成提交信息):
 A commit message drafted by the selected model from the files this commit would include; it only fills the message box and never commits.
 _Avoid_: Auto-commit, generated commit
+
+**Conflict view** (冲突视图):
+The right-hand pane for an unmerged file: the working-tree copy rendered line by line, with `<<<<<<<` / `=======` / `>>>>>>>` marker rows and the two sides tinted.
+_Avoid_: Combined diff, merge diff
+
+**AI conflict resolution** (AI 解决冲突):
+A model-proposed merge of one conflicted file, previewed as a diff and written only after the user applies it; the conflict can be restored with `git checkout --merge`.
+_Avoid_: Auto-merge, conflict fixer

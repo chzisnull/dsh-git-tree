@@ -5,6 +5,7 @@
 import type {
   AiMessagePayload,
   AiModelsPayload,
+  ConflictResolvePayload,
   DiffPayload,
   HistoryPayload,
   MutationPayload,
@@ -37,6 +38,10 @@ const OPEN_ROUTE = 'api/git-tree/open'
 const AI_MODELS_ROUTE = 'api/git-tree/ai/models'
 const AI_MODEL_ROUTE = 'api/git-tree/ai/model'
 const COMMIT_MESSAGE_ROUTE = 'api/git-tree/commit-message'
+const CONFLICT_RESOLVE_ROUTE = 'api/git-tree/conflict/resolve'
+const CONFLICT_APPLY_ROUTE = 'api/git-tree/conflict/apply'
+const CONFLICT_REVERT_ROUTE = 'api/git-tree/conflict/revert'
+const CONFLICT_MARK_ROUTE = 'api/git-tree/conflict/mark-resolved'
 
 function query(params: Record<string, string | undefined>): string {
   const search = new URLSearchParams()
@@ -167,4 +172,21 @@ export function generateCommitMessage(
   cwd?: string,
 ): Promise<AiMessagePayload> {
   return postJson<AiMessagePayload>(COMMIT_MESSAGE_ROUTE + query({ cwd }), input)
+}
+
+
+export function resolveConflict(path: string, cwd?: string): Promise<ConflictResolvePayload> {
+  return postJson<ConflictResolvePayload>(CONFLICT_RESOLVE_ROUTE + query({ cwd }), { path })
+}
+
+export function applyConflict(path: string, content: string, cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(CONFLICT_APPLY_ROUTE + query({ cwd }), { path, content })
+}
+
+export function revertConflict(path: string, cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(CONFLICT_REVERT_ROUTE + query({ cwd }), { path })
+}
+
+export function markConflictResolved(path: string, cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(CONFLICT_MARK_ROUTE + query({ cwd }), { path })
 }

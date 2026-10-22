@@ -37,6 +37,17 @@ import { REF_ARGS, parseRefs } from './refs.js'
 import { openArgv } from './open.js'
 import { resolveCwd, safeRepoPath, workspaceRootOf } from './paths.js'
 import { GitError, RequestError } from './errors.js'
+import {
+  hasConflictMarkers,
+  isUnmerged,
+  parseConflictText,
+  readConflictFile,
+  requireUnmerged,
+  revertConflict,
+  stageResolved,
+  validateResolvedText,
+  writeRepoFile,
+} from './conflict.js'
 import { json, readJsonBody } from './http.js'
 
 const MAX_WRITE_PATHS = 500
@@ -144,6 +155,25 @@ export async function handleDiff(ctx, request) {
   const commit = url.searchParams.get('commit') || ''
   if (commit && !isSafeCommitSha(commit)) throw new RequestError('无效的提交哈希', 400, 'invalid-sha')
   const subprocess = subprocessOf(ctx)
+
+  // An unmerged path has no ordinary unified diff (git prints a combined one),
+  // so answer with the working-tree file and its conflict blocks instead.
+  if (!commit && (await isUnmerged(subprocess, cwd, path))) {
+    const file = readConflictFile(cwd, path)
+    const parsed = parseConflictText(file.text)
+    return json({
+      ok: true,
+      path,
+      side: 'conflicted',
+      staged: false,
+      conflicted: true,
+      conflict: parsed,
+      binary: false,
+      stats: { additions: 0, deletions: 0 },
+      files: [],
+      text: file.text,
+    })
+  }
 
   let argv
   if (commit) {
@@ -632,4 +662,49 @@ export async function handleOpen(ctx, request) {
     throw new GitError(result.err || 'open 退出码 ' + String(result.code), 'open-failed')
   }
   return json({ ok: true, target, cwd })
+}
+
+
+// ── conflict routes ────────────────────────────────────────────────────────
+
+/** Write the reviewed resolution over the conflicted working-tree file. */
+export async function handleConflictApply(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const path = safeRepoPath(body.path)
+  const checked = validateResolvedText(body.content)
+  if (!checked.ok) throw new RequestError(checked.reason, 409, checked.code)
+  const subprocess = subprocessOf(ctx)
+
+  await requireUnmerged(subprocess, cwd, path)
+  writeRepoFile(cwd, path, checked.text)
+  return json({ ok: true, path, bytes: Buffer.byteLength(checked.text, 'utf8') })
+}
+
+/** Restore the conflicted working-tree copy (git checkout --merge). */
+export async function handleConflictRevert(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const path = safeRepoPath(body.path)
+  const subprocess = subprocessOf(ctx)
+
+  await requireUnmerged(subprocess, cwd, path)
+  await revertConflict(subprocess, cwd, path)
+  return json({ ok: true, path })
+}
+
+/** Stage a resolved file; refuses while markers are still in the file. */
+export async function handleConflictMarkResolved(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const path = safeRepoPath(body.path)
+  const subprocess = subprocessOf(ctx)
+
+  await requireUnmerged(subprocess, cwd, path)
+  const file = readConflictFile(cwd, path)
+  if (hasConflictMarkers(file.text)) {
+    throw new RequestError('文件里仍有冲突标记，先解决再标记', 409, 'markers-present')
+  }
+  await stageResolved(subprocess, cwd, path)
+  return json({ ok: true, path })
 }

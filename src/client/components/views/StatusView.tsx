@@ -40,6 +40,7 @@ export function StatusView(props: {
   onPushAfter: (value: boolean) => void
   commitCollapsed: boolean
   onToggleCommitCollapsed: () => void
+  conflict: { busy: boolean; onResolve: () => void; onRevert: () => void; onMarkResolved: () => void }
   ai: AiCommitControls
 }): any {
   const { t } = props
@@ -73,6 +74,7 @@ export function StatusView(props: {
           onToggleFile: () => {
             if (props.diffSelection) props.onToggle(props.diffSelection.entry, props.diffSelection.side)
           },
+          conflict: props.conflict,
         }),
         h(CommitBox, {
           status: props.status,

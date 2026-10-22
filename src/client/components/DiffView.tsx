@@ -2,9 +2,22 @@
 // rendered line by line (gutters, whole-row tint, hunk headers). No syntax
 // highlighting, matching Sourcetree: which lines changed beats which token is
 // a keyword.
+//
+// A conflicted file has no ordinary unified diff — git prints a combined one —
+// so the host answers with the working-tree file and this pane renders its
+// conflict blocks instead, with the resolve actions in the header.
 
 import { h } from '../react'
-import type { DiffFile, DiffLine, DiffPayload, EntrySide, GitFileEntry, Translate } from '../types'
+import type {
+  ConflictLine,
+  ConflictPayload,
+  DiffFile,
+  DiffLine,
+  DiffPayload,
+  EntrySide,
+  GitFileEntry,
+  Translate,
+} from '../types'
 
 function Line(props: { line: DiffLine }): any {
   const line = props.line
@@ -47,6 +60,49 @@ export function DiffFileBlock(props: { file: DiffFile; t: Translate }): any {
   )
 }
 
+function ConflictLineRow(props: { line: ConflictLine; index: number }): any {
+  const line = props.line
+  return h(
+    'div',
+    { className: 'dgt-cfline', 'data-kind': line.kind },
+    h('span', { className: 'dgt-cfline-no' }, String(props.index + 1)),
+    h('span', { className: 'dgt-cfline-text' }, line.text === '' ? ' ' : line.text),
+  )
+}
+
+function ConflictBody(props: { conflict: ConflictPayload; t: Translate }): any {
+  const conflict = props.conflict
+  return h(
+    'div',
+    { className: 'dgt-conflict' },
+    h(
+      'div',
+      { className: 'dgt-conflict-head' },
+      h(
+        'span',
+        { className: 'dgt-conflict-count', 'data-tone': conflict.blocks > 0 ? 'warn' : 'ok' },
+        conflict.blocks > 0 ? String(conflict.blocks) + ' ' + props.t('conflictBlocks') : props.t('conflictClean'),
+      ),
+      h(
+        'span',
+        { className: 'dgt-conflict-meta' },
+        (conflict.labels.ours || 'ours') +
+          ' ' +
+          String(conflict.ours) +
+          ' ' +
+          props.t('conflictLines') +
+          ' · ' +
+          (conflict.labels.theirs || 'theirs') +
+          ' ' +
+          String(conflict.theirs) +
+          ' ' +
+          props.t('conflictLines'),
+      ),
+    ),
+    conflict.lines.map((line, index) => h(ConflictLineRow, { key: 'cf:' + String(index), line, index })),
+  )
+}
+
 export function DiffView(props: {
   selected: { entry: GitFileEntry; side: EntrySide } | null
   diff: DiffPayload | null
@@ -54,13 +110,21 @@ export function DiffView(props: {
   hasChanges: boolean
   t: Translate
   onToggleFile: () => void
+  conflict: {
+    busy: boolean
+    onResolve: () => void
+    onRevert: () => void
+    onMarkResolved: () => void
+  }
 }): any {
   const { selected, diff, loading, t } = props
   const entry = selected?.entry ?? null
   const side = selected?.side ?? 'unstaged'
   const stats = diff?.stats
-  const canAct = entry !== null && !entry.conflicted
+  const conflicted = entry !== null && entry.conflicted
   const actionLabel = side === 'staged' ? t('unstageFile') : t('stageFile')
+  const conflict = diff?.conflict
+  const markersLeft = conflict ? conflict.blocks > 0 : true
 
   return h(
     'section',
@@ -80,8 +144,47 @@ export function DiffView(props: {
             h('span', { className: 'dgt-stat-del' }, '−' + String(stats.deletions)),
           )
         : null,
-      canAct
+      conflicted
         ? h(
+            'div',
+            { className: 'dgt-conflict-actions' },
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'dgt-diff-action',
+                'data-kind': 'ai',
+                disabled: props.conflict.busy,
+                title: t('aiResolveTip'),
+                onClick: props.conflict.onResolve,
+              },
+              props.conflict.busy ? t('aiResolving') : t('aiResolve'),
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'dgt-diff-action',
+                'data-kind': 'ghost',
+                disabled: props.conflict.busy || markersLeft,
+                onClick: props.conflict.onMarkResolved,
+                title: markersLeft ? t('markResolvedHint') : undefined,
+              },
+              t('markResolved'),
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                className: 'dgt-diff-action',
+                'data-kind': 'ghost',
+                disabled: props.conflict.busy,
+                onClick: props.conflict.onRevert,
+              },
+              t('revertConflict'),
+            ),
+          )
+        : h(
             'button',
             {
               type: 'button',
@@ -90,8 +193,7 @@ export function DiffView(props: {
               onClick: props.onToggleFile,
             },
             actionLabel,
-          )
-        : null,
+          ),
     ),
     h(
       'div',
@@ -102,15 +204,17 @@ export function DiffView(props: {
           ? h('div', { className: 'dgt-empty' }, t('loading'))
           : diff && diff.ok === false
             ? h('div', { className: 'dgt-empty' }, diff.error || t('diffFailed'))
-            : diff && diff.binary
-              ? h('div', { className: 'dgt-empty' }, t('binaryFile'))
-              : diff && diff.files && diff.files.length > 0
-                ? diff.files.map((file, index) => h(DiffFileBlock, { key: 'file:' + String(index), file, t }))
-                : h(
-                    'div',
-                    { className: 'dgt-empty' },
-                    entry.kind === 'untracked' ? t('untrackedNoDiff') : t('noDiff'),
-                  ),
+            : diff && diff.conflicted && diff.conflict
+              ? h(ConflictBody, { conflict: diff.conflict, t })
+              : diff && diff.binary
+                ? h('div', { className: 'dgt-empty' }, t('binaryFile'))
+                : diff && diff.files && diff.files.length > 0
+                  ? diff.files.map((file, index) => h(DiffFileBlock, { key: 'file:' + String(index), file, t }))
+                  : h(
+                      'div',
+                      { className: 'dgt-empty' },
+                      entry.kind === 'untracked' ? t('untrackedNoDiff') : t('noDiff'),
+                    ),
     ),
   )
 }

@@ -2,7 +2,8 @@
 // one confirm (delete); both keep the typed value and any failure on screen.
 
 import { h, React } from '../react'
-import type { Translate } from '../types'
+import type { DiffPayload, Translate } from '../types'
+import { DiffFileBlock } from './DiffView'
 
 export function PromptDialog(props: {
   title: string
@@ -84,6 +85,81 @@ export function ConfirmDialog(props: {
           'button',
           { type: 'button', className: 'dgt-primary dgt-danger', disabled: props.busy, onClick: props.onConfirm },
           props.submitLabel,
+        ),
+      ),
+    ),
+  )
+}
+
+
+/**
+ * Preview of one AI conflict resolution. Nothing is written until "Apply":
+ * the body shows the model's merged file as a diff against the conflicted
+ * working copy, so the review is line by line rather than a wall of text.
+ */
+export function ConflictDialog(props: {
+  path: string
+  provider: string
+  model: string
+  content: string
+  diff: DiffPayload | null
+  busy: boolean
+  error: string
+  t: Translate
+  onCancel: () => void
+  onApply: () => void
+}): any {
+  const stats = props.diff?.stats
+  const files = props.diff?.files ?? []
+  return h(
+    'div',
+    { className: 'dgt-overlay', role: 'presentation', onClick: props.busy ? undefined : props.onCancel },
+    h(
+      'div',
+      {
+        className: 'dgt-dialog dgt-conflict-dialog',
+        role: 'dialog',
+        'aria-modal': 'true',
+        onClick: (event: any) => event.stopPropagation(),
+      },
+      h('div', { className: 'dgt-dialog-title' }, props.t('conflictPreviewTitle')),
+      h(
+        'div',
+        { className: 'dgt-conflict-dialog-meta' },
+        h('span', { className: 'dgt-dialog-label' }, props.path),
+        props.model !== ''
+          ? h('span', { className: 'dgt-conflict-dialog-model' }, props.provider + ' / ' + props.model)
+          : null,
+        stats
+          ? h(
+              'span',
+              { className: 'dgt-stats' },
+              h('span', { className: 'dgt-stat-add' }, '+' + String(stats.additions)),
+              h('span', { className: 'dgt-stat-del' }, '−' + String(stats.deletions)),
+            )
+          : null,
+      ),
+      h(
+        'div',
+        { className: 'dgt-conflict-dialog-body' },
+        files.length > 0
+          ? files.map((file, index) => h(DiffFileBlock, { key: 'cf:' + String(index), file, t: props.t }))
+          : h('pre', { className: 'dgt-conflict-dialog-text' }, props.content),
+      ),
+      h('div', { className: 'dgt-dialog-label' }, props.t('conflictPreviewHint')),
+      props.error !== '' ? h('div', { className: 'dgt-dialog-error' }, props.error) : null,
+      h(
+        'div',
+        { className: 'dgt-dialog-actions' },
+        h(
+          'button',
+          { type: 'button', className: 'dgt-button', disabled: props.busy, onClick: props.onCancel },
+          props.t('cancel'),
+        ),
+        h(
+          'button',
+          { type: 'button', className: 'dgt-primary', disabled: props.busy, onClick: props.onApply },
+          props.busy ? props.t('loading') : props.t('applyResolution'),
         ),
       ),
     ),
