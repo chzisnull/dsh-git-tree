@@ -352,6 +352,10 @@ export const CSS = `
 .dgt-ai-menu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:45;width:min(360px,64vw);
   max-height:min(340px,52vh);overflow:auto;padding:6px;border:1px solid var(--dgt-line);border-radius:12px;
   background:var(--dgt-card);box-shadow:0 14px 34px var(--dsw-alias-bg-mask-1);scrollbar-width:thin;}
+/* The menu is viewport-fixed (see CommitBox): the fold row clips the card body,
+   and a clipped dropdown reads as a broken control. */
+.dgt-ai-menu[data-floating='true']{position:fixed;right:auto;bottom:auto;z-index:90;
+  max-height:min(360px,50vh);}
 .dgt-ai-menu-head{padding:4px 8px 6px;border-bottom:1px solid var(--dgt-line-soft);margin-bottom:4px;
   color:var(--dsw-alias-label-tertiary);font-size:10.5px;}
 .dgt-ai-menu-empty{padding:8px;color:var(--dsw-alias-label-tertiary);font-size:11.5px;}

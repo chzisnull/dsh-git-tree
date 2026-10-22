@@ -699,6 +699,10 @@ var CSS = `
 .dgt-ai-menu{position:absolute;right:0;bottom:calc(100% + 8px);z-index:45;width:min(360px,64vw);
   max-height:min(340px,52vh);overflow:auto;padding:6px;border:1px solid var(--dgt-line);border-radius:12px;
   background:var(--dgt-card);box-shadow:0 14px 34px var(--dsw-alias-bg-mask-1);scrollbar-width:thin;}
+/* The menu is viewport-fixed (see CommitBox): the fold row clips the card body,
+   and a clipped dropdown reads as a broken control. */
+.dgt-ai-menu[data-floating='true']{position:fixed;right:auto;bottom:auto;z-index:90;
+  max-height:min(360px,50vh);}
 .dgt-ai-menu-head{padding:4px 8px 6px;border-bottom:1px solid var(--dgt-line-soft);margin-bottom:4px;
   color:var(--dsw-alias-label-tertiary);font-size:10.5px;}
 .dgt-ai-menu-empty{padding:8px;color:var(--dsw-alias-label-tertiary);font-size:11.5px;}
@@ -1714,6 +1718,20 @@ function CommitBox(props) {
   const canGenerate = hasChanges && !ai.busy && !props.busy && !blocked && ai.active !== null;
   const picker = usePopover();
   const collapsed = props.collapsed === true;
+  const [menuBox, setMenuBox] = React.useState(null);
+  const openPicker = () => {
+    const trigger = picker.triggerRef.current;
+    if (trigger && typeof window !== "undefined") {
+      const rect = trigger.getBoundingClientRect();
+      const width = Math.min(380, window.innerWidth - 24);
+      setMenuBox({
+        left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
+        bottom: window.innerHeight - rect.top + 8,
+        width
+      });
+    }
+    picker.toggle();
+  };
   const defaultHint = blocked ? t("conflictsBlockCommit") : staged === 0 ? t("commitHint") : props.message.trim() === "" ? t("commitMessageEmpty") : t("commitShortcut");
   const generateTitle = !hasChanges ? t("aiNoChanges") : blocked ? t("conflictsBlockCommit") : ai.active === null ? t("aiNoModelTip") : staged > 0 ? t("aiFromStaged") : t("aiFromAll");
   const toggle = () => h(
@@ -1797,7 +1815,7 @@ function CommitBox(props) {
               "aria-haspopup": "listbox",
               "aria-expanded": picker.open,
               ref: picker.triggerRef,
-              onClick: picker.toggle
+              onClick: openPicker
             },
             h("span", { className: "dgt-ai-chip-name" }, shortModelName(ai.active, t)),
             h("span", { className: "dgt-ai-caret", "aria-hidden": "true" }, "\u25BE")
@@ -1808,7 +1826,9 @@ function CommitBox(props) {
               className: "dgt-ai-menu",
               role: "listbox",
               "aria-label": t("aiModel"),
-              ref: picker.menuRef
+              ref: picker.menuRef,
+              "data-floating": true,
+              style: menuBox ? { left: menuBox.left, bottom: menuBox.bottom, width: menuBox.width } : void 0
             },
             h("div", { className: "dgt-ai-menu-head" }, t("aiModelTip")),
             ai.loading ? h("div", { className: "dgt-ai-menu-empty" }, t("loading")) : ai.groups.length === 0 ? h("div", { className: "dgt-ai-menu-empty" }, ai.error || t("aiNoModelTip")) : ai.groups.map(

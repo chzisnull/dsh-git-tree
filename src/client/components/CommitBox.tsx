@@ -12,7 +12,7 @@
 // unfolds it again. Committing is only possible while unfolded — the whole
 // point of folding is room, not skipping the read-through.
 
-import { h } from '../react'
+import { h, React } from '../react'
 import { usePopover } from '../menu'
 import { SparkIcon } from '../icons'
 import type { AiModelGroup, AiModelRoute, GitStatusPayload, Translate } from '../types'
@@ -67,6 +67,22 @@ export function CommitBox(props: {
   const canGenerate = hasChanges && !ai.busy && !props.busy && !blocked && ai.active !== null
   const picker = usePopover()
   const collapsed = props.collapsed === true
+  // The menu floats in the viewport instead of the card: the fold animation
+  // wraps the card body in an overflow-hidden row, which would clip it.
+  const [menuBox, setMenuBox] = React.useState<{ left: number; bottom: number; width: number } | null>(null)
+  const openPicker = () => {
+    const trigger = picker.triggerRef.current
+    if (trigger && typeof window !== 'undefined') {
+      const rect = trigger.getBoundingClientRect()
+      const width = Math.min(380, window.innerWidth - 24)
+      setMenuBox({
+        left: Math.max(12, Math.min(rect.right - width, window.innerWidth - width - 12)),
+        bottom: window.innerHeight - rect.top + 8,
+        width,
+      })
+    }
+    picker.toggle()
+  }
 
   const defaultHint = blocked
     ? t('conflictsBlockCommit')
@@ -176,7 +192,7 @@ export function CommitBox(props: {
               'aria-haspopup': 'listbox',
               'aria-expanded': picker.open,
               ref: picker.triggerRef,
-              onClick: picker.toggle,
+              onClick: openPicker,
             },
             h('span', { className: 'dgt-ai-chip-name' }, shortModelName(ai.active, t)),
             h('span', { className: 'dgt-ai-caret', 'aria-hidden': 'true' }, '▾'),
@@ -189,6 +205,10 @@ export function CommitBox(props: {
                   role: 'listbox',
                   'aria-label': t('aiModel'),
                   ref: picker.menuRef,
+                  'data-floating': true,
+                  style: menuBox
+                    ? { left: menuBox.left, bottom: menuBox.bottom, width: menuBox.width }
+                    : undefined,
                 },
                 h('div', { className: 'dgt-ai-menu-head' }, t('aiModelTip')),
                 ai.loading
