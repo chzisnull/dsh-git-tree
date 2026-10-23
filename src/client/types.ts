@@ -7,12 +7,16 @@ export interface ClientCtx {
   effect(effect: () => void | (() => void), label?: string): void
   locale: {
     register(ns: string, dicts: Record<string, Record<string, string>>): () => void
-    bind(ns: string): (key: string, params?: Record<string, unknown>) => string
+    bind(ns: string): Translate
   }
   slots: {
     inject(ownerKey: string, callback: () => unknown): void
     register(options: Record<string, unknown>, component: any): unknown
   }
+  /** Optional service lookup (Cordis): returns null/undefined when absent. */
+  get?(name: string): any
+  /** Child fiber that starts once every named service is provided. */
+  inject?(deps: string[], callback: (ctx: ClientCtx) => void): unknown
 }
 
 export interface HistoryRef {

@@ -60,3 +60,22 @@ test('the artifact never rebuilds the page around the host', () => {
   assert.ok(!source.includes('document.body'), 'must not append a second application to document.body')
   assert.ok(!source.includes('innerHTML ='), 'must not replace host markup')
 })
+
+test('the keyboard shortcut rides the Harness shortcuts service, not a private listener', () => {
+  assert.ok(source.includes('panel.git-tree.toggle'), 'the command id the app catalog shows')
+  // The panel keeps its own popover keydown handlers, but no global one and no
+  // hand-rolled key matching: the shell owns dispatch, ordering and rebinds.
+  assert.ok(!source.includes('window.addEventListener("keydown"'), 'no window-level key listener')
+  assert.ok(!source.includes('window.addEventListener(\'keydown\''), 'no window-level key listener')
+  assert.ok(!source.includes('event.code === "KeyV"'), 'no private key matching')
+  assert.equal(source.match(/KeyV/g)?.length, 4, 'one physical code per declared profile')
+  assert.ok(!source.includes('"desktop:linux"'), 'Linux rejects primary+KeyV as reserved, so it stays unbound')
+})
+
+test('the shortcut is explained in the panel and labelled in the settings list', () => {
+  for (const key of ['shortcutOpen', 'shortcutToggle', 'shortcutHintBefore', 'shortcutHintAfter']) {
+    assert.ok(source.includes(key), 'missing locale copy: ' + key)
+  }
+  assert.ok(source.includes('dgt-kbd'), 'the toolbar carries a keycap badge')
+  assert.ok(source.includes('dgt-shortcut-hint'), 'the empty pane carries the same hint')
+})

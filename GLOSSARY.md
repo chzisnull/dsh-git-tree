@@ -147,3 +147,15 @@ _Avoid_: Favourite, bookmark
 **Open count** (打开次数):
 How many times the user deliberately switched to a repository from the panel; it orders the unpinned part of the switcher, together with the last-opened time.
 _Avoid_: Visits, popularity
+
+**Panel shortcut** (面板快捷键):
+The registered application command that opens the Git panel, or returns to the conversation when the panel is already in front. It is owned by DSH's shortcut service, not by a listener inside the panel.
+_Avoid_: Hotkey, keybinding script
+
+**Shortcut hold** (快捷键挂起):
+While a panel-owned overlay (confirm, prompt, AI preview, context menu) is open, the panel asks the shortcut to do nothing, because the desktop shell dispatches bound commands ahead of modal controls.
+_Avoid_: Disabled shortcut, modal lock
+
+**Keycap** (键帽):
+One key of a displayed binding, rendered as its own small cap (`⌘`, `⇧`, `V`); the panel shows the live binding in a toolbar badge and in the empty diff pane.
+_Avoid_: Shortcut text, key label

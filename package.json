@@ -1,6 +1,6 @@
 {
   "name": "dsh-git-tree",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "description": "DeepSeek Harness plugin: a Sourcetree-style Git workspace — branches, diff, history, fetch/pull/push, AI-written commit messages and AI-assisted conflict resolution, with pinned and usage-ordered repositories.",
   "license": "MIT",
   "type": "module",

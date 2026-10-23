@@ -6,6 +6,10 @@
 // A conflicted file has no ordinary unified diff — git prints a combined one —
 // so the host answers with the working-tree file and this pane renders its
 // conflict blocks instead, with the resolve actions in the header.
+//
+// The empty pane also carries the panel-toggle hint: it is the one surface a
+// user stares at when nothing is selected, and it disappears together with the
+// badge when the keybinding is unbound.
 
 import { h } from '../react'
 import type {
@@ -18,6 +22,24 @@ import type {
   GitFileEntry,
   Translate,
 } from '../types'
+import { useShortcutCaps } from '../shortcut'
+import { ShortcutCaps } from './atoms'
+
+/**
+ * Empty-pane hint for the panel toggle: the one place a user is guaranteed to
+ * look when the diff is blank. Renders nothing when the command is unbound.
+ */
+function ShortcutHint(props: { t: Translate }): any {
+  const caps = useShortcutCaps()
+  if (caps.length === 0) return null
+  return h(
+    'span',
+    { className: 'dgt-shortcut-hint' },
+    h('span', null, props.t('shortcutHintBefore')),
+    h(ShortcutCaps, { caps }),
+    h('span', null, props.t('shortcutHintAfter')),
+  )
+}
 
 function Line(props: { line: DiffLine }): any {
   const line = props.line
@@ -199,7 +221,12 @@ export function DiffView(props: {
       'div',
       { className: 'dgt-diff-body' },
       entry === null
-        ? h('div', { className: 'dgt-empty' }, props.hasChanges ? t('noFileSelected') : t('nothingHint'))
+        ? h(
+            'div',
+            { className: 'dgt-empty' },
+            h('span', null, props.hasChanges ? t('noFileSelected') : t('nothingHint')),
+            h(ShortcutHint, { t }),
+          )
         : loading
           ? h('div', { className: 'dgt-empty' }, t('loading'))
           : diff && diff.ok === false

@@ -14,17 +14,29 @@
 //
 // Visible copy goes through the Client locale service (`ctx.locale`), and every
 // color comes from a `--dsw-*` theme token so the panel inherits light/dark.
-// The panel itself lives in `components/Workspace`; this entry only wires the
-// plugin into the slot registry.
+// The panel itself lives in `components/Workspace`; this entry wires the plugin
+// into the slot registry and registers the one keyboard command that opens or
+// closes the panel (the command shape and the guards live in `shortcut.ts`).
 
 import { h } from './react'
 import { EN, NS, ZH } from './locale'
 import { CSS } from './styles'
 import { Workspace } from './components/Workspace'
-import type { AnyProps, ClientCtx } from './types'
+import {
+  PANEL_ID,
+  SHORTCUT_ID,
+  bindShortcut,
+  serviceOf,
+  shortcutHeld,
+  shortcutKeys,
+  shortcutsOf,
+  subscribeShortcut,
+  togglePanel,
+} from './shortcut'
+import type { AnyProps, ClientCtx, Translate } from './types'
 
-/** Panel id: the `main` key and the `sidebar.panellist` entry id must match. */
-const PANEL_ID = 'git-tree'
+// The panel id lives in `shortcut.ts` so the launcher, the `main` key and the
+// keyboard command all read one constant.
 
 // ── sidebar launcher icon ──────────────────────────────────────────────────
 
@@ -81,7 +93,25 @@ export function apply(ctx: ClientCtx): void {
   ctx.effect(() => ctx.locale.register(NS, { en: EN, zh: ZH }), 'dsh-git-tree: dictionaries')
   const t = ctx.locale.bind(NS)
 
-  // 3. sidebar launcher: an icon row whose id equals the main panel key.
+  // 3. keyboard command. The shortcuts service is optional on purpose: it is
+  //    not part of `inject`, so a Harness that predates it (or one where the
+  //    registration is rejected as reserved/conflicting) still loads the panel.
+  ctx.effect(() => {
+    try {
+      if (typeof ctx.inject === 'function') {
+        // Wait for the service instead of racing it: the child fiber only runs
+        // once `shortcuts` is provided.
+        ctx.inject(['shortcuts'], (child) => wireShortcut(child, t))
+      } else {
+        wireShortcut(ctx, t)
+      }
+    } catch (error) {
+      console.warn('[dsh-git-tree] keyboard shortcut unavailable:', error)
+    }
+    return () => bindShortcut(null)
+  }, 'dsh-git-tree: shortcut')
+
+  // 4. sidebar launcher: an icon row whose id equals the main panel key.
   ctx.slots.inject('sidebar.panellist', () =>
     ctx.slots.register(
       { name: 'sidebar.panellist', id: PANEL_ID, order: 20, label: () => t('panel'), locale: NS },
@@ -89,7 +119,7 @@ export function apply(ctx: ClientCtx): void {
     ),
   )
 
-  // 4. the panel itself: root-scoped keyed `main` entry, full-height. The
+  // 5. the panel itself: root-scoped keyed `main` entry, full-height. The
   //    active locale id rides along so an AI-written commit message follows the
   //    language the panel is actually showing.
   ctx.slots.inject('main', () =>
@@ -99,6 +129,74 @@ export function apply(ctx: ClientCtx): void {
     ),
   )
 }
+
+/**
+ * Publish the keycap bridge and register the toggle command against a context
+ * that already provides the shortcuts service. Every failure stays local: the
+ * divider between "the panel works" and "the panel works with a shortcut".
+ */
+function wireShortcut(host: ClientCtx, t: Translate): void {
+  const shortcuts = shortcutsOf(host)
+  if (!shortcuts) return
+
+  bindShortcut({
+    keys: () => shortcutKeys(shortcuts),
+    subscribe: (listener) => subscribeShortcut(shortcuts, listener),
+    toggle: () => {
+      togglePanel(serviceOf(host, 'layout'))
+    },
+  })
+
+  let dispose: unknown = null
+  try {
+    dispose = shortcuts.register({
+      id: SHORTCUT_ID,
+      label: () => t('shortcutOpen'),
+      aliases: ['git', 'git panel', 'source control', 'scm', 'toggle git panel'],
+      defaults: {
+        'desktop:macos': { code: 'KeyV', modifiers: ['primary', 'shift'] },
+        'desktop:windows': { code: 'KeyV', modifiers: ['primary', 'shift'] },
+        'web:macos': { code: 'KeyV', modifiers: ['primary', 'shift'] },
+        'web:windows': { code: 'KeyV', modifiers: ['primary', 'shift'] },
+      },
+      // The toggle works from text fields too: closing the panel hands focus to
+      // the conversation composer, and a second press must still reopen it.
+      // Desktop dispatch ignores regions anyway; this keeps Web identical. The
+      // price is the browser's paste-as-plain-text on the bound combination,
+      // which the user can move in Settings → Keyboard shortcuts.
+      regions: ['page', 'editable', 'terminal'],
+      modals: [],
+      resolve: () => {
+        // A panel-owned overlay owns the keyboard until it closes. `blocked`
+        // is the service's word for "consumed, but do nothing": the press must
+        // not fall through and turn into a paste behind the dialog.
+        if (shortcutHeld()) return { status: 'blocked', reason: 'panel-overlay' }
+        return {
+          status: 'handled',
+          run: () => {
+            togglePanel(serviceOf(host, 'layout'))
+          },
+        }
+      },
+    })
+  } catch (error) {
+    console.warn('[dsh-git-tree] keyboard shortcut rejected:', error)
+  }
+
+  const release = () => {
+    try {
+      if (typeof dispose === 'function') (dispose as () => void)()
+    } catch {
+      /* disposing a rejected registration never throws, but stay quiet */
+    }
+    bindShortcut(null)
+  }
+  if (typeof host.effect === 'function') host.effect(() => release, 'dsh-git-tree: shortcut disposal')
+}
+
+// The shortcut helpers are exported from the artifact as well: the boot-contract
+// test evaluates this bundle in Node and exercises the toggle without a DOM.
+export { holdShortcut, keycapParts, shortcutKeys, togglePanel } from './shortcut'
 
 /** Active UI locale id (`zh`, `en`, …), read from the live locale snapshot. */
 function activeLocale(ctx: ClientCtx): string {

@@ -12,9 +12,10 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.10.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
+Version 0.11.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
+- **Keyboard shortcut**: `⇧⌘V` (`Ctrl+Shift+V` on Windows) opens the panel from anywhere and closes it again when it is already open. The command is registered through DSH's own shortcut service, so it is listed and rebindable in Settings → Keyboard shortcuts (`⌘/`); the keycap badge in the toolbar and the hint in the empty diff pane always show the binding you actually have. Panel-owned dialogs and the AI conflict preview hold it still, so a stray press never drops work.
 - **Repository switcher** in the toolbar: pick any workspace registered in DSH; every route then runs against that repository. Workspaces can be pinned (pinned ones list first, in pin order) and the rest are ordered by how often you switch to them, then by the last time you did.
 - **Branch + sync state**: current branch, upstream, ahead/behind, repository root.
 - **Sourcetree's change model**: conflict, staged and unstaged groups with counts; renames keep their original path; a file changed on both sides appears in both groups (driven by `git status --porcelain=v2 --branch -z`).
@@ -37,9 +38,10 @@ Version 0.10.0 is the **local workbench slice**: file status, history, search an
 
 ## Status
 
-| Area | 0.10.0 |
+| Area | 0.11.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
+| keyboard shortcut (`⇧⌘V`) | done |
 | repository switcher (DSH workspaces) | done |
 | branch / ahead / behind / references rail | done |
 | conflict / staged / unstaged groups | done |
@@ -92,7 +94,7 @@ The ✨ button and the model chip in the commit card are one small, bounded feat
 | Half | File | What it does |
 | --- | --- | --- |
 | Host | `index.js` (plain ESM, no build) | registers two authenticated exact Fetch routes via `ctx.connection.fetch.register`, runs git through `ctx.subprocess` |
-| Client | `client.js` (built from `src/client/index.tsx`) | registers the sidebar launcher into `sidebar.panellist` and the panel into `main`, both under the id `git-tree` |
+| Client | `client.js` (built from `src/client/index.tsx`) | registers the sidebar launcher into `sidebar.panellist`, the panel into `main` (both under the id `git-tree`), and the `panel.git-tree.toggle` command with `ctx.shortcuts` |
 
 ```
 GET  /api/git-tree/workspaces              → registered DSH workspaces + pins/open counts, ordered

@@ -202,6 +202,10 @@ export const EN: Record<string, string> = {
   expandCommit: 'Unfold the commit box',
   foldCommit: 'Fold',
   unfoldCommit: 'Unfold',
+  shortcutOpen: 'Open Git panel',
+  shortcutToggle: 'Open or close the Git panel',
+  shortcutHintBefore: 'Press',
+  shortcutHintAfter: 'anywhere to open or close this panel.',
 }
 
 export const ZH: Record<string, string> = {
@@ -402,4 +406,8 @@ export const ZH: Record<string, string> = {
   expandCommit: '展开提交区',
   foldCommit: '收起',
   unfoldCommit: '展开',
+  shortcutOpen: '打开 Git 面板',
+  shortcutToggle: '打开／关闭 Git 面板',
+  shortcutHintBefore: '随时按',
+  shortcutHintAfter: '可打开或关闭这个面板。',
 }

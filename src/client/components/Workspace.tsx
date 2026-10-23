@@ -1,6 +1,7 @@
 // The workspace shell: repository, view, status state and host calls. Each view
-// renders its own surface; the shell owns the toolbar, the reference rail and
-// the shared banners.
+// renders its own surface; the shell owns the toolbar, the reference rail, the
+// shared banners, and the shortcut hold that an open dialog puts around the
+// panel toggle.
 
 import { h, React } from '../react'
 import type {
@@ -58,6 +59,7 @@ import { HistoryView } from './views/HistoryView'
 import { ConflictDialog, ConfirmDialog, PromptDialog } from './Dialogs'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuEntry, ContextMenuState } from './ContextMenu'
+import { holdShortcut } from '../shortcut'
 import type { ViewKind } from '../types'
 
 const POLL_MS = 2000
@@ -185,6 +187,16 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
     if (toastTimer.current) clearTimeout(toastTimer.current)
     toastTimer.current = setTimeout(() => setToast(''), 6000)
   }, [])
+
+  // A panel-owned overlay owns the keyboard until it closes. The desktop shell
+  // dispatches bound shortcuts ahead of modal controls, so without this the
+  // toggle would hide the panel (and drop an unsaved AI preview) underneath the
+  // dialog the user is looking at.
+  const overlayOpen = dialog !== null || conflictResolve !== null || contextMenu !== null
+  React.useEffect(() => {
+    if (!overlayOpen) return undefined
+    return holdShortcut()
+  }, [overlayOpen])
 
   const loadStatus = React.useCallback(
     async (options?: { silent?: boolean }) => {

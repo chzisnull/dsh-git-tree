@@ -685,6 +685,52 @@ profile's `dsh.profile.bundles` (`SKILL.md:8-10`).
 
 ---
 
+### 6.5 Keyboard commands and panel selection (verified for 0.11.0)
+
+The build ships a client shortcuts service (`@deepseek-ai/dsh-client-shortcuts`,
+mounted by the web app bundle). A plugin registers a command instead of adding a
+`keydown` listener, so the combination stays visible, rebindable and arbitrated
+by the app.
+
+- **Registration validates before it publishes.** `register(command)` walks the
+  four profiles a command may declare (`desktop|web` × `macos|windows|linux`)
+  and throws before adding anything: `Unsupported Web shortcut` for a combination
+  the web shell will not deliver, `Reserved shortcut default` for a combination
+  the OS or the editor keeps, `Conflicting shortcut defaults` when an already
+  mounted command uses it — `dsh-client-shortcuts/lib/client.js:1210-1226`. The
+  rules live in `bindingIssue()` (`:836-864`) and `isWebBindingAllowed()`
+  (`:109-134`): macOS/Windows **desktop** accepts anything, the **web** shell
+  admits `primary+alt`, `primary+shift` and three listed combinations, and
+  `primary + KeyC|KeyV|KeyX|KeyZ|KeyY|KeyQ|KeyH` is reserved on every profile
+  that reaches the reservation check. A Linux default for `primary+KeyV`
+  therefore cannot be declared at all.
+- **Dispatch.** On macOS/Windows desktop the shell dispatches accepted
+  combinations natively, ahead of editors, terminals and modal controls; the DOM
+  path checks `regions` (`page`, `editable`, `terminal`) and `modals`, then calls
+  `resolve(context)`: `pass` falls through, `blocked` consumes the press without
+  running, `handled` consumes it and runs `run()` — `:1290-1330`. `Command+C`,
+  `Command+V` and friends already hold their own bindings there, which is the
+  other half of why `KeyV` is reserved.
+- **Catalog.** `ctx.shortcuts.catalog` is an observable of presentation rows;
+  `getSnapshot()` returns `{ id, label, aliases, keys, binding, issue, conflicts }`
+  with `keys` already formatted for the receiving platform (`:1148-1151`,
+  `refreshLabels` `:1239-1260`). Reading it is how a panel shows the binding the
+  user actually has; the same rows feed the Settings dialog in
+  `dsh-client-ui-shortcuts`.
+- **Panel selection.** `ctx.layout.selectPanel(id)` shows a registered `main`
+  panel and `selectPanel(null)` returns to the Conversation; it rejects an
+  unregistered id and aborts pending navigation —
+  `dsh-client-ui-layout/lib/client.js:468-473`. The live selection is
+  `ctx.layout.panelInfo` (`{ getSnapshot(): { activePanelId }, subscribe }`,
+  `:454-461`), so a toggle compares `activePanelId` with its own panel key. The
+  layout package registers its own sidebar-toggle command exactly this way
+  (`:654-700`) — the canonical example to copy.
+- **Keep the service optional.** Declaring `shortcuts` in a plugin's `inject`
+  makes the whole plugin refuse to start on a Harness that lacks it.
+  `dsh-git-tree` uses `ctx.inject(['shortcuts'], …)` (a child fiber that waits
+  for the service) plus `ctx.get('shortcuts')`, and catches a rejected
+  registration, so the panel loads with or without a keyboard command.
+
 ## 7. The skeleton in `plugin/`
 
 Layout of the deliverable (package name `dsh-git-tree`):
@@ -795,3 +841,6 @@ part of the deliverable.
 10. **`ctx.layout` service name stability** — sidebar injects `"layout"` and the
     layout package provides `ctx.reflect.provide("layout", …)`, so the name is
     real in this build, but it is not documented as a public plugin contract.
+    Since 0.11.0 the panel also reads `ctx.layout.panelInfo` (see §6.5) and
+    `ctx.shortcuts.catalog`; both are shipped internals of this build, verified
+    against the same `app.asar` extraction, not published API.

@@ -24,7 +24,11 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var index_exports = {};
 __export(index_exports, {
   apply: () => apply,
-  inject: () => inject
+  holdShortcut: () => holdShortcut,
+  inject: () => inject,
+  keycapParts: () => keycapParts,
+  shortcutKeys: () => shortcutKeys,
+  togglePanel: () => togglePanel
 });
 module.exports = __toCommonJS(index_exports);
 
@@ -231,7 +235,11 @@ var EN = {
   collapseCommit: "Fold the commit box",
   expandCommit: "Unfold the commit box",
   foldCommit: "Fold",
-  unfoldCommit: "Unfold"
+  unfoldCommit: "Unfold",
+  shortcutOpen: "Open Git panel",
+  shortcutToggle: "Open or close the Git panel",
+  shortcutHintBefore: "Press",
+  shortcutHintAfter: "anywhere to open or close this panel."
 };
 var ZH = {
   panel: "Git",
@@ -430,7 +438,11 @@ var ZH = {
   collapseCommit: "\u6298\u53E0\u63D0\u4EA4\u533A",
   expandCommit: "\u5C55\u5F00\u63D0\u4EA4\u533A",
   foldCommit: "\u6536\u8D77",
-  unfoldCommit: "\u5C55\u5F00"
+  unfoldCommit: "\u5C55\u5F00",
+  shortcutOpen: "\u6253\u5F00 Git \u9762\u677F",
+  shortcutToggle: "\u6253\u5F00\uFF0F\u5173\u95ED Git \u9762\u677F",
+  shortcutHintBefore: "\u968F\u65F6\u6309",
+  shortcutHintAfter: "\u53EF\u6253\u5F00\u6216\u5173\u95ED\u8FD9\u4E2A\u9762\u677F\u3002"
 };
 
 // src/client/styles.ts
@@ -656,6 +668,21 @@ var CSS = `
 .dgt-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   height:100%;min-height:120px;color:var(--dsw-alias-label-secondary);font-size:12.5px;}
 .dgt-empty-hint{color:var(--dsw-alias-label-tertiary);font-size:11.5px;}
+
+/* keyboard shortcut: toolbar badge + empty-pane hint */
+.dgt-kbd{appearance:none;display:inline-flex;align-items:center;height:26px;margin-left:8px;
+  padding:0 7px;border:1px solid var(--dgt-line);border-radius:8px;background:transparent;
+  cursor:pointer;font:inherit;transition:background-color .15s ease,border-color .15s ease;}
+.dgt-kbd:hover{border-color:var(--dgt-accent);background:var(--dgt-accent-soft);}
+.dgt-kbd:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:2px;}
+.dgt-kbd-key{display:inline-flex;align-items:center;justify-content:center;min-width:17px;height:17px;
+  padding:0 4px;border-radius:4px;background:var(--dgt-line-soft);
+  color:var(--dsw-alias-label-secondary);font-size:10.5px;line-height:1;font-family:inherit;}
+.dgt-kbd:hover .dgt-kbd-key{background:var(--dgt-card);color:var(--dgt-accent-strong);}
+.dgt-shortcut-hint{display:inline-flex;align-items:center;gap:6px;margin-top:2px;
+  color:var(--dsw-alias-label-tertiary);font-size:11.5px;}
+.dgt-kbd-caps{display:inline-flex;align-items:center;gap:3px;}
+.dgt-shortcut-hint .dgt-kbd-key{padding:0 5px;}
 
 /* history */
 .dgt-history{display:flex;flex-direction:column;flex:1 1 auto;min-width:0;min-height:0;padding:0 16px 14px;}
@@ -1120,6 +1147,14 @@ function sideFor(entry, side) {
 function Chip(props) {
   return h("span", { className: "dgt-chip", "data-tone": props.tone ?? "muted", title: props.title }, props.children);
 }
+function ShortcutCaps(props) {
+  if (!Array.isArray(props.caps) || props.caps.length === 0) return null;
+  return h(
+    "span",
+    { className: props.className ?? "dgt-kbd-caps" },
+    props.caps.map((cap, index) => h("kbd", { key: "cap:" + String(index), className: "dgt-kbd-key" }, cap))
+  );
+}
 
 // src/client/icons.tsx
 function svg(children, extra) {
@@ -1276,6 +1311,122 @@ function usePopover() {
   return { open, toggle: () => setOpen((value) => !value), close, menuRef, triggerRef };
 }
 
+// src/client/shortcut.ts
+var PANEL_ID = "git-tree";
+var SHORTCUT_ID = "panel.git-tree.toggle";
+var bridge = null;
+var bridgeListeners = /* @__PURE__ */ new Set();
+function bindShortcut(next) {
+  bridge = next;
+  for (const listener of [...bridgeListeners]) {
+    try {
+      listener();
+    } catch {
+    }
+  }
+}
+var holds = 0;
+function holdShortcut() {
+  holds += 1;
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    holds = Math.max(0, holds - 1);
+  };
+}
+function shortcutHeld() {
+  return holds > 0;
+}
+function serviceOf(ctx, name) {
+  try {
+    if (!ctx || typeof ctx.get !== "function") return null;
+    const service = ctx.get(name);
+    return service ?? null;
+  } catch {
+    return null;
+  }
+}
+function shortcutsOf(ctx) {
+  const service = serviceOf(ctx, "shortcuts");
+  return service && typeof service.register === "function" ? service : null;
+}
+function shortcutKeys(shortcuts) {
+  try {
+    const catalog = shortcuts && shortcuts.catalog ? shortcuts.catalog : null;
+    if (!catalog || typeof catalog.getSnapshot !== "function") return null;
+    const rows = catalog.getSnapshot();
+    if (!Array.isArray(rows)) return null;
+    const row = rows.find((entry) => entry && entry.id === SHORTCUT_ID);
+    if (!row || !Array.isArray(row.keys) || row.keys.length === 0) return null;
+    return row.keys.map((key) => String(key));
+  } catch {
+    return null;
+  }
+}
+function subscribeShortcut(shortcuts, listener) {
+  try {
+    const catalog = shortcuts && shortcuts.catalog ? shortcuts.catalog : null;
+    if (catalog && typeof catalog.subscribe === "function") {
+      const unsubscribe = catalog.subscribe(listener);
+      return typeof unsubscribe === "function" ? unsubscribe : () => {
+      };
+    }
+  } catch {
+  }
+  return () => {
+  };
+}
+function togglePanel(layout) {
+  if (!layout || typeof layout.selectPanel !== "function") return "none";
+  try {
+    const info = layout.panelInfo && typeof layout.panelInfo.getSnapshot === "function" ? layout.panelInfo.getSnapshot() : null;
+    if (info && info.activePanelId === PANEL_ID) {
+      layout.selectPanel(null);
+      return "close";
+    }
+    layout.selectPanel(PANEL_ID);
+    return "open";
+  } catch {
+    return "none";
+  }
+}
+function readKeys() {
+  try {
+    return bridge ? bridge.keys() : null;
+  } catch {
+    return null;
+  }
+}
+function useShortcutKeys() {
+  const [keys, setKeys] = React.useState(() => readKeys());
+  React.useEffect(() => {
+    const refresh = () => setKeys(readKeys());
+    refresh();
+    bridgeListeners.add(refresh);
+    const unsubscribe = bridge ? bridge.subscribe(refresh) : () => {
+    };
+    return () => {
+      bridgeListeners.delete(refresh);
+      if (typeof unsubscribe === "function") unsubscribe();
+    };
+  }, []);
+  return keys;
+}
+function togglePanelFromUi() {
+  try {
+    if (bridge) bridge.toggle();
+  } catch {
+  }
+}
+function keycapParts(keys) {
+  if (!Array.isArray(keys)) return [];
+  return keys.filter((key) => key !== "+" && key !== " + " && key !== "");
+}
+function useShortcutCaps() {
+  return keycapParts(useShortcutKeys());
+}
+
 // src/client/components/TopBar.tsx
 function TopBar(props) {
   const { status, t } = props;
@@ -1296,6 +1447,7 @@ function TopBar(props) {
   const repoPath = props.currentPath || status?.repoRoot || status?.cwd || "";
   const current = props.workspaces.find((workspace) => workspace.path === repoPath);
   const title = current?.title || (status?.repoRoot ? lastSegment(status.repoRoot) : t("panel"));
+  const caps = useShortcutCaps();
   const renderRow = (workspace) => h(
     "div",
     {
@@ -1510,7 +1662,18 @@ function TopBar(props) {
           onClick: props.onCommitFocus
         },
         h(CommitIcon)
-      )
+      ),
+      caps.length > 0 ? h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-kbd",
+          title: t("shortcutToggle"),
+          "aria-label": t("shortcutToggle"),
+          onClick: togglePanelFromUi
+        },
+        h(ShortcutCaps, { caps })
+      ) : null
     )
   );
 }
@@ -1907,6 +2070,17 @@ function ChangeList(props) {
 }
 
 // src/client/components/DiffView.tsx
+function ShortcutHint(props) {
+  const caps = useShortcutCaps();
+  if (caps.length === 0) return null;
+  return h(
+    "span",
+    { className: "dgt-shortcut-hint" },
+    h("span", null, props.t("shortcutHintBefore")),
+    h(ShortcutCaps, { caps }),
+    h("span", null, props.t("shortcutHintAfter"))
+  );
+}
 function Line(props) {
   const line = props.line;
   const marker = line.kind === "add" ? "+" : line.kind === "del" ? "-" : line.kind === "meta" ? "" : " ";
@@ -2050,7 +2224,12 @@ function DiffView(props) {
     h(
       "div",
       { className: "dgt-diff-body" },
-      entry === null ? h("div", { className: "dgt-empty" }, props.hasChanges ? t("noFileSelected") : t("nothingHint")) : loading ? h("div", { className: "dgt-empty" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-empty" }, diff.error || t("diffFailed")) : diff && diff.conflicted && diff.conflict ? h(ConflictBody, { conflict: diff.conflict, t }) : diff && diff.binary ? h("div", { className: "dgt-empty" }, t("binaryFile")) : diff && diff.files && diff.files.length > 0 ? diff.files.map((file, index) => h(DiffFileBlock, { key: "file:" + String(index), file, t })) : h(
+      entry === null ? h(
+        "div",
+        { className: "dgt-empty" },
+        h("span", null, props.hasChanges ? t("noFileSelected") : t("nothingHint")),
+        h(ShortcutHint, { t })
+      ) : loading ? h("div", { className: "dgt-empty" }, t("loading")) : diff && diff.ok === false ? h("div", { className: "dgt-empty" }, diff.error || t("diffFailed")) : diff && diff.conflicted && diff.conflict ? h(ConflictBody, { conflict: diff.conflict, t }) : diff && diff.binary ? h("div", { className: "dgt-empty" }, t("binaryFile")) : diff && diff.files && diff.files.length > 0 ? diff.files.map((file, index) => h(DiffFileBlock, { key: "file:" + String(index), file, t })) : h(
         "div",
         { className: "dgt-empty" },
         entry.kind === "untracked" ? t("untrackedNoDiff") : t("noDiff")
@@ -2937,6 +3116,11 @@ function Workspace(props) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 6e3);
   }, []);
+  const overlayOpen = dialog !== null || conflictResolve !== null || contextMenu !== null;
+  React.useEffect(() => {
+    if (!overlayOpen) return void 0;
+    return holdShortcut();
+  }, [overlayOpen]);
   const loadStatus = React.useCallback(
     async (options) => {
       if (!options?.silent) setRefreshing(true);
@@ -4095,7 +4279,6 @@ function Workspace(props) {
 }
 
 // src/client/index.tsx
-var PANEL_ID = "git-tree";
 function GitTreeIcon(props) {
   const size = typeof props.size === "number" ? props.size : 16;
   const active = props.active === true;
@@ -4136,6 +4319,18 @@ function apply(ctx) {
   }, "dsh-git-tree: styles");
   ctx.effect(() => ctx.locale.register(NS, { en: EN, zh: ZH }), "dsh-git-tree: dictionaries");
   const t = ctx.locale.bind(NS);
+  ctx.effect(() => {
+    try {
+      if (typeof ctx.inject === "function") {
+        ctx.inject(["shortcuts"], (child) => wireShortcut(child, t));
+      } else {
+        wireShortcut(ctx, t);
+      }
+    } catch (error) {
+      console.warn("[dsh-git-tree] keyboard shortcut unavailable:", error);
+    }
+    return () => bindShortcut(null);
+  }, "dsh-git-tree: shortcut");
   ctx.slots.inject(
     "sidebar.panellist",
     () => ctx.slots.register(
@@ -4150,6 +4345,57 @@ function apply(ctx) {
       Workspace
     )
   );
+}
+function wireShortcut(host, t) {
+  const shortcuts = shortcutsOf(host);
+  if (!shortcuts) return;
+  bindShortcut({
+    keys: () => shortcutKeys(shortcuts),
+    subscribe: (listener) => subscribeShortcut(shortcuts, listener),
+    toggle: () => {
+      togglePanel(serviceOf(host, "layout"));
+    }
+  });
+  let dispose = null;
+  try {
+    dispose = shortcuts.register({
+      id: SHORTCUT_ID,
+      label: () => t("shortcutOpen"),
+      aliases: ["git", "git panel", "source control", "scm", "toggle git panel"],
+      defaults: {
+        "desktop:macos": { code: "KeyV", modifiers: ["primary", "shift"] },
+        "desktop:windows": { code: "KeyV", modifiers: ["primary", "shift"] },
+        "web:macos": { code: "KeyV", modifiers: ["primary", "shift"] },
+        "web:windows": { code: "KeyV", modifiers: ["primary", "shift"] }
+      },
+      // The toggle works from text fields too: closing the panel hands focus to
+      // the conversation composer, and a second press must still reopen it.
+      // Desktop dispatch ignores regions anyway; this keeps Web identical. The
+      // price is the browser's paste-as-plain-text on the bound combination,
+      // which the user can move in Settings → Keyboard shortcuts.
+      regions: ["page", "editable", "terminal"],
+      modals: [],
+      resolve: () => {
+        if (shortcutHeld()) return { status: "blocked", reason: "panel-overlay" };
+        return {
+          status: "handled",
+          run: () => {
+            togglePanel(serviceOf(host, "layout"));
+          }
+        };
+      }
+    });
+  } catch (error) {
+    console.warn("[dsh-git-tree] keyboard shortcut rejected:", error);
+  }
+  const release = () => {
+    try {
+      if (typeof dispose === "function") dispose();
+    } catch {
+    }
+    bindShortcut(null);
+  };
+  if (typeof host.effect === "function") host.effect(() => release, "dsh-git-tree: shortcut disposal");
 }
 function activeLocale(ctx) {
   try {

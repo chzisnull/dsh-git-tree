@@ -1,14 +1,17 @@
 // Toolbar: repository switcher, branch and sync state, and the actions the
 // panel really supports (refresh, reveal in Finder, open a terminal, focus the
-// commit box). The two local open actions only exist on macOS; elsewhere they
-// are not rendered at all rather than shown as dead buttons.
+// commit box, and the keycap badge that toggles the panel). The two local open
+// actions only exist on macOS; elsewhere they are not rendered at all rather
+// than shown as dead buttons. The badge renders nothing when the keyboard
+// command is unbound.
 
 import { h, React } from '../react'
 import type { GitStatusPayload, OpenTarget, Translate, WorkspaceRecord } from '../types'
 import { lastSegment } from '../model'
-import { Chip } from './atoms'
+import { Chip, ShortcutCaps } from './atoms'
 import { CommitIcon, FetchIcon, FolderIcon, PinIcon, PullIcon, PushIcon, RefreshIcon, TerminalIcon } from '../icons'
 import { usePopover } from '../menu'
+import { togglePanelFromUi, useShortcutCaps } from '../shortcut'
 
 export function TopBar(props: {
   status: GitStatusPayload | null
@@ -47,6 +50,9 @@ export function TopBar(props: {
   const repoPath = props.currentPath || status?.repoRoot || status?.cwd || ''
   const current = props.workspaces.find((workspace) => workspace.path === repoPath)
   const title = current?.title || (status?.repoRoot ? lastSegment(status.repoRoot) : t('panel'))
+  // Keycaps for the panel toggle, straight from the live shortcut catalog: an
+  // unbound (or unavailable) command renders no badge at all.
+  const caps = useShortcutCaps()
 
   const renderRow = (workspace: WorkspaceRecord): any =>
     h(
@@ -289,6 +295,19 @@ export function TopBar(props: {
         },
         h(CommitIcon),
       ),
+      caps.length > 0
+        ? h(
+            'button',
+            {
+              type: 'button',
+              className: 'dgt-kbd',
+              title: t('shortcutToggle'),
+              'aria-label': t('shortcutToggle'),
+              onClick: togglePanelFromUi,
+            },
+            h(ShortcutCaps, { caps }),
+          )
+        : null,
     ),
   )
 }
