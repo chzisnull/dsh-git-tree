@@ -234,7 +234,7 @@ test('the panel registers one global toggle command with the agreed defaults', (
   assert.equal(command.defaults['web:linux'], undefined)
   // Text fields are included: closing the panel focuses the composer, and the
   // second press has to reopen it there too (desktop ignores regions anyway).
-  assert.deepEqual(command.regions, ['page', 'editable', 'terminal'])
+  assert.deepEqual(command.regions, ['page', 'editable'])
   assert.deepEqual(command.modals, [])
   assert.ok(command.aliases.includes('source control'), 'the alias list is searchable in Settings')
   assert.equal(typeof command.label(), 'string')
@@ -282,20 +282,29 @@ test('an unwired or throwing shortcuts service leaves the toggle inert', () => {
   assert.deepEqual(layout.calls, [])
 })
 
-test('keycaps come from the live catalog, and disappear when unbound', () => {
+test('the badge follows the live catalog and never advertises a disabled binding', () => {
   const shortcuts = shortcutService()
   const { module } = applyWith({ shortcuts, layout: layoutService(null) })
 
-  assert.equal(module.shortcutKeys(shortcuts), null, 'no published row yet')
+  assert.deepEqual(module.shortcutState(shortcuts), { caps: [], status: 'unbound' }, 'no published row yet')
+
   shortcuts.publish([{ id: 'panel.git-tree.toggle', keys: ['⌘', '⇧', 'V'] }])
-  assert.deepEqual(module.shortcutKeys(shortcuts), ['⌘', '⇧', 'V'])
+  assert.deepEqual(module.shortcutState(shortcuts), { caps: ['⌘', '⇧', 'V'], status: 'bound' })
   assert.deepEqual(module.keycapParts(['⌘', '⇧', 'V']), ['⌘', '⇧', 'V'])
   assert.deepEqual(module.keycapParts(['Ctrl', '+', 'Shift', '+', 'V']), ['Ctrl', 'Shift', 'V'])
 
+  // The service disables a binding it cannot deliver; the panel must not show it.
+  shortcuts.publish([{ id: 'panel.git-tree.toggle', keys: ['⌘', '⇧', 'V'], issue: 'reserved' }])
+  assert.deepEqual(module.shortcutState(shortcuts), { caps: [], status: 'unbound' })
+  shortcuts.publish([{ id: 'panel.git-tree.toggle', keys: ['⌘', '⇧', 'V'], conflicts: ['workspace.files'] }])
+  assert.deepEqual(module.shortcutState(shortcuts), { caps: [], status: 'unbound' })
+
   shortcuts.publish([{ id: 'panel.git-tree.toggle', keys: [] }])
-  assert.equal(module.shortcutKeys(shortcuts), null, 'an unbound command renders no badge')
-  assert.equal(module.shortcutKeys(null), null)
-  assert.equal(module.shortcutKeys({}), null)
+  assert.deepEqual(module.shortcutState(shortcuts), { caps: [], status: 'unbound' }, 'cleared binding')
+
+  // A Harness without the service has nothing to point at.
+  assert.deepEqual(module.shortcutState(null), { caps: [], status: 'unavailable' })
+  assert.deepEqual(module.shortcutState({}), { caps: [], status: 'unavailable' })
 })
 
 test('a panel-owned overlay holds the shortcut still', () => {

@@ -77,5 +77,6 @@ test('the shortcut is explained in the panel and labelled in the settings list',
     assert.ok(source.includes(key), 'missing locale copy: ' + key)
   }
   assert.ok(source.includes('dgt-kbd'), 'the toolbar carries a keycap badge')
+  assert.ok(source.includes('commitDrafts'), 'a closed panel keeps the typed commit message')
   assert.ok(source.includes('dgt-shortcut-hint'), 'the empty pane carries the same hint')
 })

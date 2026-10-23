@@ -66,6 +66,12 @@ const POLL_MS = 2000
 const REPO_KEY = 'dsh-git-tree/repository'
 const COMMIT_FOLD_KEY = 'dsh-git-tree/commit-collapsed'
 
+// A typed commit message is worth more than the React state it lives in: the
+// panel is a `main` slot, so closing it (or toggling back to the conversation
+// with the shortcut) destroys the component. Keep the draft per repository for
+// the lifetime of the page; a successful commit clears it like pressing Clear.
+const commitDrafts = new Map<string, string>()
+
 function findEntry(status: GitStatusPayload | null, path: string): GitFileEntry | null {
   return (status?.entries ?? []).find((entry) => entry.path === path) ?? null
 }
@@ -187,6 +193,24 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
     if (toastTimer.current) clearTimeout(toastTimer.current)
     toastTimer.current = setTimeout(() => setToast(''), 6000)
   }, [])
+
+  // Restore / remember the commit draft. The key is the repository the git
+  // command actually ran against, not the explicit switcher selection: with no
+  // repository chosen the host answers for the session workspace, so `repoPath`
+  // alone stays empty and would never match a draft.
+  const draftKey = repoPath || status?.repoRoot || status?.cwd || ''
+  React.useEffect(() => {
+    if (!draftKey) return
+    const saved = commitDrafts.get(draftKey)
+    if (saved === undefined) return
+    setMessage((current) => (current === '' ? saved : current))
+  }, [draftKey])
+
+  React.useEffect(() => {
+    if (!draftKey) return
+    if (message === '') commitDrafts.delete(draftKey)
+    else commitDrafts.set(draftKey, message)
+  }, [draftKey, message])
 
   // A panel-owned overlay owns the keyboard until it closes. The desktop shell
   // dispatches bound shortcuts ahead of modal controls, so without this the

@@ -28,7 +28,7 @@ import {
   bindShortcut,
   serviceOf,
   shortcutHeld,
-  shortcutKeys,
+  shortcutState,
   shortcutsOf,
   subscribeShortcut,
   togglePanel,
@@ -140,7 +140,7 @@ function wireShortcut(host: ClientCtx, t: Translate): void {
   if (!shortcuts) return
 
   bindShortcut({
-    keys: () => shortcutKeys(shortcuts),
+    state: () => shortcutState(shortcuts),
     subscribe: (listener) => subscribeShortcut(shortcuts, listener),
     toggle: () => {
       togglePanel(serviceOf(host, 'layout'))
@@ -152,7 +152,7 @@ function wireShortcut(host: ClientCtx, t: Translate): void {
     dispose = shortcuts.register({
       id: SHORTCUT_ID,
       label: () => t('shortcutOpen'),
-      aliases: ['git', 'git panel', 'source control', 'scm', 'toggle git panel'],
+      aliases: ['git', 'source control', 'scm'],
       defaults: {
         'desktop:macos': { code: 'KeyV', modifiers: ['primary', 'shift'] },
         'desktop:windows': { code: 'KeyV', modifiers: ['primary', 'shift'] },
@@ -163,8 +163,11 @@ function wireShortcut(host: ClientCtx, t: Translate): void {
       // the conversation composer, and a second press must still reopen it.
       // Desktop dispatch ignores regions anyway; this keeps Web identical. The
       // price is the browser's paste-as-plain-text on the bound combination,
-      // which the user can move in Settings → Keyboard shortcuts.
-      regions: ['page', 'editable', 'terminal'],
+      // which the user can move in Settings → Keyboard shortcuts. The terminal
+      // is excluded on purpose — it is the one surface where the combination
+      // still does something useful (`Ctrl+Shift+V` pastes), and the user can
+      // reach the panel from anywhere else.
+      regions: ['page', 'editable'],
       modals: [],
       resolve: () => {
         // A panel-owned overlay owns the keyboard until it closes. `blocked`
@@ -196,7 +199,7 @@ function wireShortcut(host: ClientCtx, t: Translate): void {
 
 // The shortcut helpers are exported from the artifact as well: the boot-contract
 // test evaluates this bundle in Node and exercises the toggle without a DOM.
-export { holdShortcut, keycapParts, shortcutKeys, togglePanel } from './shortcut'
+export { holdShortcut, keycapParts, shortcutState, togglePanel } from './shortcut'
 
 /** Active UI locale id (`zh`, `en`, …), read from the live locale snapshot. */
 function activeLocale(ctx: ClientCtx): string {

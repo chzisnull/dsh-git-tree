@@ -22,7 +22,7 @@ import type {
   GitFileEntry,
   Translate,
 } from '../types'
-import { useShortcutCaps } from '../shortcut'
+import { useShortcutState } from '../shortcut'
 import { ShortcutCaps } from './atoms'
 
 /**
@@ -30,13 +30,17 @@ import { ShortcutCaps } from './atoms'
  * look when the diff is blank. Renders nothing when the command is unbound.
  */
 function ShortcutHint(props: { t: Translate }): any {
-  const caps = useShortcutCaps()
-  if (caps.length === 0) return null
+  const shortcut = useShortcutState()
+  // No service means no settings page to point at; say nothing.
+  if (shortcut.status === 'unavailable') return null
+  if (shortcut.status === 'unbound') {
+    return h('span', { className: 'dgt-shortcut-hint' }, props.t('shortcutUnbound'))
+  }
   return h(
     'span',
     { className: 'dgt-shortcut-hint' },
     h('span', null, props.t('shortcutHintBefore')),
-    h(ShortcutCaps, { caps }),
+    h(ShortcutCaps, { caps: shortcut.caps }),
     h('span', null, props.t('shortcutHintAfter')),
   )
 }

@@ -25,11 +25,26 @@ export const PANEL_ID = 'git-tree'
 /** Command id registered with the shortcuts service. */
 export const SHORTCUT_ID = 'panel.git-tree.toggle'
 
+/** What the panel can say about the panel toggle. */
+export type ShortcutState = {
+  /** One entry per keycap of the binding the shell will actually deliver. */
+  caps: string[]
+  /**
+   * `bound`: the command has a working binding.
+   * `unbound`: the command exists but has none (cleared, or disabled by a
+   *   conflict) — the panel points at Settings instead of showing keys.
+   * `unavailable`: this Harness has no shortcuts service at all; say nothing.
+   */
+  status: 'bound' | 'unbound' | 'unavailable'
+}
+
+const UNAVAILABLE: ShortcutState = { caps: [], status: 'unavailable' }
+
 /** What the client entry publishes for the panel components. */
 export interface ShortcutBridge {
-  /** Current keycaps for our command (`[]`/null when unbound or unavailable). */
-  keys: () => string[] | null
-  /** Re-read the keycaps when the shortcut catalog changes. */
+  /** Current binding state of our command. */
+  state: () => ShortcutState
+  /** Re-read the state when the shortcut catalog changes. */
   subscribe: (listener: () => void) => () => void
   /** Toggle the panel the same way the keyboard command does. */
   toggle: () => void
@@ -94,18 +109,26 @@ export function shortcutsOf(ctx: any): any | null {
   return service && typeof service.register === 'function' ? service : null
 }
 
-/** Read the binding the catalog currently shows for our command. */
-export function shortcutKeys(shortcuts: any): string[] | null {
+/**
+ * Read the state of our command from the live catalog. A binding the service
+ * has disabled (`issue`, or a conflict with another command) counts as unbound:
+ * showing its keycaps would advertise a combination that cannot fire.
+ */
+export function shortcutState(shortcuts: any): ShortcutState {
+  if (!shortcuts) return UNAVAILABLE
   try {
-    const catalog = shortcuts && shortcuts.catalog ? shortcuts.catalog : null
-    if (!catalog || typeof catalog.getSnapshot !== 'function') return null
+    const catalog = shortcuts.catalog ? shortcuts.catalog : null
+    if (!catalog || typeof catalog.getSnapshot !== 'function') return UNAVAILABLE
     const rows = catalog.getSnapshot()
-    if (!Array.isArray(rows)) return null
+    if (!Array.isArray(rows)) return UNAVAILABLE
     const row = rows.find((entry: any) => entry && entry.id === SHORTCUT_ID)
-    if (!row || !Array.isArray(row.keys) || row.keys.length === 0) return null
-    return row.keys.map((key: unknown) => String(key))
+    if (!row) return { caps: [], status: 'unbound' }
+    if (row.issue !== null && row.issue !== undefined) return { caps: [], status: 'unbound' }
+    if (Array.isArray(row.conflicts) && row.conflicts.length > 0) return { caps: [], status: 'unbound' }
+    const caps = keycapParts(Array.isArray(row.keys) ? row.keys.map((key: unknown) => String(key)) : null)
+    return caps.length === 0 ? { caps: [], status: 'unbound' } : { caps, status: 'bound' }
   } catch {
-    return null
+    return UNAVAILABLE
   }
 }
 
@@ -147,28 +170,37 @@ export function togglePanel(layout: any): 'open' | 'close' | 'none' {
 
 // ── panel-side reads ──────────────────────────────────────────────────────
 
-function readKeys(): string[] | null {
+function readState(): ShortcutState {
   try {
-    return bridge ? bridge.keys() : null
+    return bridge ? bridge.state() : UNAVAILABLE
   } catch {
-    return null
+    return UNAVAILABLE
   }
 }
 
-/** Keycaps to show for the toggle command, following live rebinds. */
-export function useShortcutKeys(): string[] | null {
-  const [keys, setKeys] = React.useState<string[] | null>(() => readKeys())
+/**
+ * The toggle's state for the panel, following live rebinds. The bridge may
+ * appear after the panel mounted (the service starts in a child fiber), so a
+ * late bind re-subscribes to the catalog instead of only refreshing once.
+ */
+export function useShortcutState(): ShortcutState {
+  const [state, setState] = React.useState<ShortcutState>(() => readState())
   React.useEffect(() => {
-    const refresh = () => setKeys(readKeys())
-    refresh()
-    bridgeListeners.add(refresh)
-    const unsubscribe = bridge ? bridge.subscribe(refresh) : () => {}
+    let offCatalog = () => {}
+    const refresh = () => setState(readState())
+    const sync = () => {
+      refresh()
+      offCatalog()
+      offCatalog = bridge ? bridge.subscribe(refresh) : () => {}
+    }
+    sync()
+    bridgeListeners.add(sync)
     return () => {
-      bridgeListeners.delete(refresh)
-      if (typeof unsubscribe === 'function') unsubscribe()
+      bridgeListeners.delete(sync)
+      offCatalog()
     }
   }, [])
-  return keys
+  return state
 }
 
 /** Toggle the panel from a click; silently does nothing when unwired. */
@@ -186,7 +218,4 @@ export function keycapParts(keys: string[] | null): string[] {
   return keys.filter((key) => key !== '+' && key !== ' + ' && key !== '')
 }
 
-/** Caps for the panel components: one hook, always the live binding. */
-export function useShortcutCaps(): string[] {
-  return keycapParts(useShortcutKeys())
-}
+

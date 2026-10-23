@@ -27,7 +27,7 @@ __export(index_exports, {
   holdShortcut: () => holdShortcut,
   inject: () => inject,
   keycapParts: () => keycapParts,
-  shortcutKeys: () => shortcutKeys,
+  shortcutState: () => shortcutState,
   togglePanel: () => togglePanel
 });
 module.exports = __toCommonJS(index_exports);
@@ -239,7 +239,8 @@ var EN = {
   shortcutOpen: "Open Git panel",
   shortcutToggle: "Open or close the Git panel",
   shortcutHintBefore: "Press",
-  shortcutHintAfter: "anywhere to open or close this panel."
+  shortcutHintAfter: "anywhere to open or close this panel.",
+  shortcutUnbound: "No shortcut for this panel yet \u2014 set one in Settings \u2192 Keyboard shortcuts."
 };
 var ZH = {
   panel: "Git",
@@ -442,7 +443,8 @@ var ZH = {
   shortcutOpen: "\u6253\u5F00 Git \u9762\u677F",
   shortcutToggle: "\u6253\u5F00\uFF0F\u5173\u95ED Git \u9762\u677F",
   shortcutHintBefore: "\u968F\u65F6\u6309",
-  shortcutHintAfter: "\u53EF\u6253\u5F00\u6216\u5173\u95ED\u8FD9\u4E2A\u9762\u677F\u3002"
+  shortcutHintAfter: "\u53EF\u6253\u5F00\u6216\u5173\u95ED\u8FD9\u4E2A\u9762\u677F\u3002",
+  shortcutUnbound: "\u8FD9\u4E2A\u9762\u677F\u8FD8\u6CA1\u6709\u5FEB\u6377\u952E\uFF0C\u53EF\u5728\u300C\u8BBE\u7F6E \u2192 \u952E\u76D8\u5FEB\u6377\u952E\u300D\u91CC\u8BBE\u7F6E\u3002"
 };
 
 // src/client/styles.ts
@@ -1314,6 +1316,7 @@ function usePopover() {
 // src/client/shortcut.ts
 var PANEL_ID = "git-tree";
 var SHORTCUT_ID = "panel.git-tree.toggle";
+var UNAVAILABLE = { caps: [], status: "unavailable" };
 var bridge = null;
 var bridgeListeners = /* @__PURE__ */ new Set();
 function bindShortcut(next) {
@@ -1351,17 +1354,21 @@ function shortcutsOf(ctx) {
   const service = serviceOf(ctx, "shortcuts");
   return service && typeof service.register === "function" ? service : null;
 }
-function shortcutKeys(shortcuts) {
+function shortcutState(shortcuts) {
+  if (!shortcuts) return UNAVAILABLE;
   try {
-    const catalog = shortcuts && shortcuts.catalog ? shortcuts.catalog : null;
-    if (!catalog || typeof catalog.getSnapshot !== "function") return null;
+    const catalog = shortcuts.catalog ? shortcuts.catalog : null;
+    if (!catalog || typeof catalog.getSnapshot !== "function") return UNAVAILABLE;
     const rows = catalog.getSnapshot();
-    if (!Array.isArray(rows)) return null;
+    if (!Array.isArray(rows)) return UNAVAILABLE;
     const row = rows.find((entry) => entry && entry.id === SHORTCUT_ID);
-    if (!row || !Array.isArray(row.keys) || row.keys.length === 0) return null;
-    return row.keys.map((key) => String(key));
+    if (!row) return { caps: [], status: "unbound" };
+    if (row.issue !== null && row.issue !== void 0) return { caps: [], status: "unbound" };
+    if (Array.isArray(row.conflicts) && row.conflicts.length > 0) return { caps: [], status: "unbound" };
+    const caps = keycapParts(Array.isArray(row.keys) ? row.keys.map((key) => String(key)) : null);
+    return caps.length === 0 ? { caps: [], status: "unbound" } : { caps, status: "bound" };
   } catch {
-    return null;
+    return UNAVAILABLE;
   }
 }
 function subscribeShortcut(shortcuts, listener) {
@@ -1391,27 +1398,33 @@ function togglePanel(layout) {
     return "none";
   }
 }
-function readKeys() {
+function readState() {
   try {
-    return bridge ? bridge.keys() : null;
+    return bridge ? bridge.state() : UNAVAILABLE;
   } catch {
-    return null;
+    return UNAVAILABLE;
   }
 }
-function useShortcutKeys() {
-  const [keys, setKeys] = React.useState(() => readKeys());
+function useShortcutState() {
+  const [state, setState] = React.useState(() => readState());
   React.useEffect(() => {
-    const refresh = () => setKeys(readKeys());
-    refresh();
-    bridgeListeners.add(refresh);
-    const unsubscribe = bridge ? bridge.subscribe(refresh) : () => {
+    let offCatalog = () => {
     };
+    const refresh = () => setState(readState());
+    const sync = () => {
+      refresh();
+      offCatalog();
+      offCatalog = bridge ? bridge.subscribe(refresh) : () => {
+      };
+    };
+    sync();
+    bridgeListeners.add(sync);
     return () => {
-      bridgeListeners.delete(refresh);
-      if (typeof unsubscribe === "function") unsubscribe();
+      bridgeListeners.delete(sync);
+      offCatalog();
     };
   }, []);
-  return keys;
+  return state;
 }
 function togglePanelFromUi() {
   try {
@@ -1422,9 +1435,6 @@ function togglePanelFromUi() {
 function keycapParts(keys) {
   if (!Array.isArray(keys)) return [];
   return keys.filter((key) => key !== "+" && key !== " + " && key !== "");
-}
-function useShortcutCaps() {
-  return keycapParts(useShortcutKeys());
 }
 
 // src/client/components/TopBar.tsx
@@ -1447,7 +1457,7 @@ function TopBar(props) {
   const repoPath = props.currentPath || status?.repoRoot || status?.cwd || "";
   const current = props.workspaces.find((workspace) => workspace.path === repoPath);
   const title = current?.title || (status?.repoRoot ? lastSegment(status.repoRoot) : t("panel"));
-  const caps = useShortcutCaps();
+  const caps = useShortcutState().caps;
   const renderRow = (workspace) => h(
     "div",
     {
@@ -2071,13 +2081,16 @@ function ChangeList(props) {
 
 // src/client/components/DiffView.tsx
 function ShortcutHint(props) {
-  const caps = useShortcutCaps();
-  if (caps.length === 0) return null;
+  const shortcut = useShortcutState();
+  if (shortcut.status === "unavailable") return null;
+  if (shortcut.status === "unbound") {
+    return h("span", { className: "dgt-shortcut-hint" }, props.t("shortcutUnbound"));
+  }
   return h(
     "span",
     { className: "dgt-shortcut-hint" },
     h("span", null, props.t("shortcutHintBefore")),
-    h(ShortcutCaps, { caps }),
+    h(ShortcutCaps, { caps: shortcut.caps }),
     h("span", null, props.t("shortcutHintAfter"))
   );
 }
@@ -3033,6 +3046,7 @@ function ContextMenu(props) {
 var POLL_MS = 2e3;
 var REPO_KEY = "dsh-git-tree/repository";
 var COMMIT_FOLD_KEY = "dsh-git-tree/commit-collapsed";
+var commitDrafts = /* @__PURE__ */ new Map();
 function findEntry(status, path) {
   return (status?.entries ?? []).find((entry) => entry.path === path) ?? null;
 }
@@ -3116,6 +3130,18 @@ function Workspace(props) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 6e3);
   }, []);
+  const draftKey = repoPath || status?.repoRoot || status?.cwd || "";
+  React.useEffect(() => {
+    if (!draftKey) return;
+    const saved = commitDrafts.get(draftKey);
+    if (saved === void 0) return;
+    setMessage((current) => current === "" ? saved : current);
+  }, [draftKey]);
+  React.useEffect(() => {
+    if (!draftKey) return;
+    if (message === "") commitDrafts.delete(draftKey);
+    else commitDrafts.set(draftKey, message);
+  }, [draftKey, message]);
   const overlayOpen = dialog !== null || conflictResolve !== null || contextMenu !== null;
   React.useEffect(() => {
     if (!overlayOpen) return void 0;
@@ -4350,7 +4376,7 @@ function wireShortcut(host, t) {
   const shortcuts = shortcutsOf(host);
   if (!shortcuts) return;
   bindShortcut({
-    keys: () => shortcutKeys(shortcuts),
+    state: () => shortcutState(shortcuts),
     subscribe: (listener) => subscribeShortcut(shortcuts, listener),
     toggle: () => {
       togglePanel(serviceOf(host, "layout"));
@@ -4361,7 +4387,7 @@ function wireShortcut(host, t) {
     dispose = shortcuts.register({
       id: SHORTCUT_ID,
       label: () => t("shortcutOpen"),
-      aliases: ["git", "git panel", "source control", "scm", "toggle git panel"],
+      aliases: ["git", "source control", "scm"],
       defaults: {
         "desktop:macos": { code: "KeyV", modifiers: ["primary", "shift"] },
         "desktop:windows": { code: "KeyV", modifiers: ["primary", "shift"] },
@@ -4372,8 +4398,11 @@ function wireShortcut(host, t) {
       // the conversation composer, and a second press must still reopen it.
       // Desktop dispatch ignores regions anyway; this keeps Web identical. The
       // price is the browser's paste-as-plain-text on the bound combination,
-      // which the user can move in Settings → Keyboard shortcuts.
-      regions: ["page", "editable", "terminal"],
+      // which the user can move in Settings → Keyboard shortcuts. The terminal
+      // is excluded on purpose — it is the one surface where the combination
+      // still does something useful (`Ctrl+Shift+V` pastes), and the user can
+      // reach the panel from anywhere else.
+      regions: ["page", "editable"],
       modals: [],
       resolve: () => {
         if (shortcutHeld()) return { status: "blocked", reason: "panel-overlay" };

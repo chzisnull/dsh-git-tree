@@ -11,7 +11,7 @@ import { lastSegment } from '../model'
 import { Chip, ShortcutCaps } from './atoms'
 import { CommitIcon, FetchIcon, FolderIcon, PinIcon, PullIcon, PushIcon, RefreshIcon, TerminalIcon } from '../icons'
 import { usePopover } from '../menu'
-import { togglePanelFromUi, useShortcutCaps } from '../shortcut'
+import { togglePanelFromUi, useShortcutState } from '../shortcut'
 
 export function TopBar(props: {
   status: GitStatusPayload | null
@@ -52,7 +52,7 @@ export function TopBar(props: {
   const title = current?.title || (status?.repoRoot ? lastSegment(status.repoRoot) : t('panel'))
   // Keycaps for the panel toggle, straight from the live shortcut catalog: an
   // unbound (or unavailable) command renders no badge at all.
-  const caps = useShortcutCaps()
+  const caps = useShortcutState().caps
 
   const renderRow = (workspace: WorkspaceRecord): any =>
     h(

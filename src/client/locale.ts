@@ -206,6 +206,7 @@ export const EN: Record<string, string> = {
   shortcutToggle: 'Open or close the Git panel',
   shortcutHintBefore: 'Press',
   shortcutHintAfter: 'anywhere to open or close this panel.',
+  shortcutUnbound: 'No shortcut for this panel yet — set one in Settings → Keyboard shortcuts.',
 }
 
 export const ZH: Record<string, string> = {
@@ -410,4 +411,5 @@ export const ZH: Record<string, string> = {
   shortcutToggle: '打开／关闭 Git 面板',
   shortcutHintBefore: '随时按',
   shortcutHintAfter: '可打开或关闭这个面板。',
+  shortcutUnbound: '这个面板还没有快捷键，可在「设置 → 键盘快捷键」里设置。',
 }

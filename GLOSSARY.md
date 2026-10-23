@@ -159,3 +159,7 @@ _Avoid_: Disabled shortcut, modal lock
 **Keycap** (键帽):
 One key of a displayed binding, rendered as its own small cap (`⌘`, `⇧`, `V`); the panel shows the live binding in a toolbar badge and in the empty diff pane.
 _Avoid_: Shortcut text, key label
+
+**Commit draft** (提交信息草稿):
+What the user typed into the commit box, kept per repository for the page's lifetime so closing the panel (the shortcut, the sidebar, switching views) never loses it; a successful commit or Clear drops it.
+_Avoid_: Unsaved message, pending text
