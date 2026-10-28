@@ -507,3 +507,83 @@ test('the refs rail is read when the branch moved or on its own slower clock', (
   assert.ok(module.POLL_IDLE_MS > module.POLL_FAST_MS, 'the idle cadence is the slower one')
   assert.ok(module.POLL_FAST_MS >= 3000, 'no polling faster than 3 s')
 })
+
+test('the poll loop stops while unwatched and only reads the rail when it moves', async () => {
+  const module = evaluateBundle()
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+  const timers = []
+  const statusCalls = []
+  const refsCalls = []
+  let clock = 1000
+  let focused = true
+  let status = { ok: true, branch: 'main', oid: 'one', counts: { staged: 0, unstaged: 0, conflicted: 0 }, entries: [] }
+
+  const loop = module.startPollLoop({
+    readStatus: async () => {
+      statusCalls.push(clock)
+      return status
+    },
+    readRefs: (branch) => refsCalls.push({ branch, at: clock }),
+    stopped: () => !focused,
+    busy: () => false,
+    now: () => clock,
+    setTimer: (run, ms) => {
+      timers.push({ run, ms })
+      return timers.length - 1
+    },
+    clearTimer: () => {},
+  })
+
+  // The first wake reads immediately.
+  loop.wake()
+  assert.equal(timers.length, 1)
+  assert.equal(timers[0].ms, 0, 'a wake reads on the next tick')
+  await timers[0].run()
+  await flush()
+  assert.equal(statusCalls.length, 1)
+  assert.equal(timers[1].ms, module.POLL_FAST_MS, 'a moving working copy polls at the fast cadence')
+
+  // Unwatched: the tick returns without reading and without re-arming.
+  focused = false
+  const armed = timers.length
+  clock += module.POLL_FAST_MS
+  await timers[1].run()
+  await flush()
+  assert.equal(statusCalls.length, 1, 'no git while unfocused')
+  assert.equal(timers.length, armed, 'an unwatched panel stops scheduling altogether')
+
+  // Watching again: immediate read, and three identical polls back off.
+  focused = true
+  loop.wake()
+  await timers[timers.length - 1].run()
+  await flush()
+  clock += module.POLL_FAST_MS
+  await timers[timers.length - 1].run()
+  await flush()
+  clock += module.POLL_FAST_MS
+  await timers[timers.length - 1].run()
+  await flush()
+  clock += module.POLL_FAST_MS
+  await timers[timers.length - 1].run()
+  await flush()
+  assert.equal(timers[timers.length - 1].ms, module.POLL_IDLE_MS, 'nothing changed, so the loop backs off')
+
+  // A moved branch reads the rail at once, not on the refs clock.
+  const refsBefore = refsCalls.length
+  status = { ...status, oid: 'two' }
+  clock += module.POLL_IDLE_MS
+  await timers[timers.length - 1].run()
+  await flush()
+  assert.equal(refsCalls.length, refsBefore + 1, 'a moved HEAD reads the rail')
+  assert.equal(refsCalls[refsCalls.length - 1].branch, 'main', 'the rail read reuses the branch the status already has')
+
+  // Staging a file changes the status but not the rail.
+  status = { ...status, entries: [], counts: { staged: 1, unstaged: 0, conflicted: 0 } }
+  const stagedRefs = refsCalls.length
+  clock += 100
+  await timers[timers.length - 1].run()
+  await flush()
+  assert.equal(refsCalls.length, stagedRefs, 'a change that does not move HEAD leaves the rail alone')
+
+  loop.stop()
+})

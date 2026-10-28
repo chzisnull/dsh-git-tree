@@ -754,15 +754,19 @@ plugin API — they are shipped internals of this build.
   the user has not pressed send.
 - **`workspaces.list`** — `@deepseek-ai/dsh-api-workspace-controller`
   (`super(ctx, "workspaces")`, `lib/client.js:389`) exposes the same registry
-  the browser uses, with `getSnapshot().items[]` carrying `workspaceId`, `path`
-  and `title`. Matching a repository to a workspace on this list keeps ids and
+  the browser uses: `getSnapshot()` carries `{ items[], phase, state }`, and
+  each item has `workspaceId`, `path` and `title`. Check `phase === 'ready'`
+  before deciding a repository has no workspace — while the stream loads,
+  `items` is empty. Matching a repository to a workspace on this list keeps ids and
   paths consistent with what `startSession` expects; a repository may sit below
   its workspace, so pick the longest matching `path`.
 - **Degrade, do not assume.** Both services are optional: a Harness without the
   workspace browser, or a build that stops exposing them, must fall back to
   showing the prompt for copying rather than to a dead button. `dsh-git-tree`
-  reads them through `ctx.get` and returns a verdict (`opened`,
-  `no-workspace`, `unavailable`) instead of throwing.
+  reads them through `ctx.get` and returns a verdict (`requested`,
+  `no-workspace`, `not-ready`, `unavailable`) instead of throwing: `requested`
+  is deliberate, because `startSession` is fire-and-forget and cannot report
+  that the session appeared.
 
 ## 7. The skeleton in `plugin/`
 

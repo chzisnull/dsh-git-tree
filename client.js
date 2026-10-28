@@ -35,8 +35,10 @@ __export(index_exports, {
   keycapParts: () => keycapParts,
   matchWorkspace: () => matchWorkspace,
   pollDelay: () => pollDelay,
+  refSignature: () => refSignature,
   shortcutState: () => shortcutState,
   shouldFetchRefs: () => shouldFetchRefs,
+  startPollLoop: () => startPollLoop,
   statusSignature: () => statusSignature,
   togglePanel: () => togglePanel
 });
@@ -3158,14 +3160,69 @@ function statusSignature(status) {
   ].join("");
 }
 function pollDelay(previousSignature, nextSignature, unchangedTicks) {
-  const unchanged = nextSignature === previousSignature ? unchangedTicks + 1 : 0;
+  const changed = nextSignature !== previousSignature;
+  const unchanged = changed ? 0 : unchangedTicks + 1;
   return {
     delay: unchanged >= POLL_IDLE_TICKS ? POLL_IDLE_MS : POLL_FAST_MS,
-    unchangedTicks: unchanged
+    unchangedTicks: unchanged,
+    changed
   };
 }
-function shouldFetchRefs(signatureChanged, sinceRefsMs) {
-  return signatureChanged || sinceRefsMs >= REFS_EVERY_MS;
+function refSignature(status) {
+  if (!status || status.ok !== true) return "";
+  return (status.branch ?? "") + "" + (status.oid ?? "");
+}
+function shouldFetchRefs(refsMoved, sinceRefsMs) {
+  return refsMoved || sinceRefsMs >= REFS_EVERY_MS;
+}
+function startPollLoop(host) {
+  let signature = "";
+  let refs = "";
+  let unchanged = 0;
+  let lastRefsAt = host.now();
+  let timer = null;
+  let stopped = false;
+  const schedule = (ms) => {
+    if (stopped) return;
+    if (timer !== null) host.clearTimer(timer);
+    timer = host.setTimer(() => void tick(), ms);
+  };
+  const tick = async () => {
+    if (stopped) return;
+    if (host.stopped()) return;
+    if (host.busy()) {
+      schedule(POLL_FAST_MS);
+      return;
+    }
+    const next = await host.readStatus();
+    if (stopped) return;
+    const nextSignature = statusSignature(next);
+    const decision = pollDelay(signature, nextSignature, unchanged);
+    const nextRefs = refSignature(next);
+    const refsMoved = signature !== "" && nextRefs !== refs && nextRefs !== "";
+    signature = nextSignature;
+    refs = nextRefs;
+    unchanged = decision.unchangedTicks;
+    const now = host.now();
+    if (shouldFetchRefs(refsMoved, now - lastRefsAt)) {
+      lastRefsAt = now;
+      host.readRefs(next?.branch);
+    }
+    schedule(decision.delay);
+  };
+  return {
+    wake() {
+      if (stopped) return;
+      unchanged = 0;
+      lastRefsAt = host.now();
+      schedule(0);
+    },
+    stop() {
+      stopped = true;
+      if (timer !== null) host.clearTimer(timer);
+      timer = null;
+    }
+  };
 }
 
 // src/client/handoff.ts
@@ -3711,69 +3768,44 @@ function Workspace(props) {
     }
   }, [status, selected]);
   React.useEffect(() => {
-    let timer = null;
-    let stopped = false;
-    let signature = "";
-    let unchanged = 0;
-    let lastRefsAt = 0;
-    let focused = true;
-    const schedule = (ms) => {
-      if (stopped) return;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void tick(), ms);
-    };
-    const tick = async () => {
-      if (stopped) return;
-      const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
-      if (hidden || !focused || busyRef.current) {
-        schedule(POLL_FAST_MS);
-        return;
-      }
-      const next = await loadStatus({ silent: true });
-      if (stopped) return;
-      const nextSignature = statusSignature(next);
-      const decision = pollDelay(signature, nextSignature, unchanged);
-      signature = nextSignature;
-      unchanged = decision.unchangedTicks;
-      const now = Date.now();
-      if (shouldFetchRefs(decision.unchangedTicks === 0, now - lastRefsAt)) {
-        lastRefsAt = now;
-        void loadRefs(next?.branch);
-      }
-      schedule(decision.delay);
-    };
-    const wake = () => {
-      unchanged = 0;
-      lastRefsAt = 0;
-      schedule(0);
-    };
-    wakePollRef.current = wake;
+    const focusedNow = () => typeof document === "undefined" || typeof document.hasFocus !== "function" ? true : document.hasFocus();
+    let focused = focusedNow();
+    const loop = startPollLoop({
+      readStatus: () => loadStatus({ silent: true }),
+      readRefs: (branch) => void loadRefs(branch),
+      stopped: () => typeof document !== "undefined" && document.visibilityState === "hidden" || !focused,
+      busy: () => busyRef.current,
+      now: () => Date.now(),
+      setTimer: (run, ms) => setTimeout(run, ms),
+      clearTimer: (handle) => clearTimeout(handle)
+    });
+    wakePollRef.current = () => loop.wake();
     const onFocus = () => {
       focused = true;
-      wake();
+      loop.wake();
     };
     const onBlur = () => {
       focused = false;
     };
     const onVisible = () => {
-      if (typeof document === "undefined" || document.visibilityState === "visible") {
-        focused = true;
-        wake();
-      } else {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") {
         focused = false;
+        return;
       }
+      if (!focusedNow()) return;
+      focused = true;
+      loop.wake();
     };
     window.addEventListener("focus", onFocus);
     window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVisible);
-    schedule(POLL_FAST_MS);
+    loop.wake();
     return () => {
-      stopped = true;
       wakePollRef.current = null;
-      if (timer) clearTimeout(timer);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("blur", onBlur);
       document.removeEventListener("visibilitychange", onVisible);
+      loop.stop();
     };
   }, [loadStatus, loadRefs]);
   const toggle = React.useCallback(

@@ -210,7 +210,9 @@ export {
   POLL_IDLE_TICKS,
   REFS_EVERY_MS,
   pollDelay,
+  refSignature,
   shouldFetchRefs,
+  startPollLoop,
   statusSignature,
 } from './poll'
 

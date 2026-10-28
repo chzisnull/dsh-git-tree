@@ -73,9 +73,9 @@ async function readIdentity(subprocess, cwd) {
       const match = /^user\.(name|email)\s+(.*)$/.exec(line)
       if (match) identity[match[1]] = match[2]
     }
-    return identity.name || identity.email ? identity : null
+    return { identity: identity.name || identity.email ? identity : null, ok: true }
   } catch {
-    return null
+    return { identity: null, ok: false }
   }
 }
 
@@ -163,23 +163,24 @@ async function readRepoStatics(subprocess, cwd, signal) {
   if (cached && Date.now() - cached.at < REPO_STATICS_TTL_MS) return cached
 
   let repoRoot = cwd
+  let rootOk = false
   try {
     repoRoot =
       (await git(subprocess, ['rev-parse', '--show-toplevel'], cwd, { maxBytes: 64 * 1024, signal })).trim() || cwd
+    rootOk = true
   } catch {
     /* keep cwd; status already succeeded inside a repository */
   }
-  const entry = {
-    repoRoot,
-    identity: await readIdentity(subprocess, cwd),
-    remotes: await readRemotes(subprocess, cwd),
-    at: Date.now(),
-  }
-  repoStatics.set(key, entry)
+  const identity = await readIdentity(subprocess, cwd)
+  const remoteList = await readRemotes(subprocess, cwd)
+  const entry = { repoRoot, identity: identity.identity, remotes: remoteList.remotes, at: Date.now() }
+  // A degraded read (timeout, abort, git failure) must not be frozen for the
+  // whole TTL: the next poll should try again.
+  if (rootOk && identity.ok && remoteList.ok) repoStatics.set(key, entry)
   return entry
 }
 
-/** Drop every cached per-repository fact (tests, and after a workspace write). */
+/** Drop every cached per-repository fact; the test harness uses it to isolate contexts. */
 export function forgetRepoStatics() {
   repoStatics.clear()
 }
@@ -521,12 +522,15 @@ async function readUpstream(subprocess, cwd) {
 async function readRemotes(subprocess, cwd) {
   try {
     const out = await git(subprocess, ['remote'], cwd, { maxBytes: 16 * 1024 })
-    return out
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean)
+    return {
+      remotes: out
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
+      ok: true,
+    }
   } catch {
-    return []
+    return { remotes: [], ok: false }
   }
 }
 
@@ -543,7 +547,7 @@ export async function handlePush(ctx, request) {
   const current = await currentBranchOf(subprocess, cwd)
   if (current === '') throw new RequestError('当前处于分离头指针状态，无法推送', 409, 'detached-head')
 
-  const remotes = await readRemotes(subprocess, cwd)
+  const { remotes } = await readRemotes(subprocess, cwd)
   if (remotes.length === 0) throw new RequestError('当前仓库没有配置远端', 409, 'no-remote')
 
   const upstream = await readUpstream(subprocess, cwd)
@@ -612,7 +616,7 @@ export async function handleFetch(ctx, request) {
   await readJsonBody(request)
   const subprocess = subprocessOf(ctx)
 
-  const remotes = await readRemotes(subprocess, cwd)
+  const { remotes } = await readRemotes(subprocess, cwd)
   if (remotes.length === 0) throw new RequestError('当前仓库没有配置远端', 409, 'no-remote')
   const parsed = splitUpstream(await readUpstream(subprocess, cwd))
   const remote =
@@ -644,7 +648,7 @@ export async function handlePull(ctx, request) {
   const current = await currentBranchOf(subprocess, cwd)
   if (current === '') throw new RequestError('当前处于分离头指针状态，无法拉取', 409, 'detached-head')
 
-  const remotes = await readRemotes(subprocess, cwd)
+  const { remotes } = await readRemotes(subprocess, cwd)
   const originBranch = remotes.includes('origin') && (await hasRemoteBranch(subprocess, cwd, 'origin', current))
   const target = resolvePullTarget({
     upstream: await readUpstream(subprocess, cwd),

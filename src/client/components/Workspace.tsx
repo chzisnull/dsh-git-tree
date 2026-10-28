@@ -60,7 +60,7 @@ import { ConflictDialog, ConfirmDialog, HandoffDialog, PromptDialog } from './Di
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuEntry, ContextMenuState } from './ContextMenu'
 import { holdShortcut } from '../shortcut'
-import { POLL_FAST_MS, pollDelay, shouldFetchRefs, statusSignature } from '../poll'
+import { startPollLoop } from '../poll'
 import { buildConflictPrompt } from '../handoff'
 import type { HandoffBridge, HandoffFailure, HandoffResult } from '../handoff'
 import type { ViewKind } from '../types'
@@ -664,77 +664,52 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   // Poll only while the window is focused and the panel is on screen, at a
   // cadence that backs off when nothing changes. A poll is two routes and, on
   // the host side, one `git status`; the rail is read on its own slower clock.
-  // See poll.ts for the numbers and why.
+  // See poll.ts for the loop and the numbers behind it.
   React.useEffect(() => {
-    let timer: any = null
-    let stopped = false
-    let signature = ''
-    let unchanged = 0
-    let lastRefsAt = 0
-    let focused = true
+    const focusedNow = () =>
+      typeof document === 'undefined' || typeof document.hasFocus !== 'function' ? true : document.hasFocus()
+    let focused = focusedNow()
 
-    const schedule = (ms: number) => {
-      if (stopped) return
-      if (timer) clearTimeout(timer)
-      timer = setTimeout(() => void tick(), ms)
-    }
+    const loop = startPollLoop({
+      readStatus: () => loadStatus({ silent: true }),
+      readRefs: (branch) => void loadRefs(branch),
+      stopped: () => (typeof document !== 'undefined' && document.visibilityState === 'hidden') || !focused,
+      busy: () => busyRef.current,
+      now: () => Date.now(),
+      setTimer: (run, ms) => setTimeout(run, ms),
+      clearTimer: (handle) => clearTimeout(handle),
+    })
+    wakePollRef.current = () => loop.wake()
 
-    const tick = async () => {
-      if (stopped) return
-      const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
-      if (hidden || !focused || busyRef.current) {
-        // Nothing to ask git; wait for focus/visibility/interaction to resume.
-        schedule(POLL_FAST_MS)
-        return
-      }
-      const next = await loadStatus({ silent: true })
-      if (stopped) return
-      const nextSignature = statusSignature(next)
-      const decision = pollDelay(signature, nextSignature, unchanged)
-      signature = nextSignature
-      unchanged = decision.unchangedTicks
-      const now = Date.now()
-      if (shouldFetchRefs(decision.unchangedTicks === 0, now - lastRefsAt)) {
-        lastRefsAt = now
-        void loadRefs(next?.branch)
-      }
-      schedule(decision.delay)
-    }
-
-    // The user came back to the panel: read now and go back to the fast cadence.
-    const wake = () => {
-      unchanged = 0
-      lastRefsAt = 0
-      schedule(0)
-    }
-    wakePollRef.current = wake
     const onFocus = () => {
       focused = true
-      wake()
+      loop.wake()
     }
     const onBlur = () => {
+      // The loop stops scheduling on its own; nothing to poll while we are away.
       focused = false
     }
     const onVisible = () => {
-      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
-        focused = true
-        wake()
-      } else {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
         focused = false
+        return
       }
+      // Visible is not focused: a window can be on screen behind another app.
+      if (!focusedNow()) return
+      focused = true
+      loop.wake()
     }
     window.addEventListener('focus', onFocus)
     window.addEventListener('blur', onBlur)
     document.addEventListener('visibilitychange', onVisible)
     // The mount effect above already read status and refs; don't ask twice.
-    schedule(POLL_FAST_MS)
+    loop.wake()
     return () => {
-      stopped = true
       wakePollRef.current = null
-      if (timer) clearTimeout(timer)
       window.removeEventListener('focus', onFocus)
       window.removeEventListener('blur', onBlur)
       document.removeEventListener('visibilitychange', onVisible)
+      loop.stop()
     }
   }, [loadStatus, loadRefs])
 
