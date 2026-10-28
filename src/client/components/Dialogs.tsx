@@ -1,5 +1,7 @@
-// Small modal dialogs for branch operations. One prompt (create / rename) and
-// one confirm (delete); both keep the typed value and any failure on screen.
+// Small modal dialogs: one prompt (create / rename branch), one confirm
+// (destructive branch and file actions), the conflict-resolution preview, and
+// the hand-off fallback that explains why no session was opened. Each keeps the
+// typed value and any failure on screen.
 
 import { h, React } from '../react'
 import type { DiffPayload, Translate } from '../types'
@@ -180,6 +182,7 @@ export function ConflictDialog(props: {
  */
 const HANDOFF_BODY: Record<HandoffFailure, string> = {
   'no-workspace': 'handoffNoWorkspace',
+  'not-ready': 'handoffNotReady',
   unavailable: 'handoffUnavailable',
   failed: 'handoffFailedBody',
 }
@@ -188,7 +191,7 @@ export function HandoffDialog(props: {
   reason: HandoffFailure
   prompt: string
   /** The prompt is already on the clipboard; show it only when that failed. */
-  showPrompt: boolean
+  copyFailed: boolean
   t: Translate
   onCopy: () => void
   onClose: () => void
@@ -208,12 +211,12 @@ export function HandoffDialog(props: {
       },
       h('div', { className: 'dgt-dialog-title' }, props.t('handoffFallbackTitle')),
       h('div', { className: 'dgt-dialog-label' }, body),
-      props.showPrompt ? h('pre', { className: 'dgt-handoff-prompt', tabIndex: 0 }, props.prompt) : null,
+      props.copyFailed ? h('pre', { className: 'dgt-handoff-prompt', tabIndex: 0 }, props.prompt) : null,
       h(
         'div',
         { className: 'dgt-dialog-actions' },
         h('button', { type: 'button', className: 'dgt-button', onClick: props.onClose }, props.t('close')),
-        props.showPrompt
+        props.copyFailed
           ? h('button', { type: 'button', className: 'dgt-primary', onClick: props.onCopy }, props.t('handoffCopy'))
           : null,
       ),

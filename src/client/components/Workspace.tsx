@@ -60,11 +60,11 @@ import { ConflictDialog, ConfirmDialog, HandoffDialog, PromptDialog } from './Di
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuEntry, ContextMenuState } from './ContextMenu'
 import { holdShortcut } from '../shortcut'
+import { POLL_FAST_MS, pollDelay, shouldFetchRefs, statusSignature } from '../poll'
 import { buildConflictPrompt } from '../handoff'
 import type { HandoffBridge, HandoffFailure, HandoffResult } from '../handoff'
 import type { ViewKind } from '../types'
 
-const POLL_MS = 2000
 const REPO_KEY = 'dsh-git-tree/repository'
 const COMMIT_FOLD_KEY = 'dsh-git-tree/commit-collapsed'
 
@@ -164,7 +164,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     prompt: string
     reason: HandoffFailure
     /** True only when the automatic copy failed; then the dialog carries the text. */
-    showPrompt: boolean
+    copyFailed: boolean
   } | null>(null)
   const [conflictError, setConflictError] = React.useState('')
   const [dialogBusy, setDialogBusy] = React.useState(false)
@@ -184,6 +184,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   const [notice, setNotice] = React.useState('')
 
   const busyRef = React.useRef(false)
+  // Set by the poll loop: a pointer entering the panel is a signal to refresh.
+  const wakePollRef = React.useRef<(() => void) | null>(null)
   const handoffTimer = React.useRef<any>(null)
   const commitInput = React.useRef<any>(null)
   const toastTimer = React.useRef<any>(null)
@@ -242,7 +244,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   }, [overlayOpen])
 
   const loadStatus = React.useCallback(
-    async (options?: { silent?: boolean }) => {
+    async (options?: { silent?: boolean }): Promise<GitStatusPayload | null> => {
       if (!options?.silent) setRefreshing(true)
       try {
         const next = await fetchStatus(repoPath || undefined)
@@ -253,9 +255,11 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
           setStatus(null)
           setStatusError(next.error || t('statusFailed'))
         }
+        return next
       } catch (error) {
         setStatus(null)
         setStatusError(error instanceof Error ? error.message : String(error))
+        return null
       } finally {
         if (!options?.silent) setRefreshing(false)
       }
@@ -263,9 +267,9 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     [repoPath, t],
   )
 
-  const loadRefs = React.useCallback(async () => {
+  const loadRefs = React.useCallback(async (branch?: string) => {
     try {
-      const next = await fetchRefs(repoPath || undefined)
+      const next = await fetchRefs(repoPath || undefined, branch)
       if (next.ok) setRefs(next)
     } catch {
       /* the rail degrades to empty groups */
@@ -657,26 +661,79 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     }
   }, [status, selected])
 
-  // Poll while the panel is on screen; pause when hidden or a write is running.
+  // Poll only while the window is focused and the panel is on screen, at a
+  // cadence that backs off when nothing changes. A poll is two routes and, on
+  // the host side, one `git status`; the rail is read on its own slower clock.
+  // See poll.ts for the numbers and why.
   React.useEffect(() => {
-    const id = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
-      if (busyRef.current) return
-      void loadStatus({ silent: true })
-      void loadRefs()
-    }, POLL_MS)
+    let timer: any = null
+    let stopped = false
+    let signature = ''
+    let unchanged = 0
+    let lastRefsAt = 0
+    let focused = true
+
+    const schedule = (ms: number) => {
+      if (stopped) return
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => void tick(), ms)
+    }
+
+    const tick = async () => {
+      if (stopped) return
+      const hidden = typeof document !== 'undefined' && document.visibilityState === 'hidden'
+      if (hidden || !focused || busyRef.current) {
+        // Nothing to ask git; wait for focus/visibility/interaction to resume.
+        schedule(POLL_FAST_MS)
+        return
+      }
+      const next = await loadStatus({ silent: true })
+      if (stopped) return
+      const nextSignature = statusSignature(next)
+      const decision = pollDelay(signature, nextSignature, unchanged)
+      signature = nextSignature
+      unchanged = decision.unchangedTicks
+      const now = Date.now()
+      if (shouldFetchRefs(decision.unchangedTicks === 0, now - lastRefsAt)) {
+        lastRefsAt = now
+        void loadRefs(next?.branch)
+      }
+      schedule(decision.delay)
+    }
+
+    // The user came back to the panel: read now and go back to the fast cadence.
+    const wake = () => {
+      unchanged = 0
+      lastRefsAt = 0
+      schedule(0)
+    }
+    wakePollRef.current = wake
     const onFocus = () => {
-      void loadStatus({ silent: true })
-      void loadRefs()
+      focused = true
+      wake()
+    }
+    const onBlur = () => {
+      focused = false
     }
     const onVisible = () => {
-      if (typeof document === 'undefined' || document.visibilityState === 'visible') onFocus()
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+        focused = true
+        wake()
+      } else {
+        focused = false
+      }
     }
     window.addEventListener('focus', onFocus)
+    window.addEventListener('blur', onBlur)
     document.addEventListener('visibilitychange', onVisible)
+    // The mount effect above already read status and refs; don't ask twice.
+    schedule(POLL_FAST_MS)
     return () => {
-      clearInterval(id)
+      stopped = true
+      wakePollRef.current = null
+      if (timer) clearTimeout(timer)
       window.removeEventListener('focus', onFocus)
+      window.removeEventListener('blur', onBlur)
       document.removeEventListener('visibilitychange', onVisible)
     }
   }, [loadStatus, loadRefs])
@@ -978,7 +1035,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       try {
         const result = await resolveConflict(path, repoPath || undefined)
         if (!result.ok || typeof result.content !== 'string') {
-          throw new Error(result.error || t('aiResolveFailed'))
+          throw new Error(result.error || t('mergeModelFailed'))
         }
         setConflictResolve({
           path,
@@ -1033,9 +1090,9 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
         // The click already asked for this text, so hand it over silently; the
         // dialog explains the reason and only shows the prompt if copying failed.
         const copied = await copyText(prompt, t('handoffCopied'), t('handoffCopyFailed'))
-        setHandoffDialog({ prompt, reason, showPrompt: !copied })
+        setHandoffDialog({ prompt, reason, copyFailed: !copied })
       }
-      if (result !== 'opened') {
+      if (result !== 'requested') {
         void fallBack(result)
         return
       }
@@ -1389,7 +1446,11 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
 
   return h(
     'div',
-    { className: 'dgt-root', 'data-plugin': 'dsh-git-tree' },
+    {
+      className: 'dgt-root',
+      'data-plugin': 'dsh-git-tree',
+      onPointerEnter: () => wakePollRef.current?.(),
+    },
     h(TopBar, {
       status,
       workspaces,
@@ -1496,7 +1557,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       ? h(HandoffDialog, {
           reason: handoffDialog.reason,
           prompt: handoffDialog.prompt,
-          showPrompt: handoffDialog.showPrompt,
+          copyFailed: handoffDialog.copyFailed,
           t,
           onCopy: copyHandoffPrompt,
           onClose: () => setHandoffDialog(null),

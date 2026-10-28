@@ -73,7 +73,7 @@ test('the keyboard shortcut rides the Harness shortcuts service, not a private l
 })
 
 test('the conflict view hands the file to a session instead of merging inline', () => {
-  for (const key of ['handoff', 'handoffTip', 'handoffOpening', 'handoffPromptHead', 'handoffPromptBody', 'handoffNoWorkspace', 'handoffCopy', 'close']) {
+  for (const key of ['handoff', 'handoffTip', 'handoffOpening', 'handoffPromptHead', 'handoffPromptBody', 'handoffNoWorkspace', 'handoffNotReady', 'handoffCopy', 'close']) {
     assert.ok(source.includes(key), 'missing locale copy: ' + key)
   }
   assert.ok(source.includes('uiWorkspace'), 'the hand-off opens a session through the client workspace service')

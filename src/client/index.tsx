@@ -204,6 +204,15 @@ function wireShortcut(host: ClientCtx, t: Translate): void {
 // test evaluates this bundle in Node and exercises the toggle without a DOM.
 export { holdShortcut, keycapParts, shortcutState, togglePanel } from './shortcut'
 export { buildConflictPrompt, createHandoff, matchWorkspace } from './handoff'
+export {
+  POLL_FAST_MS,
+  POLL_IDLE_MS,
+  POLL_IDLE_TICKS,
+  REFS_EVERY_MS,
+  pollDelay,
+  shouldFetchRefs,
+  statusSignature,
+} from './poll'
 
 /** Active UI locale id (`zh`, `en`, …), read from the live locale snapshot. */
 function activeLocale(ctx: ClientCtx): string {

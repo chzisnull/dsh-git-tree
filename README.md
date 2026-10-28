@@ -12,7 +12,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.12.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
+Version 0.13.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Keyboard shortcut**: `⇧⌘V` (`Ctrl+Shift+V` on Windows) opens the panel from anywhere and closes it again when it is already open. The command is registered through DSH's own shortcut service, so it is listed and rebindable in Settings → Keyboard shortcuts (`⌘/`); the keycap badge in the toolbar and the hint in the empty diff pane always show the binding you actually have. Panel-owned dialogs and the AI conflict preview hold it still, and the commit draft is kept per repository, so a stray press never drops work; when the command has no binding the empty pane points at Settings instead of showing keys.
@@ -34,12 +34,12 @@ Version 0.12.0 is the **local workbench slice**: file status, history, search an
 - **Hand the conflict to a DSH session**: the header action `✦ Hand to AI` opens a session in the repository's own workspace and writes a ready prompt into the composer — repository, file, branch, the conflict-block count when the panel has counted it, and the boundary (edit this file only, no `git add`/`commit`/`checkout`, the human marks it resolved). Nothing is sent and nothing is written by the panel. If the repository is not a registered DSH workspace, the same prompt is copied to the clipboard and a dialog explains why. The older in-panel model merge (`git checkout`-safe preview + Apply) stays available from the conflicted file's right-click menu as `Merge with the model (preview)`; "Mark resolved" (`git add`) and "Restore conflict" (`git checkout --merge`) remain separate, deliberate actions.
 - **AI commit message**: the ✨ button in the commit card writes the message from the diff of the files that commit would include — the staged rows when there are any, otherwise every working-tree row — and the model chip picks which DSH model does it. The picker is the live DSH model catalog (every registered provider, grouped), the choice is remembered per DSH home, and the call itself goes through DSH's own `llm` service; there is no second provider configuration in this plugin. It only fills the text box: you still review and press Commit. The diff of the selected files is sent to the model you chose.
 - **Local actions**: reveal the repository in Finder or open it in Terminal (macOS).
-- **Live**: the panel polls status every 2s while visible and refetches immediately after a write.
+- **Live, at a cost that matches what you are doing**: the panel polls only while the window is focused and the panel is on screen — 3s while the working copy is moving, backing off to 10s once three polls in a row saw nothing change, and stopping entirely when the window loses focus. An idle poll is one `git status` (the repository root, identity and remote names are cached for a minute; the refs rail is read on its own 10s clock), and every write still refreshes immediately. Measured on a mid-size repository: 9 git processes per 40 idle seconds instead of 123, ~0.25% of one core instead of ~0.75%.
 - **Small write surface by construction**: stage/unstage/commit, discard, delete, branch create-rename-delete, checkout, merge into the current branch, and a push of the current branch that never forces. No `reset --hard`, no force-push, no amend, no rebase, no stash route exists.
 
 ## Status
 
-| Area | 0.12.0 |
+| Area | 0.13.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | keyboard shortcut (`⇧⌘V`) | done |
@@ -57,7 +57,7 @@ Version 0.12.0 is the **local workbench slice**: file status, history, search an
 | right-click actions + discard / delete | done |
 | push / commit and push | done |
 | Finder / Terminal | done |
-| auto refresh | done |
+| auto refresh (focus-aware, backing off) | done |
 | right-sidebar tab (compact mode) | not yet |
 | push current branch | done |
 | fetch / pull | done |

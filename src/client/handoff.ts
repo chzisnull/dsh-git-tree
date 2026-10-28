@@ -15,12 +15,17 @@
 // dead button.
 
 import { serviceOf } from './shortcut'
+import type { Translate, WorkspaceRecord } from './types'
 
-/** What happened when the panel asked for a session. */
-export type HandoffResult = 'opened' | 'no-workspace' | 'unavailable'
+/**
+ * What happened when the panel asked for a session. `requested` is honest about
+ * the call: `startSession` is fire-and-forget, so the panel can only know the
+ * session was asked for, not that it appeared.
+ */
+export type HandoffResult = 'requested' | 'no-workspace' | 'not-ready' | 'unavailable'
 
-/** Why a hand-off ended in the fallback dialog (the opened case has none). */
-export type HandoffFailure = Exclude<HandoffResult, 'opened'> | 'failed'
+/** Why a hand-off ended in the fallback dialog (a requested session has none). */
+export type HandoffFailure = Exclude<HandoffResult, 'requested'> | 'failed'
 
 /** The panel-side seam the client entry publishes. */
 export interface HandoffBridge {
@@ -43,10 +48,10 @@ function cleanPath(value: unknown): string {
  * deepest registered folder containing it (a repository can live below its
  * workspace). Longest match wins, so nested workspaces stay distinguishable.
  */
-export function matchWorkspace(workspaces: unknown, target: string): any | null {
+export function matchWorkspace(workspaces: unknown, target: string): WorkspaceRecord | null {
   const path = cleanPath(target)
   if (!path || !Array.isArray(workspaces)) return null
-  let best: any = null
+  let best: WorkspaceRecord | null = null
   let bestLength = -1
   for (const workspace of workspaces) {
     if (!workspace || typeof workspace !== 'object') continue
@@ -71,9 +76,14 @@ export function createHandoff(ctx: any): HandoffBridge {
         const uiWorkspace = serviceOf(ctx, 'uiWorkspace')
         if (!uiWorkspace || typeof uiWorkspace.startSession !== 'function') return 'unavailable'
         const workspaces = serviceOf(ctx, 'workspaces')
-        const items = workspaces && workspaces.list && typeof workspaces.list.getSnapshot === 'function'
-          ? workspaces.list.getSnapshot()?.items
+        const snapshot = workspaces && workspaces.list && typeof workspaces.list.getSnapshot === 'function'
+          ? workspaces.list.getSnapshot()
           : null
+        if (!snapshot) return 'unavailable'
+        // The list loads over a stream: while it is not ready `items` is empty,
+        // and answering "no workspace" would be a lie about the repository.
+        if (snapshot.phase && snapshot.phase !== 'ready') return 'not-ready'
+        const items = snapshot.items
         if (!Array.isArray(items)) return 'unavailable'
         const match = matchWorkspace(items, repoRoot)
         const workspaceId = match && match.workspaceId
@@ -81,7 +91,7 @@ export function createHandoff(ctx: any): HandoffBridge {
         // `replace`: the prompt is the point of the click, even if the blank
         // session still holds an older handoff for the same file.
         uiWorkspace.startSession(workspaceId, { prompt, whenDraftExists: 'replace' })
-        return 'opened'
+        return 'requested'
       } catch {
         return 'unavailable'
       }
@@ -96,10 +106,15 @@ export function createHandoff(ctx: any): HandoffBridge {
  * claim a number), then states the boundary: the agent edits the file, the
  * human marks it resolved.
  */
-export function buildConflictPrompt(
-  input: { repo: string; path: string; branch: string; blocks: number },
-  t: (key: string, params?: Record<string, string | number>) => string,
-): string {
+/** Everything the prompt names; the four fields always travel together. */
+export interface ConflictPromptInput {
+  repo: string
+  path: string
+  branch: string
+  blocks: number
+}
+
+export function buildConflictPrompt(input: ConflictPromptInput, t: Translate): string {
   const head = t('handoffPromptHead', {
     repo: input.repo || '—',
     path: input.path,

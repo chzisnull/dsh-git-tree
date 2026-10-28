@@ -358,9 +358,9 @@ function panelProps(available) {
   return panel.options.inject()
 }
 
-function handoffServices(items, startSession) {
+function handoffServices(items, startSession, phase = 'ready') {
   return {
-    workspaces: { list: { getSnapshot: () => ({ items }) } },
+    workspaces: { list: { getSnapshot: () => ({ items, phase }) } },
     uiWorkspace: { startSession },
   }
 }
@@ -391,7 +391,7 @@ test('the hand-off opens the workspace session with the prompt, never sending it
   assert.equal(typeof props.handoff.open, 'function')
 
   const verdict = props.handoff.open('/srv/app/repo', '解决冲突')
-  assert.equal(verdict, 'opened')
+  assert.equal(verdict, 'requested', 'the call is fire-and-forget, so it reports a request')
   assert.equal(calls.length, 1)
   assert.equal(calls[0].id, 'w1')
   assert.deepEqual(calls[0].options, { prompt: '解决冲突', whenDraftExists: 'replace' })
@@ -407,6 +407,10 @@ test('the hand-off degrades instead of throwing when there is nothing to open', 
 
   const missing = panelProps({ workspaces: { list: { getSnapshot: () => ({ items: [] }) } } })
   assert.equal(missing.handoff.open('/srv/app', 'x'), 'unavailable')
+
+  // The list arrives over a stream: an empty not-ready snapshot is not "no such workspace".
+  const loading = panelProps(handoffServices([], () => {}, 'loading'))
+  assert.equal(loading.handoff.open('/srv/app', 'x'), 'not-ready')
 
   const throwing = panelProps(handoffServices([{ workspaceId: 'w1', path: '/srv/app' }], () => {
     throw new Error('connect failed')
@@ -441,4 +445,65 @@ test('the prompt names the repository, file and branch, and the count only when 
   assert.ok(!seen.some((entry) => entry.key === 'handoffPromptBlocks'), 'no count line without a count')
   assert.ok(!uncounted.includes('handoffPromptBlocks'))
   assert.ok(uncounted.includes('handoffPromptBody'), 'the boundary text is always there')
+})
+
+// ── polling cadence and cost (0.13.0) ──────────────────────────────────────
+//
+// The panel used to ask the host for a full status every two seconds, and each
+// poll ran six git processes. These helpers make the cadence observable without
+// a DOM: same signature means "nothing to show", so the tick can back off.
+
+test('the status signature only changes when something the panel shows changed', () => {
+  const module = evaluateBundle()
+  const base = {
+    ok: true,
+    branch: 'main',
+    oid: 'abc',
+    upstream: 'origin/main',
+    ahead: 0,
+    behind: 0,
+    counts: { staged: 1, unstaged: 0, conflicted: 0 },
+    entries: [{ path: 'a.js', x: 'M', y: ' ', staged: true }],
+  }
+  const signature = module.statusSignature(base)
+  assert.equal(module.statusSignature({ ...base }), signature, 'an identical poll is the same signature')
+  assert.notEqual(module.statusSignature({ ...base, oid: 'def' }), signature, 'a new commit moves it')
+  assert.notEqual(module.statusSignature({ ...base, branch: 'topic' }), signature, 'a checkout moves it')
+  assert.notEqual(
+    module.statusSignature({ ...base, entries: [{ path: 'a.js', x: 'MM', y: 'M', staged: true }] }),
+    signature,
+    'entries are part of the signature',
+  )
+  assert.notEqual(module.statusSignature({ ...base, entries: [] }), signature, 'a clean tree is not a dirty one')
+  assert.equal(module.statusSignature(null), 'none')
+  assert.equal(module.statusSignature({ ok: false }), 'none')
+})
+
+test('the tick backs off only after several unchanged polls, and resets on any change', () => {
+  const module = evaluateBundle()
+  let unchanged = 0
+  let delay = 0
+  for (let i = 0; i < 2; i++) {
+    const decision = module.pollDelay('sig', 'sig', unchanged)
+    unchanged = decision.unchangedTicks
+    delay = decision.delay
+  }
+  assert.equal(delay, module.POLL_FAST_MS, 'two quiet polls stay fast')
+  const third = module.pollDelay('sig', 'sig', unchanged)
+  assert.equal(third.delay, module.POLL_IDLE_MS, 'the third quiet poll backs off')
+  assert.equal(third.unchangedTicks, module.POLL_IDLE_TICKS)
+
+  const changed = module.pollDelay('sig', 'other', third.unchangedTicks)
+  assert.equal(changed.delay, module.POLL_FAST_MS, 'a change goes back to the fast cadence')
+  assert.equal(changed.unchangedTicks, 0)
+})
+
+test('the refs rail is read when the branch moved or on its own slower clock', () => {
+  const module = evaluateBundle()
+  assert.equal(module.shouldFetchRefs(false, 0), false)
+  assert.equal(module.shouldFetchRefs(true, 0), true, 'a branch move refreshes the rail immediately')
+  assert.equal(module.shouldFetchRefs(false, module.REFS_EVERY_MS - 1), false)
+  assert.equal(module.shouldFetchRefs(false, module.REFS_EVERY_MS), true)
+  assert.ok(module.POLL_IDLE_MS > module.POLL_FAST_MS, 'the idle cadence is the slower one')
+  assert.ok(module.POLL_FAST_MS >= 3000, 'no polling faster than 3 s')
 })

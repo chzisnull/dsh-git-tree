@@ -34,6 +34,7 @@ import {
 } from './history.js'
 import { COMMIT_FORMAT, isSafeCommitSha, parseCommitShow, parseNameStatus } from './commit.js'
 import { REF_ARGS, parseRefs } from './refs.js'
+import { realpathSync } from 'node:fs'
 import { openArgv } from './open.js'
 import { resolveCwd, safeRepoPath, workspaceRootOf } from './paths.js'
 import { GitError, RequestError } from './errors.js'
@@ -134,6 +135,55 @@ export async function handleRepositoryOpen(ctx, request) {
   return json({ ok: true, path, openCount: prefs.opened[path] ? prefs.opened[path].count : 0 })
 }
 
+/**
+ * Per-repository facts that do not change between two polls: the repository
+ * root, the configured identity and the remote names. They are re-read at most
+ * once a minute, or immediately for a repository this process has not seen.
+ *
+ * Keyed by the repository path, not by the subprocess service: the service
+ * handle is not guaranteed to be the same object across requests, and the
+ * facts belong to the repository anyway. The test harness clears this map when
+ * it builds a context so fixtures never leak between tests.
+ */
+const REPO_STATICS_TTL_MS = 60_000
+const repoStatics = new Map()
+
+/** Real path for the cache key; a missing directory falls back to the value. */
+function repoCacheKey(cwd) {
+  try {
+    return realpathSync.native(cwd)
+  } catch {
+    return cwd
+  }
+}
+
+async function readRepoStatics(subprocess, cwd, signal) {
+  const key = repoCacheKey(cwd)
+  const cached = repoStatics.get(key)
+  if (cached && Date.now() - cached.at < REPO_STATICS_TTL_MS) return cached
+
+  let repoRoot = cwd
+  try {
+    repoRoot =
+      (await git(subprocess, ['rev-parse', '--show-toplevel'], cwd, { maxBytes: 64 * 1024, signal })).trim() || cwd
+  } catch {
+    /* keep cwd; status already succeeded inside a repository */
+  }
+  const entry = {
+    repoRoot,
+    identity: await readIdentity(subprocess, cwd),
+    remotes: await readRemotes(subprocess, cwd),
+    at: Date.now(),
+  }
+  repoStatics.set(key, entry)
+  return entry
+}
+
+/** Drop every cached per-repository fact (tests, and after a workspace write). */
+export function forgetRepoStatics() {
+  repoStatics.clear()
+}
+
 export async function handleStatus(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
   const signal = request.signal
@@ -146,27 +196,20 @@ export async function handleStatus(ctx, request) {
     { maxBytes: MAX_STATUS_BYTES, signal },
   )
   const parsed = parsePorcelainV2(statusText)
-
-  let repoRoot = cwd
-  try {
-    repoRoot =
-      (await git(subprocess, ['rev-parse', '--show-toplevel'], cwd, { maxBytes: 64 * 1024, signal })).trim() || cwd
-  } catch {
-    /* keep cwd; status already succeeded inside a repository */
-  }
+  const statics = await readRepoStatics(subprocess, cwd, signal)
 
   return json({
     ok: true,
     cwd,
-    repoRoot,
+    repoRoot: statics.repoRoot,
     platform: process.platform,
     branch: parsed.branch,
     oid: parsed.oid,
     upstream: parsed.upstream,
     ahead: parsed.ahead,
     behind: parsed.behind,
-    identity: await readIdentity(subprocess, cwd),
-    remotes: await readRemotes(subprocess, cwd),
+    identity: statics.identity,
+    remotes: statics.remotes,
     entries: parsed.entries,
     counts: summariseEntries(parsed.entries),
     truncated: parsed.truncated,
@@ -645,14 +688,18 @@ export async function handlePull(ctx, request) {
 }
 
 export async function handleRefs(ctx, request) {
-  const { cwd } = handleCwd(ctx, request)
+  const { url, cwd } = handleCwd(ctx, request)
   const subprocess = subprocessOf(ctx)
 
-  let current = ''
-  try {
-    current = (await git(subprocess, ['symbolic-ref', '--short', '-q', 'HEAD'], cwd, { maxBytes: 8 * 1024 })).trim()
-  } catch {
-    /* detached HEAD: no current branch */
+  // The caller polls /status in the same tick and already has `branch`; passing
+  // it saves one git process per poll. Without it, ask git as before.
+  let current = (url.searchParams.get('branch') || '').trim()
+  if (!current) {
+    try {
+      current = (await git(subprocess, ['symbolic-ref', '--short', '-q', 'HEAD'], cwd, { maxBytes: 8 * 1024 })).trim()
+    } catch {
+      /* detached HEAD: no current branch */
+    }
   }
 
   const text = await git(subprocess, REF_ARGS, cwd, {

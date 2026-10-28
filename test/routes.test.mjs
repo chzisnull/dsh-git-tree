@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { apply, inject, name } from '../index.js'
+import { forgetRepoStatics } from '../src/host/handlers.js'
 import { isSafeBranchName } from '../src/host/history.js'
 
 const WORKSPACE = '/tmp/fake-workspace'
@@ -92,6 +93,8 @@ function defaultResult(argv) {
 }
 
 function fakeContext({ handler = defaultResult, workspaceRoot = WORKSPACE, registry } = {}) {
+  // Per-repository facts are cached process-wide; a new context is a new world.
+  forgetRepoStatics()
   const routes = []
   const spawns = []
   const services = {
@@ -894,6 +897,33 @@ test('push translates authentication and non-fast-forward failures', async () =>
   apply(behind)
   const behindResult = await call(behind, '/api/git-tree/push', { method: 'POST', body: {} })
   assert.equal(behindResult.body.code, 'non-fast-forward')
+})
+
+test('a second status poll inside the TTL runs git status and nothing else', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const first = await call(ctx, '/api/git-tree/status')
+  const firstCommands = ctx.spawns.map((spawn) => spawn.argv[1]).sort()
+  assert.deepEqual(firstCommands, ['config', 'remote', 'rev-parse', 'status'], 'a cold read fills the cache')
+
+  const before = ctx.spawns.length
+  const second = await call(ctx, '/api/git-tree/status')
+  const warmCommands = ctx.spawns.slice(before).map((spawn) => spawn.argv[1])
+  assert.deepEqual(warmCommands, ['status'], 'the per-repository facts are cached')
+
+  assert.equal(second.body.repoRoot, first.body.repoRoot)
+  assert.deepEqual(second.body.identity, first.body.identity, 'identity still comes back from the cache')
+  assert.deepEqual(second.body.remotes, first.body.remotes)
+})
+
+test('refs reuse the branch the poll already read instead of asking git again', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  const before = ctx.spawns.length
+  const { body } = await call(ctx, '/api/git-tree/refs?branch=main')
+  const commands = ctx.spawns.slice(before).map((spawn) => spawn.argv[1])
+  assert.deepEqual(commands, ['for-each-ref'], 'no symbolic-ref when the caller knows the branch')
+  assert.equal(body.branches.find((branch) => branch.name === 'main').current, true)
 })
 
 test('refs route parses branches, remotes and tags and marks the current branch', async () => {

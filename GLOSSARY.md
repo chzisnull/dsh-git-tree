@@ -167,3 +167,15 @@ _Avoid_: Shortcut text, key label
 **Commit draft** (提交信息草稿):
 What the user typed into the commit box, kept per repository for the page's lifetime so closing the panel (the shortcut, the sidebar, switching views) never loses it; a successful commit or Clear drops it.
 _Avoid_: Unsaved message, pending text
+
+**Poll tick** (轮询节拍):
+One status read while the panel is on screen and the window is focused; a poll is one `git status` plus, on their own clocks, the refs rail and the cached repository facts.
+_Avoid_: Refresh loop, heartbeat
+
+**Idle backoff** (空闲退避):
+Several polls in a row returning the same signature slow the tick down instead of repeating the same work; any change, focus, or pointer entry restores the fast cadence.
+_Avoid_: Throttle, rate limit
+
+**Repository statics** (仓库静态信息):
+The repository root, the configured identity and the remote names: facts that only change when the repository does, cached for a minute instead of re-read on every poll.
+_Avoid_: Metadata, repo info

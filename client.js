@@ -23,6 +23,10 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/client/index.tsx
 var index_exports = {};
 __export(index_exports, {
+  POLL_FAST_MS: () => POLL_FAST_MS,
+  POLL_IDLE_MS: () => POLL_IDLE_MS,
+  POLL_IDLE_TICKS: () => POLL_IDLE_TICKS,
+  REFS_EVERY_MS: () => REFS_EVERY_MS,
   apply: () => apply,
   buildConflictPrompt: () => buildConflictPrompt,
   createHandoff: () => createHandoff,
@@ -30,7 +34,10 @@ __export(index_exports, {
   inject: () => inject,
   keycapParts: () => keycapParts,
   matchWorkspace: () => matchWorkspace,
+  pollDelay: () => pollDelay,
   shortcutState: () => shortcutState,
+  shouldFetchRefs: () => shouldFetchRefs,
+  statusSignature: () => statusSignature,
   togglePanel: () => togglePanel
 });
 module.exports = __toCommonJS(index_exports);
@@ -208,7 +215,7 @@ var EN = {
   conflictBlocks: "conflict blocks",
   conflictClean: "no markers left",
   conflictLines: "lines",
-  aiResolveFailed: "Could not resolve this conflict",
+  mergeModelFailed: "Could not merge this file with the model",
   markResolved: "Mark resolved",
   markResolvedHint: "Conflict markers are still in the file",
   revertConflict: "Restore conflict",
@@ -246,11 +253,12 @@ var EN = {
   handoffOpening: "Opening session\u2026",
   handoffPromptHead: "Please resolve this Git merge conflict for me.\n\nRepository: {repo}\nFile: {path}\nBranch: {branch}",
   handoffPromptBlocks: "Conflicts: {blocks} block(s)",
-  handoffPromptBody: "The file still contains <<<<<<<, =======, >>>>>>> markers. Read the file, understand what each side intended, merge the two versions and remove every marker, keeping both intents. Touch only this file, and end with a sentence or two about what you changed and why. Tell me when you are done \u2014 I will mark it resolved in the Git panel myself, so do not run git add, git commit or git checkout.",
+  handoffPromptBody: "Resolve the conflict in that file. If it still contains <<<<<<<, =======, >>>>>>> markers, remove every marker after merging both intents. Touch only this file, and end with a sentence or two about what you changed and why. Tell me when you are done \u2014 I will mark it resolved in the Git panel myself, so do not run git add, git commit or git checkout.",
   handoffFallbackTitle: "Could not open a session",
   handoffNoWorkspace: "This repository is not one of the workspaces registered in DSH, so there is no session to open. Paste the prompt into any conversation.",
   handoffUnavailable: "This DSH build does not expose sessions to plugins. Paste the prompt into a conversation.",
   handoffFailedBody: "The session did not open. Paste the prompt into a conversation.",
+  handoffNotReady: "The workspace list is still loading, so no session can be opened yet. Paste the prompt into any conversation, or try again in a moment.",
   handoffCopy: "Copy prompt",
   close: "Close",
   handoffCopied: "Prompt copied",
@@ -424,7 +432,7 @@ var ZH = {
   conflictBlocks: "\u5904\u51B2\u7A81",
   conflictClean: "\u51B2\u7A81\u6807\u8BB0\u5DF2\u6E05\u7A7A",
   conflictLines: "\u884C",
-  aiResolveFailed: "AI \u89E3\u51B3\u51B2\u7A81\u5931\u8D25",
+  mergeModelFailed: "\u6A21\u578B\u5408\u5E76\u5931\u8D25",
   markResolved: "\u6807\u8BB0\u4E3A\u5DF2\u89E3\u51B3",
   markResolvedHint: "\u6587\u4EF6\u91CC\u8FD8\u6709\u51B2\u7A81\u6807\u8BB0",
   revertConflict: "\u8FD8\u539F\u51B2\u7A81",
@@ -462,11 +470,12 @@ var ZH = {
   handoffOpening: "\u6B63\u5728\u6253\u5F00\u4F1A\u8BDD\u2026",
   handoffPromptHead: "\u8BF7\u5E2E\u6211\u89E3\u51B3\u8FD9\u4E2A Git \u5408\u5E76\u51B2\u7A81\u3002\n\n\u4ED3\u5E93\uFF1A{repo}\n\u6587\u4EF6\uFF1A{path}\n\u5206\u652F\uFF1A{branch}",
   handoffPromptBlocks: "\u51B2\u7A81\uFF1A{blocks} \u5904",
-  handoffPromptBody: "\u6587\u4EF6\u91CC\u8FD8\u6709 <<<<<<<\u3001=======\u3001>>>>>>> \u6807\u8BB0\u3002\u8BF7\u5148\u8BFB\u53D6\u8BE5\u6587\u4EF6\uFF0C\u7406\u89E3\u4E24\u8FB9\u6539\u52A8\u7684\u610F\u56FE\uFF0C\u5408\u5E76\u51B2\u7A81\u5E76\u79FB\u9664\u6240\u6709\u6807\u8BB0\uFF0C\u4FDD\u7559\u53CC\u65B9\u5408\u7406\u7684\u6539\u52A8\uFF1B\u53EA\u6539\u8FD9\u4E2A\u6587\u4EF6\uFF0C\u6539\u5B8C\u7528\u4E00\u4E24\u53E5\u8BDD\u8BF4\u660E\u4F60\u6539\u4E86\u4EC0\u4E48\u3001\u4E3A\u4EC0\u4E48\u3002\u5B8C\u6210\u540E\u544A\u8BC9\u6211\uFF0C\u6211\u4F1A\u5728 Git \u9762\u677F\u91CC\u81EA\u5DF1\u6807\u8BB0\u4E3A\u5DF2\u89E3\u51B3\uFF0C\u6240\u4EE5\u4E0D\u8981\u6267\u884C git add\u3001git commit\u3001git checkout\u3002",
+  handoffPromptBody: "\u8BF7\u89E3\u51B3\u8FD9\u4E2A\u6587\u4EF6\u91CC\u7684\u51B2\u7A81\uFF1A\u8BFB\u53D6\u8BE5\u6587\u4EF6\u3001\u7406\u89E3\u4E24\u8FB9\u6539\u52A8\u7684\u610F\u56FE\uFF1B\u5982\u679C\u6587\u4EF6\u91CC\u8FD8\u6709 <<<<<<<\u3001=======\u3001>>>>>>> \u6807\u8BB0\uFF0C\u5408\u5E76\u540E\u628A\u5B83\u4EEC\u5168\u90E8\u79FB\u9664\uFF0C\u4FDD\u7559\u53CC\u65B9\u5408\u7406\u7684\u6539\u52A8\uFF1B\u53EA\u6539\u8FD9\u4E2A\u6587\u4EF6\uFF0C\u6539\u5B8C\u7528\u4E00\u4E24\u53E5\u8BDD\u8BF4\u660E\u4F60\u6539\u4E86\u4EC0\u4E48\u3001\u4E3A\u4EC0\u4E48\u3002\u5B8C\u6210\u540E\u544A\u8BC9\u6211\uFF0C\u6211\u4F1A\u5728 Git \u9762\u677F\u91CC\u81EA\u5DF1\u6807\u8BB0\u4E3A\u5DF2\u89E3\u51B3\uFF0C\u6240\u4EE5\u4E0D\u8981\u6267\u884C git add\u3001git commit\u3001git checkout\u3002",
   handoffFallbackTitle: "\u6253\u4E0D\u5F00\u4F1A\u8BDD",
   handoffNoWorkspace: "\u8FD9\u4E2A\u4ED3\u5E93\u4E0D\u5728 DSH \u5DF2\u6CE8\u518C\u7684\u5DE5\u4F5C\u533A\u91CC\uFF0C\u6CA1\u6709\u53EF\u4EE5\u6253\u5F00\u7684\u4F1A\u8BDD\u3002\u628A\u63D0\u793A\u8BCD\u7C98\u8D34\u5230\u4EFB\u610F\u4F1A\u8BDD\u91CC\u5373\u53EF\u3002",
   handoffUnavailable: "\u5F53\u524D DSH \u7248\u672C\u6CA1\u6709\u5411\u63D2\u4EF6\u5F00\u653E\u4F1A\u8BDD\u3002\u628A\u63D0\u793A\u8BCD\u7C98\u8D34\u5230\u5BF9\u8BDD\u91CC\u5373\u53EF\u3002",
   handoffFailedBody: "\u4F1A\u8BDD\u6CA1\u6709\u6253\u5F00\u6210\u529F\u3002\u628A\u63D0\u793A\u8BCD\u7C98\u8D34\u5230\u5BF9\u8BDD\u91CC\u5373\u53EF\u3002",
+  handoffNotReady: "\u5DE5\u4F5C\u533A\u5217\u8868\u8FD8\u5728\u52A0\u8F7D\uFF0C\u73B0\u5728\u6253\u4E0D\u5F00\u4F1A\u8BDD\u3002\u53EF\u4EE5\u5148\u628A\u63D0\u793A\u8BCD\u7C98\u8D34\u5230\u4EFB\u610F\u5BF9\u8BDD\u91CC\uFF0C\u6216\u7A0D\u540E\u518D\u8BD5\u3002",
   handoffCopy: "\u590D\u5236\u63D0\u793A\u8BCD",
   close: "\u5173\u95ED",
   handoffCopied: "\u63D0\u793A\u8BCD\u5DF2\u590D\u5236",
@@ -1062,8 +1071,8 @@ function fetchStatus(cwd, signal) {
 function fetchDiff(params, signal) {
   return getJson(DIFF_ROUTE, params, signal);
 }
-function fetchRefs(cwd, signal) {
-  return getJson(REFS_ROUTE, { cwd }, signal);
+function fetchRefs(cwd, branch, signal) {
+  return getJson(REFS_ROUTE, { cwd, branch }, signal);
 }
 function fetchCommitInfo(params, signal) {
   return getJson(COMMIT_INFO_ROUTE, params, signal);
@@ -3024,6 +3033,7 @@ function ConflictDialog(props) {
 }
 var HANDOFF_BODY = {
   "no-workspace": "handoffNoWorkspace",
+  "not-ready": "handoffNotReady",
   unavailable: "handoffUnavailable",
   failed: "handoffFailedBody"
 };
@@ -3043,12 +3053,12 @@ function HandoffDialog(props) {
       },
       h("div", { className: "dgt-dialog-title" }, props.t("handoffFallbackTitle")),
       h("div", { className: "dgt-dialog-label" }, body),
-      props.showPrompt ? h("pre", { className: "dgt-handoff-prompt", tabIndex: 0 }, props.prompt) : null,
+      props.copyFailed ? h("pre", { className: "dgt-handoff-prompt", tabIndex: 0 }, props.prompt) : null,
       h(
         "div",
         { className: "dgt-dialog-actions" },
         h("button", { type: "button", className: "dgt-button", onClick: props.onClose }, props.t("close")),
-        props.showPrompt ? h("button", { type: "button", className: "dgt-primary", onClick: props.onCopy }, props.t("handoffCopy")) : null
+        props.copyFailed ? h("button", { type: "button", className: "dgt-primary", onClick: props.onCopy }, props.t("handoffCopy")) : null
       )
     )
   );
@@ -3126,6 +3136,38 @@ function ContextMenu(props) {
   );
 }
 
+// src/client/poll.ts
+var POLL_FAST_MS = 3e3;
+var POLL_IDLE_MS = 1e4;
+var POLL_IDLE_TICKS = 3;
+var REFS_EVERY_MS = 1e4;
+function statusSignature(status) {
+  if (!status || status.ok !== true) return "none";
+  const counts = status.counts ?? { staged: 0, unstaged: 0, conflicted: 0 };
+  const entries = (status.entries ?? []).map((entry) => entry.x + entry.y + entry.path).join("\0");
+  return [
+    status.branch ?? "",
+    status.oid ?? "",
+    status.upstream ?? "",
+    status.ahead ?? 0,
+    status.behind ?? 0,
+    counts.staged,
+    counts.unstaged,
+    counts.conflicted,
+    entries
+  ].join("");
+}
+function pollDelay(previousSignature, nextSignature, unchangedTicks) {
+  const unchanged = nextSignature === previousSignature ? unchangedTicks + 1 : 0;
+  return {
+    delay: unchanged >= POLL_IDLE_TICKS ? POLL_IDLE_MS : POLL_FAST_MS,
+    unchangedTicks: unchanged
+  };
+}
+function shouldFetchRefs(signatureChanged, sinceRefsMs) {
+  return signatureChanged || sinceRefsMs >= REFS_EVERY_MS;
+}
+
 // src/client/handoff.ts
 function cleanPath(value) {
   if (typeof value !== "string") return "";
@@ -3155,13 +3197,16 @@ function createHandoff(ctx) {
         const uiWorkspace = serviceOf(ctx, "uiWorkspace");
         if (!uiWorkspace || typeof uiWorkspace.startSession !== "function") return "unavailable";
         const workspaces = serviceOf(ctx, "workspaces");
-        const items = workspaces && workspaces.list && typeof workspaces.list.getSnapshot === "function" ? workspaces.list.getSnapshot()?.items : null;
+        const snapshot = workspaces && workspaces.list && typeof workspaces.list.getSnapshot === "function" ? workspaces.list.getSnapshot() : null;
+        if (!snapshot) return "unavailable";
+        if (snapshot.phase && snapshot.phase !== "ready") return "not-ready";
+        const items = snapshot.items;
         if (!Array.isArray(items)) return "unavailable";
         const match = matchWorkspace(items, repoRoot);
         const workspaceId = match && match.workspaceId;
         if (typeof workspaceId !== "string" || !workspaceId) return "no-workspace";
         uiWorkspace.startSession(workspaceId, { prompt, whenDraftExists: "replace" });
-        return "opened";
+        return "requested";
       } catch {
         return "unavailable";
       }
@@ -3179,7 +3224,6 @@ function buildConflictPrompt(input, t) {
 }
 
 // src/client/components/Workspace.tsx
-var POLL_MS = 2e3;
 var REPO_KEY = "dsh-git-tree/repository";
 var COMMIT_FOLD_KEY = "dsh-git-tree/commit-collapsed";
 var commitDrafts = /* @__PURE__ */ new Map();
@@ -3251,6 +3295,7 @@ function Workspace(props) {
   const [toast, setToast] = React.useState("");
   const [notice, setNotice] = React.useState("");
   const busyRef = React.useRef(false);
+  const wakePollRef = React.useRef(null);
   const handoffTimer = React.useRef(null);
   const commitInput = React.useRef(null);
   const toastTimer = React.useRef(null);
@@ -3304,18 +3349,20 @@ function Workspace(props) {
           setStatus(null);
           setStatusError(next.error || t("statusFailed"));
         }
+        return next;
       } catch (error) {
         setStatus(null);
         setStatusError(error instanceof Error ? error.message : String(error));
+        return null;
       } finally {
         if (!options?.silent) setRefreshing(false);
       }
     },
     [repoPath, t]
   );
-  const loadRefs = React.useCallback(async () => {
+  const loadRefs = React.useCallback(async (branch) => {
     try {
-      const next = await fetchRefs(repoPath || void 0);
+      const next = await fetchRefs(repoPath || void 0, branch);
       if (next.ok) setRefs(next);
     } catch {
     }
@@ -3664,24 +3711,68 @@ function Workspace(props) {
     }
   }, [status, selected]);
   React.useEffect(() => {
-    const id = setInterval(() => {
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      if (busyRef.current) return;
-      void loadStatus({ silent: true });
-      void loadRefs();
-    }, POLL_MS);
+    let timer = null;
+    let stopped = false;
+    let signature = "";
+    let unchanged = 0;
+    let lastRefsAt = 0;
+    let focused = true;
+    const schedule = (ms) => {
+      if (stopped) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void tick(), ms);
+    };
+    const tick = async () => {
+      if (stopped) return;
+      const hidden = typeof document !== "undefined" && document.visibilityState === "hidden";
+      if (hidden || !focused || busyRef.current) {
+        schedule(POLL_FAST_MS);
+        return;
+      }
+      const next = await loadStatus({ silent: true });
+      if (stopped) return;
+      const nextSignature = statusSignature(next);
+      const decision = pollDelay(signature, nextSignature, unchanged);
+      signature = nextSignature;
+      unchanged = decision.unchangedTicks;
+      const now = Date.now();
+      if (shouldFetchRefs(decision.unchangedTicks === 0, now - lastRefsAt)) {
+        lastRefsAt = now;
+        void loadRefs(next?.branch);
+      }
+      schedule(decision.delay);
+    };
+    const wake = () => {
+      unchanged = 0;
+      lastRefsAt = 0;
+      schedule(0);
+    };
+    wakePollRef.current = wake;
     const onFocus = () => {
-      void loadStatus({ silent: true });
-      void loadRefs();
+      focused = true;
+      wake();
+    };
+    const onBlur = () => {
+      focused = false;
     };
     const onVisible = () => {
-      if (typeof document === "undefined" || document.visibilityState === "visible") onFocus();
+      if (typeof document === "undefined" || document.visibilityState === "visible") {
+        focused = true;
+        wake();
+      } else {
+        focused = false;
+      }
     };
     window.addEventListener("focus", onFocus);
+    window.addEventListener("blur", onBlur);
     document.addEventListener("visibilitychange", onVisible);
+    schedule(POLL_FAST_MS);
     return () => {
-      clearInterval(id);
+      stopped = true;
+      wakePollRef.current = null;
+      if (timer) clearTimeout(timer);
       window.removeEventListener("focus", onFocus);
+      window.removeEventListener("blur", onBlur);
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, [loadStatus, loadRefs]);
@@ -3970,7 +4061,7 @@ function Workspace(props) {
       try {
         const result = await resolveConflict(path, repoPath || void 0);
         if (!result.ok || typeof result.content !== "string") {
-          throw new Error(result.error || t("aiResolveFailed"));
+          throw new Error(result.error || t("mergeModelFailed"));
         }
         setConflictResolve({
           path,
@@ -4012,9 +4103,9 @@ function Workspace(props) {
       const fallBack = async (reason) => {
         setHandoffBusy(false);
         const copied = await copyText(prompt, t("handoffCopied"), t("handoffCopyFailed"));
-        setHandoffDialog({ prompt, reason, showPrompt: !copied });
+        setHandoffDialog({ prompt, reason, copyFailed: !copied });
       };
-      if (result !== "opened") {
+      if (result !== "requested") {
         void fallBack(result);
         return;
       }
@@ -4329,7 +4420,11 @@ function Workspace(props) {
   };
   return h(
     "div",
-    { className: "dgt-root", "data-plugin": "dsh-git-tree" },
+    {
+      className: "dgt-root",
+      "data-plugin": "dsh-git-tree",
+      onPointerEnter: () => wakePollRef.current?.()
+    },
     h(TopBar, {
       status,
       workspaces,
@@ -4424,7 +4519,7 @@ function Workspace(props) {
     handoffDialog ? h(HandoffDialog, {
       reason: handoffDialog.reason,
       prompt: handoffDialog.prompt,
-      showPrompt: handoffDialog.showPrompt,
+      copyFailed: handoffDialog.copyFailed,
       t,
       onCopy: copyHandoffPrompt,
       onClose: () => setHandoffDialog(null)

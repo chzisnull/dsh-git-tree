@@ -5,7 +5,9 @@
 //
 // A conflicted file has no ordinary unified diff — git prints a combined one —
 // so the host answers with the working-tree file and this pane renders its
-// conflict blocks instead, with the resolve actions in the header.
+// conflict blocks instead. The header offers the hand-off (open a session with
+// the prompt) plus mark-resolved and restore; the in-panel model merge lives in
+// the file row's context menu.
 //
 // The empty pane also carries the panel-toggle hint: it is the one surface a
 // user stares at when nothing is selected, and it disappears together with the

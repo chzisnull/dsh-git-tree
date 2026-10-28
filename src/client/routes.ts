@@ -92,8 +92,10 @@ export function fetchDiff(
   return getJson<DiffPayload>(DIFF_ROUTE, params, signal)
 }
 
-export function fetchRefs(cwd?: string, signal?: AbortSignal): Promise<RefsPayload> {
-  return getJson<RefsPayload>(REFS_ROUTE, { cwd }, signal)
+export function fetchRefs(cwd?: string, branch?: string, signal?: AbortSignal): Promise<RefsPayload> {
+  // `branch` saves the host one git process per poll: the caller just read it
+  // from /status. Without it the host asks git itself.
+  return getJson<RefsPayload>(REFS_ROUTE, { cwd, branch }, signal)
 }
 
 export function fetchCommitInfo(
