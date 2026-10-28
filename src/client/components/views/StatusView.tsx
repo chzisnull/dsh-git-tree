@@ -40,7 +40,13 @@ export function StatusView(props: {
   onPushAfter: (value: boolean) => void
   commitCollapsed: boolean
   onToggleCommitCollapsed: () => void
-  conflict: { busy: boolean; onResolve: () => void; onRevert: () => void; onMarkResolved: () => void }
+  conflict: {
+    busy: boolean
+    opening: boolean
+    onHandoff: () => void
+    onRevert: () => void
+    onMarkResolved: () => void
+  }
   ai: AiCommitControls
 }): any {
   const { t } = props

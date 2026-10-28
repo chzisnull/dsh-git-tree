@@ -56,10 +56,12 @@ import { TopBar } from './TopBar'
 import { RefRail } from './RefRail'
 import { StatusView } from './views/StatusView'
 import { HistoryView } from './views/HistoryView'
-import { ConflictDialog, ConfirmDialog, PromptDialog } from './Dialogs'
+import { ConflictDialog, ConfirmDialog, HandoffDialog, PromptDialog } from './Dialogs'
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuEntry, ContextMenuState } from './ContextMenu'
 import { holdShortcut } from '../shortcut'
+import { buildConflictPrompt } from '../handoff'
+import type { HandoffBridge, HandoffFailure, HandoffResult } from '../handoff'
 import type { ViewKind } from '../types'
 
 const POLL_MS = 2000
@@ -86,7 +88,7 @@ function sideOf(entry: GitFileEntry): EntrySide {
 /** What the commit card needs from the AI model catalog; one object, one prop. */
 export type AiCommitProps = AiCommitControls
 
-export function Workspace(props: { t?: Translate; locale?: () => string }): any {
+export function Workspace(props: { t?: Translate; locale?: () => string; handoff?: HandoffBridge }): any {
   const t: Translate = typeof props.t === 'function' ? props.t : (key: string) => key
 
   const [status, setStatus] = React.useState<GitStatusPayload | null>(null)
@@ -155,6 +157,15 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
     model: string
   } | null>(null)
   const [conflictBusy, setConflictBusy] = React.useState('')
+  // Handing the file to a session: the button runs while the main view swaps,
+  // and the dialog is the only way out when no session can be opened.
+  const [handoffBusy, setHandoffBusy] = React.useState(false)
+  const [handoffDialog, setHandoffDialog] = React.useState<{
+    prompt: string
+    reason: HandoffFailure
+    /** True only when the automatic copy failed; then the dialog carries the text. */
+    showPrompt: boolean
+  } | null>(null)
   const [conflictError, setConflictError] = React.useState('')
   const [dialogBusy, setDialogBusy] = React.useState(false)
   const [dialogError, setDialogError] = React.useState('')
@@ -173,11 +184,18 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
   const [notice, setNotice] = React.useState('')
 
   const busyRef = React.useRef(false)
+  const handoffTimer = React.useRef<any>(null)
   const commitInput = React.useRef<any>(null)
   const toastTimer = React.useRef<any>(null)
   React.useEffect(() => {
     busyRef.current = busy
   }, [busy])
+  React.useEffect(
+    () => () => {
+      if (handoffTimer.current) clearTimeout(handoffTimer.current)
+    },
+    [],
+  )
 
   const setCommitFold = React.useCallback((folded: boolean) => {
     setCommitCollapsed(folded)
@@ -216,7 +234,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
   // dispatches bound shortcuts ahead of modal controls, so without this the
   // toggle would hide the panel (and drop an unsaved AI preview) underneath the
   // dialog the user is looking at.
-  const overlayOpen = dialog !== null || conflictResolve !== null || contextMenu !== null
+  const overlayOpen =
+    dialog !== null || conflictResolve !== null || contextMenu !== null || handoffDialog !== null
   React.useEffect(() => {
     if (!overlayOpen) return undefined
     return holdShortcut()
@@ -704,12 +723,20 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
   )
 
   const copyText = React.useCallback(
-    (text: string, toast: string) => {
+    async (text: string, toast: string, failureToast?: string): Promise<boolean> => {
+      const fallback = () => showToast(failureToast ?? text)
       try {
-        void navigator.clipboard?.writeText(text)
+        const clipboard = typeof navigator !== 'undefined' ? navigator.clipboard : undefined
+        if (!clipboard || typeof clipboard.writeText !== 'function') {
+          fallback()
+          return false
+        }
+        await clipboard.writeText(text)
         showToast(toast)
+        return true
       } catch {
-        showToast(text)
+        fallback()
+        return false
       }
     },
     [showToast],
@@ -822,7 +849,19 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
   const fileMenu = (entry: GitFileEntry, side: EntrySide, event: any) => {
     const conflict = side === 'conflicted' || entry.conflicted
     const untracked = entry.kind === 'untracked'
-    const items: ContextMenuEntry[] = [
+    const items: ContextMenuEntry[] = []
+    if (conflict) {
+      // One primary hand-off, plus the older in-panel model merge kept as a
+      // deliberate secondary (it writes the file itself, the session does not).
+      items.push({ label: t('handoff'), onSelect: () => void handoffConflict(entry.path) })
+      items.push({
+        label: t('modelMergePreview'),
+        disabled: conflictBusy !== '',
+        onSelect: () => void resolveConflictWithAi(entry.path),
+      })
+      items.push({ divider: true })
+    }
+    items.push(
       {
         label: t('commitThis'),
         disabled: conflict,
@@ -830,7 +869,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
         onSelect: () => void commitThis(entry, side),
       },
       { divider: true },
-    ]
+    )
     if (!conflict) {
       items.push({
         label: side === 'staged' ? t('unstageFile') : t('stageFile'),
@@ -958,6 +997,60 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
     },
     [repoPath, showToast, t],
   )
+
+  /** The conflict-block count for one path, read from the open diff or fetched. */
+  const conflictBlocksOf = React.useCallback(
+    async (path: string): Promise<number> => {
+      if (selected?.path === path && diff?.conflict) return diff.conflict.blocks
+      try {
+        const payload = await fetchDiff({ path, side: 'conflicted', cwd: repoPath || undefined })
+        return payload?.conflict?.blocks ?? 0
+      } catch {
+        // An uncounted file still gets a prompt; the count line is optional.
+        return 0
+      }
+    },
+    [diff, repoPath, selected],
+  )
+
+  /**
+   * Hand the conflicted file to a DSH session: match the repository to its
+   * workspace, open the blank Session and leave the prompt in the composer
+   * (never sent). Nothing is written, staged or committed by this panel.
+   */
+  const handoffConflict = React.useCallback(
+    async (path: string) => {
+      setActionError('')
+      setHandoffBusy(true)
+      const repo = status?.repoRoot || status?.cwd || repoPath || ''
+      const blocks = await conflictBlocksOf(path)
+      const prompt = buildConflictPrompt({ repo, path, branch: status?.branch || '', blocks }, t)
+      const result: HandoffResult | 'failed' = props.handoff ? props.handoff.open(repo, prompt) : 'unavailable'
+      // Every failure hands the prompt over: the click already asked for it, and
+      // the dialog stays up only to explain why no session opened.
+      const fallBack = async (reason: HandoffFailure) => {
+        setHandoffBusy(false)
+        // The click already asked for this text, so hand it over silently; the
+        // dialog explains the reason and only shows the prompt if copying failed.
+        const copied = await copyText(prompt, t('handoffCopied'), t('handoffCopyFailed'))
+        setHandoffDialog({ prompt, reason, showPrompt: !copied })
+      }
+      if (result !== 'opened') {
+        void fallBack(result)
+        return
+      }
+      // The panel is replaced by the session; if that never happens (the host
+      // refused it), recover instead of leaving a dead busy button.
+      if (handoffTimer.current) clearTimeout(handoffTimer.current)
+      handoffTimer.current = setTimeout(() => void fallBack('failed'), 4000)
+    },
+    [conflictBlocksOf, copyText, props.handoff, repoPath, status, t],
+  )
+
+  /** Copy button inside the fallback dialog (re-copy, or copy after editing). */
+  const copyHandoffPrompt = React.useCallback(() => {
+    void copyText(handoffDialog?.prompt ?? '', t('handoffCopied'), t('handoffCopyFailed'))
+  }, [copyText, handoffDialog, t])
 
   const refreshAfterConflict = React.useCallback(
     async (path: string) => {
@@ -1267,8 +1360,9 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
           onToggleCommitCollapsed: () => setCommitFold(!commitCollapsed),
           conflict: {
             busy: conflictBusy !== '',
-            onResolve: () => {
-              if (selected) void resolveConflictWithAi(selected.path)
+            opening: handoffBusy,
+            onHandoff: () => {
+              if (selected) void handoffConflict(selected.path)
             },
             onRevert: () => {
               if (!selected) return
@@ -1396,6 +1490,16 @@ export function Workspace(props: { t?: Translate; locale?: () => string }): any 
           t,
           onCancel: closeDialog,
           onConfirm: () => void submitDelete(),
+        })
+      : null,
+    handoffDialog
+      ? h(HandoffDialog, {
+          reason: handoffDialog.reason,
+          prompt: handoffDialog.prompt,
+          showPrompt: handoffDialog.showPrompt,
+          t,
+          onCopy: copyHandoffPrompt,
+          onClose: () => setHandoffDialog(null),
         })
       : null,
     conflictResolve

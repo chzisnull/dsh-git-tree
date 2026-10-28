@@ -124,8 +124,12 @@ _Avoid_: Auto-commit, generated commit
 The right-hand pane for an unmerged file: the working-tree copy rendered line by line, with `<<<<<<<` / `=======` / `>>>>>>>` marker rows and the two sides tinted.
 _Avoid_: Combined diff, merge diff
 
-**AI conflict resolution** (AI 解决冲突):
-A model-proposed merge of one conflicted file, previewed as a diff and written only after the user applies it; the conflict can be restored with `git checkout --merge`.
+**Conflict hand-off** (交给 AI 助手):
+The header action that opens a DSH session in the repository's workspace and writes a ready prompt into the composer; nothing is sent and the panel writes nothing. The human marks the file resolved afterwards.
+_Avoid_: AI resolve, auto-fix
+
+**AI conflict resolution** (模型合并):
+The in-panel path kept from an earlier decision: one conflicted file goes to the selected model, the answer is previewed as a diff, and the file is written only after Apply. Now reachable from the conflicted file's context menu.
 _Avoid_: Auto-merge, conflict fixer
 
 **Fetch** (获取):

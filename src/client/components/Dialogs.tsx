@@ -3,6 +3,7 @@
 
 import { h, React } from '../react'
 import type { DiffPayload, Translate } from '../types'
+import type { HandoffFailure } from '../handoff'
 import { DiffFileBlock } from './DiffView'
 
 export function PromptDialog(props: {
@@ -168,6 +169,53 @@ export function ConflictDialog(props: {
           { type: 'button', className: 'dgt-primary', disabled: props.busy, onClick: props.onApply },
           props.busy ? props.t('loading') : props.t('applyResolution'),
         ),
+      ),
+    ),
+  )
+}
+
+/**
+ * Fallback when no session can be opened: state the reason and hand the prompt
+ * over, so the work is not stuck inside a panel that cannot start a session.
+ */
+const HANDOFF_BODY: Record<HandoffFailure, string> = {
+  'no-workspace': 'handoffNoWorkspace',
+  unavailable: 'handoffUnavailable',
+  failed: 'handoffFailedBody',
+}
+
+export function HandoffDialog(props: {
+  reason: HandoffFailure
+  prompt: string
+  /** The prompt is already on the clipboard; show it only when that failed. */
+  showPrompt: boolean
+  t: Translate
+  onCopy: () => void
+  onClose: () => void
+}): any {
+  const body = props.t(HANDOFF_BODY[props.reason])
+  return h(
+    'div',
+    { className: 'dgt-overlay', role: 'presentation', onClick: props.onClose },
+    h(
+      'div',
+      {
+        className: 'dgt-dialog dgt-handoff-dialog',
+        role: 'dialog',
+        'aria-modal': 'true',
+        'aria-label': props.t('handoffFallbackTitle'),
+        onClick: (event: any) => event.stopPropagation(),
+      },
+      h('div', { className: 'dgt-dialog-title' }, props.t('handoffFallbackTitle')),
+      h('div', { className: 'dgt-dialog-label' }, body),
+      props.showPrompt ? h('pre', { className: 'dgt-handoff-prompt', tabIndex: 0 }, props.prompt) : null,
+      h(
+        'div',
+        { className: 'dgt-dialog-actions' },
+        h('button', { type: 'button', className: 'dgt-button', onClick: props.onClose }, props.t('close')),
+        props.showPrompt
+          ? h('button', { type: 'button', className: 'dgt-primary', onClick: props.onCopy }, props.t('handoffCopy'))
+          : null,
       ),
     ),
   )

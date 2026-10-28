@@ -731,6 +731,39 @@ by the app.
   for the service) plus `ctx.get('shortcuts')`, and catches a rejected
   registration, so the panel loads with or without a keyboard command.
 
+### 6.6 Handing work to a session (verified for 0.12.0)
+
+A panel can hand a task to a real conversation instead of calling a model
+itself: open (or reuse) the blank Session of a Workspace and leave a prompt in
+its composer. Two client services make that possible, neither is a published
+plugin API — they are shipped internals of this build.
+
+- **`uiWorkspace.startSession(workspaceId, options)`** —
+  `dsh-client-ui-workspace/lib/client.js:1500-1542`. `options` is
+  `{ prompt?, clearPreviousDraft?, whenDraftExists? }`; passing `prompt` makes
+  the call initialise the draft (`:1503`) after the blank Session exists
+  (`prepareDraft` → `conversation.input.requestDraftInitialization`, `:1529-1536`).
+  An existing blank Session for the same workspace is reused rather than
+  created again (`createInWorkspace`, `:1418-1431`), so repeated hand-offs do not
+  spawn sessions.
+- **`conversation.input.requestDraftInitialization(options)`** —
+  `dsh-client-ui-conversation/lib/client.js:15110-15131`. `whenDraftExists`
+  decides what happens to text already in the box: `replace` overwrites, `keep`
+  preserves it (and then does not insert the prompt), `append` adds after it.
+  The composer is focused with the text present; **nothing is submitted** while
+  the user has not pressed send.
+- **`workspaces.list`** — `@deepseek-ai/dsh-api-workspace-controller`
+  (`super(ctx, "workspaces")`, `lib/client.js:389`) exposes the same registry
+  the browser uses, with `getSnapshot().items[]` carrying `workspaceId`, `path`
+  and `title`. Matching a repository to a workspace on this list keeps ids and
+  paths consistent with what `startSession` expects; a repository may sit below
+  its workspace, so pick the longest matching `path`.
+- **Degrade, do not assume.** Both services are optional: a Harness without the
+  workspace browser, or a build that stops exposing them, must fall back to
+  showing the prompt for copying rather than to a dead button. `dsh-git-tree`
+  reads them through `ctx.get` and returns a verdict (`opened`,
+  `no-workspace`, `unavailable`) instead of throwing.
+
 ## 7. The skeleton in `plugin/`
 
 Layout of the deliverable (package name `dsh-git-tree`):

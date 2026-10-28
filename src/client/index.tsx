@@ -22,6 +22,7 @@ import { h } from './react'
 import { EN, NS, ZH } from './locale'
 import { CSS } from './styles'
 import { Workspace } from './components/Workspace'
+import { createHandoff } from './handoff'
 import {
   PANEL_ID,
   SHORTCUT_ID,
@@ -121,10 +122,12 @@ export function apply(ctx: ClientCtx): void {
 
   // 5. the panel itself: root-scoped keyed `main` entry, full-height. The
   //    active locale id rides along so an AI-written commit message follows the
-  //    language the panel is actually showing.
+  //    language the panel is actually showing, and `handoff` lets the conflict
+  //    view open a DSH session in the repository's workspace.
+  const handoff = createHandoff(ctx)
   ctx.slots.inject('main', () =>
     ctx.slots.register(
-      { name: 'main', key: PANEL_ID, locale: NS, inject: () => ({ t, locale: () => activeLocale(ctx) }) },
+      { name: 'main', key: PANEL_ID, locale: NS, inject: () => ({ t, locale: () => activeLocale(ctx), handoff }) },
       Workspace,
     ),
   )
@@ -200,6 +203,7 @@ function wireShortcut(host: ClientCtx, t: Translate): void {
 // The shortcut helpers are exported from the artifact as well: the boot-contract
 // test evaluates this bundle in Node and exercises the toggle without a DOM.
 export { holdShortcut, keycapParts, shortcutState, togglePanel } from './shortcut'
+export { buildConflictPrompt, createHandoff, matchWorkspace } from './handoff'
 
 /** Active UI locale id (`zh`, `en`, …), read from the live locale snapshot. */
 function activeLocale(ctx: ClientCtx): string {

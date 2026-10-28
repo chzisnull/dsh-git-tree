@@ -24,9 +24,12 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var index_exports = {};
 __export(index_exports, {
   apply: () => apply,
+  buildConflictPrompt: () => buildConflictPrompt,
+  createHandoff: () => createHandoff,
   holdShortcut: () => holdShortcut,
   inject: () => inject,
   keycapParts: () => keycapParts,
+  matchWorkspace: () => matchWorkspace,
   shortcutState: () => shortcutState,
   togglePanel: () => togglePanel
 });
@@ -205,9 +208,6 @@ var EN = {
   conflictBlocks: "conflict blocks",
   conflictClean: "no markers left",
   conflictLines: "lines",
-  aiResolve: "Resolve with AI",
-  aiResolving: "Merging\u2026",
-  aiResolveTip: "Let the selected model merge this file; you review the result first",
   aiResolveFailed: "Could not resolve this conflict",
   markResolved: "Mark resolved",
   markResolvedHint: "Conflict markers are still in the file",
@@ -240,7 +240,22 @@ var EN = {
   shortcutToggle: "Open or close the Git panel",
   shortcutHintBefore: "Press",
   shortcutHintAfter: "anywhere to open or close this panel.",
-  shortcutUnbound: "No shortcut for this panel yet \u2014 set one in Settings \u2192 Keyboard shortcuts."
+  shortcutUnbound: "No shortcut for this panel yet \u2014 set one in Settings \u2192 Keyboard shortcuts.",
+  handoff: "Hand to AI",
+  handoffTip: "Open a session in this repository and write the conflict prompt into the input box (nothing is sent)",
+  handoffOpening: "Opening session\u2026",
+  handoffPromptHead: "Please resolve this Git merge conflict for me.\n\nRepository: {repo}\nFile: {path}\nBranch: {branch}",
+  handoffPromptBlocks: "Conflicts: {blocks} block(s)",
+  handoffPromptBody: "The file still contains <<<<<<<, =======, >>>>>>> markers. Read the file, understand what each side intended, merge the two versions and remove every marker, keeping both intents. Touch only this file, and end with a sentence or two about what you changed and why. Tell me when you are done \u2014 I will mark it resolved in the Git panel myself, so do not run git add, git commit or git checkout.",
+  handoffFallbackTitle: "Could not open a session",
+  handoffNoWorkspace: "This repository is not one of the workspaces registered in DSH, so there is no session to open. Paste the prompt into any conversation.",
+  handoffUnavailable: "This DSH build does not expose sessions to plugins. Paste the prompt into a conversation.",
+  handoffFailedBody: "The session did not open. Paste the prompt into a conversation.",
+  handoffCopy: "Copy prompt",
+  close: "Close",
+  handoffCopied: "Prompt copied",
+  handoffCopyFailed: "Could not copy the prompt",
+  modelMergePreview: "Merge with the model (preview)"
 };
 var ZH = {
   panel: "Git",
@@ -409,9 +424,6 @@ var ZH = {
   conflictBlocks: "\u5904\u51B2\u7A81",
   conflictClean: "\u51B2\u7A81\u6807\u8BB0\u5DF2\u6E05\u7A7A",
   conflictLines: "\u884C",
-  aiResolve: "AI \u89E3\u51B3",
-  aiResolving: "\u5408\u5E76\u4E2D\u2026",
-  aiResolveTip: "\u8BA9\u5F53\u524D\u6A21\u578B\u5408\u5E76\u8FD9\u4E2A\u6587\u4EF6\uFF0C\u5148\u770B\u9884\u89C8\u518D\u51B3\u5B9A\u662F\u5426\u5199\u5165",
   aiResolveFailed: "AI \u89E3\u51B3\u51B2\u7A81\u5931\u8D25",
   markResolved: "\u6807\u8BB0\u4E3A\u5DF2\u89E3\u51B3",
   markResolvedHint: "\u6587\u4EF6\u91CC\u8FD8\u6709\u51B2\u7A81\u6807\u8BB0",
@@ -444,7 +456,22 @@ var ZH = {
   shortcutToggle: "\u6253\u5F00\uFF0F\u5173\u95ED Git \u9762\u677F",
   shortcutHintBefore: "\u968F\u65F6\u6309",
   shortcutHintAfter: "\u53EF\u6253\u5F00\u6216\u5173\u95ED\u8FD9\u4E2A\u9762\u677F\u3002",
-  shortcutUnbound: "\u8FD9\u4E2A\u9762\u677F\u8FD8\u6CA1\u6709\u5FEB\u6377\u952E\uFF0C\u53EF\u5728\u300C\u8BBE\u7F6E \u2192 \u952E\u76D8\u5FEB\u6377\u952E\u300D\u91CC\u8BBE\u7F6E\u3002"
+  shortcutUnbound: "\u8FD9\u4E2A\u9762\u677F\u8FD8\u6CA1\u6709\u5FEB\u6377\u952E\uFF0C\u53EF\u5728\u300C\u8BBE\u7F6E \u2192 \u952E\u76D8\u5FEB\u6377\u952E\u300D\u91CC\u8BBE\u7F6E\u3002",
+  handoff: "\u4EA4\u7ED9 AI \u52A9\u624B",
+  handoffTip: "\u5728\u8FD9\u4E2A\u4ED3\u5E93\u7684 DSH \u4F1A\u8BDD\u91CC\u6253\u5F00\u5B83\uFF0C\u5E76\u628A\u51B2\u7A81\u8BF4\u660E\u586B\u8FDB\u8F93\u5165\u6846\uFF08\u4E0D\u4F1A\u81EA\u52A8\u53D1\u9001\uFF09",
+  handoffOpening: "\u6B63\u5728\u6253\u5F00\u4F1A\u8BDD\u2026",
+  handoffPromptHead: "\u8BF7\u5E2E\u6211\u89E3\u51B3\u8FD9\u4E2A Git \u5408\u5E76\u51B2\u7A81\u3002\n\n\u4ED3\u5E93\uFF1A{repo}\n\u6587\u4EF6\uFF1A{path}\n\u5206\u652F\uFF1A{branch}",
+  handoffPromptBlocks: "\u51B2\u7A81\uFF1A{blocks} \u5904",
+  handoffPromptBody: "\u6587\u4EF6\u91CC\u8FD8\u6709 <<<<<<<\u3001=======\u3001>>>>>>> \u6807\u8BB0\u3002\u8BF7\u5148\u8BFB\u53D6\u8BE5\u6587\u4EF6\uFF0C\u7406\u89E3\u4E24\u8FB9\u6539\u52A8\u7684\u610F\u56FE\uFF0C\u5408\u5E76\u51B2\u7A81\u5E76\u79FB\u9664\u6240\u6709\u6807\u8BB0\uFF0C\u4FDD\u7559\u53CC\u65B9\u5408\u7406\u7684\u6539\u52A8\uFF1B\u53EA\u6539\u8FD9\u4E2A\u6587\u4EF6\uFF0C\u6539\u5B8C\u7528\u4E00\u4E24\u53E5\u8BDD\u8BF4\u660E\u4F60\u6539\u4E86\u4EC0\u4E48\u3001\u4E3A\u4EC0\u4E48\u3002\u5B8C\u6210\u540E\u544A\u8BC9\u6211\uFF0C\u6211\u4F1A\u5728 Git \u9762\u677F\u91CC\u81EA\u5DF1\u6807\u8BB0\u4E3A\u5DF2\u89E3\u51B3\uFF0C\u6240\u4EE5\u4E0D\u8981\u6267\u884C git add\u3001git commit\u3001git checkout\u3002",
+  handoffFallbackTitle: "\u6253\u4E0D\u5F00\u4F1A\u8BDD",
+  handoffNoWorkspace: "\u8FD9\u4E2A\u4ED3\u5E93\u4E0D\u5728 DSH \u5DF2\u6CE8\u518C\u7684\u5DE5\u4F5C\u533A\u91CC\uFF0C\u6CA1\u6709\u53EF\u4EE5\u6253\u5F00\u7684\u4F1A\u8BDD\u3002\u628A\u63D0\u793A\u8BCD\u7C98\u8D34\u5230\u4EFB\u610F\u4F1A\u8BDD\u91CC\u5373\u53EF\u3002",
+  handoffUnavailable: "\u5F53\u524D DSH \u7248\u672C\u6CA1\u6709\u5411\u63D2\u4EF6\u5F00\u653E\u4F1A\u8BDD\u3002\u628A\u63D0\u793A\u8BCD\u7C98\u8D34\u5230\u5BF9\u8BDD\u91CC\u5373\u53EF\u3002",
+  handoffFailedBody: "\u4F1A\u8BDD\u6CA1\u6709\u6253\u5F00\u6210\u529F\u3002\u628A\u63D0\u793A\u8BCD\u7C98\u8D34\u5230\u5BF9\u8BDD\u91CC\u5373\u53EF\u3002",
+  handoffCopy: "\u590D\u5236\u63D0\u793A\u8BCD",
+  close: "\u5173\u95ED",
+  handoffCopied: "\u63D0\u793A\u8BCD\u5DF2\u590D\u5236",
+  handoffCopyFailed: "\u590D\u5236\u63D0\u793A\u8BCD\u5931\u8D25",
+  modelMergePreview: "\u7528\u6A21\u578B\u5408\u5E76\uFF08\u9884\u89C8\uFF09"
 };
 
 // src/client/styles.ts
@@ -847,6 +874,21 @@ var CSS = `
   background:var(--dgt-accent-soft);color:var(--dgt-accent-strong);}
 .dgt-diff-action[data-kind='ai']:disabled{opacity:.55;}
 .dgt-diff-action[data-kind='ghost']{background:transparent;color:var(--dsw-alias-label-secondary);}
+.dgt-diff-action-ai{display:inline-flex;align-items:center;gap:6px;}
+.dgt-diff-action-busy{display:inline-flex;align-items:center;gap:6px;}
+.dgt-diff-action-glyph{font-size:11px;line-height:1;color:var(--dgt-accent-strong);}
+.dgt-diff-action[data-busy='true'] .dgt-diff-action-glyph{display:none;}
+.dgt-spinner{width:11px;height:11px;border-radius:50%;border:1.5px solid currentColor;
+  border-top-color:transparent;animation:dgt-spin .7s linear infinite;opacity:.85;}
+@media (prefers-reduced-motion:reduce){.dgt-spinner{animation:none;border-top-color:currentColor;opacity:.55;}}
+
+/* session hand-off fallback: the prompt is portable, so show it to copy out */
+.dgt-dialog.dgt-handoff-dialog{box-sizing:border-box;width:min(620px,92vw);}
+.dgt-handoff-prompt{margin:2px 0 0;padding:10px 12px;max-height:34vh;overflow:auto;
+  border:1px solid var(--dgt-line);border-radius:10px;background:var(--dgt-line-soft);
+  color:var(--dsw-alias-label-secondary);font-family:var(--ds-font-family-code);font-size:11px;
+  line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;}
+.dgt-handoff-prompt:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:1px;}
 /* Resolution preview dialog */
 .dgt-dialog.dgt-conflict-dialog{box-sizing:border-box;width:min(880px,92vw);max-height:86vh;}
 .dgt-conflict-dialog-meta{display:flex;align-items:center;gap:12px;min-width:0;}
@@ -2192,13 +2234,24 @@ function DiffView(props) {
           "button",
           {
             type: "button",
-            className: "dgt-diff-action",
+            className: "dgt-diff-action dgt-diff-action-ai",
             "data-kind": "ai",
-            disabled: props.conflict.busy,
-            title: t("aiResolveTip"),
-            onClick: props.conflict.onResolve
+            "data-busy": props.conflict.opening || void 0,
+            disabled: props.conflict.busy || props.conflict.opening,
+            title: props.conflict.opening ? t("handoffOpening") : t("handoffTip"),
+            onClick: props.conflict.onHandoff
           },
-          props.conflict.busy ? t("aiResolving") : t("aiResolve")
+          props.conflict.opening ? h(
+            "span",
+            { className: "dgt-diff-action-busy" },
+            h("span", { className: "dgt-spinner", "aria-hidden": "true" }),
+            t("handoffOpening")
+          ) : h(
+            "span",
+            { className: "dgt-diff-action-busy" },
+            h("span", { className: "dgt-diff-action-glyph", "aria-hidden": "true" }, "\u2726"),
+            t("handoff")
+          )
         ),
         h(
           "button",
@@ -2969,6 +3022,37 @@ function ConflictDialog(props) {
     )
   );
 }
+var HANDOFF_BODY = {
+  "no-workspace": "handoffNoWorkspace",
+  unavailable: "handoffUnavailable",
+  failed: "handoffFailedBody"
+};
+function HandoffDialog(props) {
+  const body = props.t(HANDOFF_BODY[props.reason]);
+  return h(
+    "div",
+    { className: "dgt-overlay", role: "presentation", onClick: props.onClose },
+    h(
+      "div",
+      {
+        className: "dgt-dialog dgt-handoff-dialog",
+        role: "dialog",
+        "aria-modal": "true",
+        "aria-label": props.t("handoffFallbackTitle"),
+        onClick: (event) => event.stopPropagation()
+      },
+      h("div", { className: "dgt-dialog-title" }, props.t("handoffFallbackTitle")),
+      h("div", { className: "dgt-dialog-label" }, body),
+      props.showPrompt ? h("pre", { className: "dgt-handoff-prompt", tabIndex: 0 }, props.prompt) : null,
+      h(
+        "div",
+        { className: "dgt-dialog-actions" },
+        h("button", { type: "button", className: "dgt-button", onClick: props.onClose }, props.t("close")),
+        props.showPrompt ? h("button", { type: "button", className: "dgt-primary", onClick: props.onCopy }, props.t("handoffCopy")) : null
+      )
+    )
+  );
+}
 
 // src/client/components/ContextMenu.tsx
 function ContextMenu(props) {
@@ -3042,6 +3126,58 @@ function ContextMenu(props) {
   );
 }
 
+// src/client/handoff.ts
+function cleanPath(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim().replace(/[\\/]+$/, "");
+  return trimmed.length > 0 && trimmed.length <= 4096 ? trimmed : "";
+}
+function matchWorkspace(workspaces, target) {
+  const path = cleanPath(target);
+  if (!path || !Array.isArray(workspaces)) return null;
+  let best = null;
+  let bestLength = -1;
+  for (const workspace of workspaces) {
+    if (!workspace || typeof workspace !== "object") continue;
+    const candidate = cleanPath(workspace.path);
+    if (!candidate) continue;
+    const inside = path === candidate || path.startsWith(candidate + "/") || path.startsWith(candidate + "\\");
+    if (!inside || candidate.length <= bestLength) continue;
+    best = workspace;
+    bestLength = candidate.length;
+  }
+  return best;
+}
+function createHandoff(ctx) {
+  return {
+    open(repoRoot, prompt) {
+      try {
+        const uiWorkspace = serviceOf(ctx, "uiWorkspace");
+        if (!uiWorkspace || typeof uiWorkspace.startSession !== "function") return "unavailable";
+        const workspaces = serviceOf(ctx, "workspaces");
+        const items = workspaces && workspaces.list && typeof workspaces.list.getSnapshot === "function" ? workspaces.list.getSnapshot()?.items : null;
+        if (!Array.isArray(items)) return "unavailable";
+        const match = matchWorkspace(items, repoRoot);
+        const workspaceId = match && match.workspaceId;
+        if (typeof workspaceId !== "string" || !workspaceId) return "no-workspace";
+        uiWorkspace.startSession(workspaceId, { prompt, whenDraftExists: "replace" });
+        return "opened";
+      } catch {
+        return "unavailable";
+      }
+    }
+  };
+}
+function buildConflictPrompt(input, t) {
+  const head = t("handoffPromptHead", {
+    repo: input.repo || "\u2014",
+    path: input.path,
+    branch: input.branch || "\u2014"
+  });
+  const blocks = input.blocks > 0 ? t("handoffPromptBlocks", { blocks: String(input.blocks) }) : "";
+  return head + (blocks === "" ? "" : "\n" + blocks) + "\n\n" + t("handoffPromptBody");
+}
+
 // src/client/components/Workspace.tsx
 var POLL_MS = 2e3;
 var REPO_KEY = "dsh-git-tree/repository";
@@ -3096,6 +3232,8 @@ function Workspace(props) {
   const [aiBusy, setAiBusy] = React.useState(false);
   const [conflictResolve, setConflictResolve] = React.useState(null);
   const [conflictBusy, setConflictBusy] = React.useState("");
+  const [handoffBusy, setHandoffBusy] = React.useState(false);
+  const [handoffDialog, setHandoffDialog] = React.useState(null);
   const [conflictError, setConflictError] = React.useState("");
   const [dialogBusy, setDialogBusy] = React.useState(false);
   const [dialogError, setDialogError] = React.useState("");
@@ -3113,11 +3251,18 @@ function Workspace(props) {
   const [toast, setToast] = React.useState("");
   const [notice, setNotice] = React.useState("");
   const busyRef = React.useRef(false);
+  const handoffTimer = React.useRef(null);
   const commitInput = React.useRef(null);
   const toastTimer = React.useRef(null);
   React.useEffect(() => {
     busyRef.current = busy;
   }, [busy]);
+  React.useEffect(
+    () => () => {
+      if (handoffTimer.current) clearTimeout(handoffTimer.current);
+    },
+    []
+  );
   const setCommitFold = React.useCallback((folded) => {
     setCommitCollapsed(folded);
     try {
@@ -3142,7 +3287,7 @@ function Workspace(props) {
     if (message === "") commitDrafts.delete(draftKey);
     else commitDrafts.set(draftKey, message);
   }, [draftKey, message]);
-  const overlayOpen = dialog !== null || conflictResolve !== null || contextMenu !== null;
+  const overlayOpen = dialog !== null || conflictResolve !== null || contextMenu !== null || handoffDialog !== null;
   React.useEffect(() => {
     if (!overlayOpen) return void 0;
     return holdShortcut();
@@ -3577,12 +3722,20 @@ function Workspace(props) {
     [showToast, t]
   );
   const copyText = React.useCallback(
-    (text, toast2) => {
+    async (text, toast2, failureToast) => {
+      const fallback = () => showToast(failureToast ?? text);
       try {
-        void navigator.clipboard?.writeText(text);
+        const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : void 0;
+        if (!clipboard || typeof clipboard.writeText !== "function") {
+          fallback();
+          return false;
+        }
+        await clipboard.writeText(text);
         showToast(toast2);
+        return true;
       } catch {
-        showToast(text);
+        fallback();
+        return false;
       }
     },
     [showToast]
@@ -3689,7 +3842,17 @@ function Workspace(props) {
   const fileMenu = (entry, side, event) => {
     const conflict = side === "conflicted" || entry.conflicted;
     const untracked = entry.kind === "untracked";
-    const items = [
+    const items = [];
+    if (conflict) {
+      items.push({ label: t("handoff"), onSelect: () => void handoffConflict(entry.path) });
+      items.push({
+        label: t("modelMergePreview"),
+        disabled: conflictBusy !== "",
+        onSelect: () => void resolveConflictWithAi(entry.path)
+      });
+      items.push({ divider: true });
+    }
+    items.push(
       {
         label: t("commitThis"),
         disabled: conflict,
@@ -3697,7 +3860,7 @@ function Workspace(props) {
         onSelect: () => void commitThis(entry, side)
       },
       { divider: true }
-    ];
+    );
     if (!conflict) {
       items.push({
         label: side === "staged" ? t("unstageFile") : t("stageFile"),
@@ -3826,6 +3989,43 @@ function Workspace(props) {
     },
     [repoPath, showToast, t]
   );
+  const conflictBlocksOf = React.useCallback(
+    async (path) => {
+      if (selected?.path === path && diff?.conflict) return diff.conflict.blocks;
+      try {
+        const payload = await fetchDiff({ path, side: "conflicted", cwd: repoPath || void 0 });
+        return payload?.conflict?.blocks ?? 0;
+      } catch {
+        return 0;
+      }
+    },
+    [diff, repoPath, selected]
+  );
+  const handoffConflict = React.useCallback(
+    async (path) => {
+      setActionError("");
+      setHandoffBusy(true);
+      const repo = status?.repoRoot || status?.cwd || repoPath || "";
+      const blocks = await conflictBlocksOf(path);
+      const prompt = buildConflictPrompt({ repo, path, branch: status?.branch || "", blocks }, t);
+      const result = props.handoff ? props.handoff.open(repo, prompt) : "unavailable";
+      const fallBack = async (reason) => {
+        setHandoffBusy(false);
+        const copied = await copyText(prompt, t("handoffCopied"), t("handoffCopyFailed"));
+        setHandoffDialog({ prompt, reason, showPrompt: !copied });
+      };
+      if (result !== "opened") {
+        void fallBack(result);
+        return;
+      }
+      if (handoffTimer.current) clearTimeout(handoffTimer.current);
+      handoffTimer.current = setTimeout(() => void fallBack("failed"), 4e3);
+    },
+    [conflictBlocksOf, copyText, props.handoff, repoPath, status, t]
+  );
+  const copyHandoffPrompt = React.useCallback(() => {
+    void copyText(handoffDialog?.prompt ?? "", t("handoffCopied"), t("handoffCopyFailed"));
+  }, [copyText, handoffDialog, t]);
   const refreshAfterConflict = React.useCallback(
     async (path) => {
       await loadStatus({ silent: true });
@@ -4101,8 +4301,9 @@ function Workspace(props) {
           onToggleCommitCollapsed: () => setCommitFold(!commitCollapsed),
           conflict: {
             busy: conflictBusy !== "",
-            onResolve: () => {
-              if (selected) void resolveConflictWithAi(selected.path);
+            opening: handoffBusy,
+            onHandoff: () => {
+              if (selected) void handoffConflict(selected.path);
             },
             onRevert: () => {
               if (!selected) return;
@@ -4219,6 +4420,14 @@ function Workspace(props) {
       t,
       onCancel: closeDialog,
       onConfirm: () => void submitDelete()
+    }) : null,
+    handoffDialog ? h(HandoffDialog, {
+      reason: handoffDialog.reason,
+      prompt: handoffDialog.prompt,
+      showPrompt: handoffDialog.showPrompt,
+      t,
+      onCopy: copyHandoffPrompt,
+      onClose: () => setHandoffDialog(null)
     }) : null,
     conflictResolve ? h(ConflictDialog, {
       path: conflictResolve.path,
@@ -4364,10 +4573,11 @@ function apply(ctx) {
       GitTreeIcon
     )
   );
+  const handoff = createHandoff(ctx);
   ctx.slots.inject(
     "main",
     () => ctx.slots.register(
-      { name: "main", key: PANEL_ID, locale: NS, inject: () => ({ t, locale: () => activeLocale(ctx) }) },
+      { name: "main", key: PANEL_ID, locale: NS, inject: () => ({ t, locale: () => activeLocale(ctx), handoff }) },
       Workspace
     )
   );

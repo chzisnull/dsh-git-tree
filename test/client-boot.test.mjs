@@ -343,3 +343,102 @@ test('togglePanel closes only the panel it owns', () => {
   assert.deepEqual(layout.calls, ['git-tree', null])
   assert.equal(module.togglePanel(null), 'none', 'a missing layout service is not an error')
 })
+
+// ── conflict hand-off to a DSH session (0.12.0) ────────────────────────────
+//
+// The button opens a session in the repository's workspace and writes the
+// prompt into the composer. These tests pin the two things that can silently
+// break: which workspace gets picked, and what the session is asked to do.
+
+function panelProps(available) {
+  const module = evaluateBundle()
+  const { ctx, registrations } = cordisLikeContext(module.inject, available)
+  module.apply(ctx)
+  const panel = registrations.find((entry) => entry.options.name === 'main')
+  return panel.options.inject()
+}
+
+function handoffServices(items, startSession) {
+  return {
+    workspaces: { list: { getSnapshot: () => ({ items }) } },
+    uiWorkspace: { startSession },
+  }
+}
+
+test('the hand-off picks the deepest workspace that contains the repository', () => {
+  const module = evaluateBundle()
+  const cases = [
+    [{ items: [{ workspaceId: 'w1', path: '/srv/app' }] }, '/srv/app', 'w1'],
+    [{ items: [{ workspaceId: 'w1', path: '/srv/app' }] }, '/srv/app/sub/repo', 'w1'],
+    [
+      { items: [{ workspaceId: 'outer', path: '/srv' }, { workspaceId: 'inner', path: '/srv/app' }] },
+      '/srv/app/deep/repo',
+      'inner',
+    ],
+    [{ items: [{ workspaceId: 'w1', path: '/srv/app/' }] }, '/srv/app', 'w1'],
+    [{ items: [{ workspaceId: 'w1', path: '/srv/app' }] }, '/srv/application', null],
+    [{ items: [] }, '/srv/app', null],
+  ]
+  for (const [list, target, expected] of cases) {
+    const match = module.matchWorkspace(list.items, target)
+    assert.equal(match ? match.workspaceId : null, expected, target + ' → ' + expected)
+  }
+})
+
+test('the hand-off opens the workspace session with the prompt, never sending it', () => {
+  const calls = []
+  const props = panelProps(handoffServices([{ workspaceId: 'w1', path: '/srv/app' }], (id, options) => calls.push({ id, options })))
+  assert.equal(typeof props.handoff.open, 'function')
+
+  const verdict = props.handoff.open('/srv/app/repo', '解决冲突')
+  assert.equal(verdict, 'opened')
+  assert.equal(calls.length, 1)
+  assert.equal(calls[0].id, 'w1')
+  assert.deepEqual(calls[0].options, { prompt: '解决冲突', whenDraftExists: 'replace' })
+})
+
+test('the hand-off degrades instead of throwing when there is nothing to open', () => {
+  const module = evaluateBundle()
+  // Repository outside every registered workspace.
+  assert.equal(module.matchWorkspace([{ workspaceId: 'w1', path: '/srv/app' }], '/elsewhere'), null)
+
+  const opened = panelProps(handoffServices([{ workspaceId: 'w1', path: '/srv/app' }], () => {}))
+  assert.equal(opened.handoff.open('/elsewhere', 'x'), 'no-workspace')
+
+  const missing = panelProps({ workspaces: { list: { getSnapshot: () => ({ items: [] }) } } })
+  assert.equal(missing.handoff.open('/srv/app', 'x'), 'unavailable')
+
+  const throwing = panelProps(handoffServices([{ workspaceId: 'w1', path: '/srv/app' }], () => {
+    throw new Error('connect failed')
+  }))
+  assert.equal(throwing.handoff.open('/srv/app', 'x'), 'unavailable')
+})
+
+test('the prompt names the repository, file and branch, and the count only when known', () => {
+  const module = evaluateBundle()
+  const seen = []
+  const t = (key, params) => {
+    seen.push({ key, params })
+    return key + ':' + JSON.stringify(params)
+  }
+
+  const counted = module.buildConflictPrompt(
+    { repo: '/srv/app', path: 'src/lib/search.ts', branch: 'main', blocks: 2 },
+    t,
+  )
+  assert.equal(seen[0].key, 'handoffPromptHead')
+  assert.deepEqual(seen[0].params, { repo: '/srv/app', path: 'src/lib/search.ts', branch: 'main' })
+  assert.ok(seen.some((entry) => entry.key === 'handoffPromptBlocks' && entry.params.blocks === '2'))
+  assert.ok(counted.includes('src/lib/search.ts'))
+  assert.ok(counted.includes('handoffPromptBlocks'), 'the count line follows the head')
+
+  // A right-click on a file whose diff never loaded must not claim "0 blocks".
+  seen.length = 0
+  const uncounted = module.buildConflictPrompt(
+    { repo: '/srv/app', path: 'src/lib/search.ts', branch: 'main', blocks: 0 },
+    t,
+  )
+  assert.ok(!seen.some((entry) => entry.key === 'handoffPromptBlocks'), 'no count line without a count')
+  assert.ok(!uncounted.includes('handoffPromptBlocks'))
+  assert.ok(uncounted.includes('handoffPromptBody'), 'the boundary text is always there')
+})

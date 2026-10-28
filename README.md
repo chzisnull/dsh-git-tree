@@ -12,7 +12,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.11.1 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
+Version 0.12.0 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Keyboard shortcut**: `⇧⌘V` (`Ctrl+Shift+V` on Windows) opens the panel from anywhere and closes it again when it is already open. The command is registered through DSH's own shortcut service, so it is listed and rebindable in Settings → Keyboard shortcuts (`⌘/`); the keycap badge in the toolbar and the hint in the empty diff pane always show the binding you actually have. Panel-owned dialogs and the AI conflict preview hold it still, and the commit draft is kept per repository, so a stray press never drops work; when the command has no binding the empty pane points at Settings instead of showing keys.
@@ -30,7 +30,8 @@ Version 0.11.1 is the **local workbench slice**: file status, history, search an
 - **Push**: push the current branch to its upstream (setting the upstream on first push). Never forces; authentication and non-fast-forward failures are translated into readable next steps.
 - **Commit and push**: a checkbox in the commit card pushes right after a successful commit. A failed push never rolls the commit back.
 - **Foldable commit card**: the card folds to one strip — author, branch, staged count and the first line of the message — so the diff gets the space back. The Fold/Unfold pill sits at the right of the metadata row in both states; clicking the strip unfolds too, and the fold is remembered across reloads. A row action that opens the message box unfolds it first.
-- **Conflict view and AI resolution**: a conflicted file shows the working-tree copy with its `<<<<<<<` markers rendered line by line (ours tinted blue, theirs amber) instead of an empty "no differences" pane. "Resolve with AI" asks the selected DSH model to merge that one file, previews the result as a diff, and writes it only after Apply. The conflict can be restored with one action (`git checkout --merge`), and "Mark resolved" (`git add`) is a separate, deliberate step — applying never stages.
+- **Conflict view**: a conflicted file shows the working-tree copy with its `<<<<<<<` markers rendered line by line (ours tinted blue, theirs amber) instead of an empty "no differences" pane.
+- **Hand the conflict to a DSH session**: the header action `✦ Hand to AI` opens a session in the repository's own workspace and writes a ready prompt into the composer — repository, file, branch, the conflict-block count when the panel has counted it, and the boundary (edit this file only, no `git add`/`commit`/`checkout`, the human marks it resolved). Nothing is sent and nothing is written by the panel. If the repository is not a registered DSH workspace, the same prompt is copied to the clipboard and a dialog explains why. The older in-panel model merge (`git checkout`-safe preview + Apply) stays available from the conflicted file's right-click menu as `Merge with the model (preview)`; "Mark resolved" (`git add`) and "Restore conflict" (`git checkout --merge`) remain separate, deliberate actions.
 - **AI commit message**: the ✨ button in the commit card writes the message from the diff of the files that commit would include — the staged rows when there are any, otherwise every working-tree row — and the model chip picks which DSH model does it. The picker is the live DSH model catalog (every registered provider, grouped), the choice is remembered per DSH home, and the call itself goes through DSH's own `llm` service; there is no second provider configuration in this plugin. It only fills the text box: you still review and press Commit. The diff of the selected files is sent to the model you chose.
 - **Local actions**: reveal the repository in Finder or open it in Terminal (macOS).
 - **Live**: the panel polls status every 2s while visible and refetches immediately after a write.
@@ -38,7 +39,7 @@ Version 0.11.1 is the **local workbench slice**: file status, history, search an
 
 ## Status
 
-| Area | 0.11.1 |
+| Area | 0.12.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | keyboard shortcut (`⇧⌘V`) | done |
@@ -62,7 +63,9 @@ Version 0.11.1 is the **local workbench slice**: file status, history, search an
 | fetch / pull | done |
 | remote branches / remote management | not yet |
 | merge into current branch | done |
-| conflict view + AI conflict resolution | done |
+| conflict view | done |
+| hand the conflict to a DSH session | done |
+| in-panel model merge (preview → apply) | done (file context menu) |
 | rebase / stash / manual 3-way merge editor | not yet |
 | large-repo virtualisation | not planned |
 | agent-shared operations | not yet |
@@ -94,7 +97,7 @@ The ✨ button and the model chip in the commit card are one small, bounded feat
 | Half | File | What it does |
 | --- | --- | --- |
 | Host | `index.js` (plain ESM, no build) | registers two authenticated exact Fetch routes via `ctx.connection.fetch.register`, runs git through `ctx.subprocess` |
-| Client | `client.js` (built from `src/client/index.tsx`) | registers the sidebar launcher into `sidebar.panellist`, the panel into `main` (both under the id `git-tree`), and the `panel.git-tree.toggle` command with `ctx.shortcuts` |
+| Client | `client.js` (built from `src/client/index.tsx`) | registers the sidebar launcher into `sidebar.panellist`, the panel into `main` (both under the id `git-tree`), the `panel.git-tree.toggle` command with `ctx.shortcuts`, and the `✦ Hand to AI` action that opens a session in the repository's workspace with the conflict prompt pre-filled |
 
 ```
 GET  /api/git-tree/workspaces              → registered DSH workspaces + pins/open counts, ordered

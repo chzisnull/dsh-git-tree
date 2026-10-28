@@ -72,6 +72,15 @@ test('the keyboard shortcut rides the Harness shortcuts service, not a private l
   assert.ok(!source.includes('"desktop:linux"'), 'Linux rejects primary+KeyV as reserved, so it stays unbound')
 })
 
+test('the conflict view hands the file to a session instead of merging inline', () => {
+  for (const key of ['handoff', 'handoffTip', 'handoffOpening', 'handoffPromptHead', 'handoffPromptBody', 'handoffNoWorkspace', 'handoffCopy', 'close']) {
+    assert.ok(source.includes(key), 'missing locale copy: ' + key)
+  }
+  assert.ok(source.includes('uiWorkspace'), 'the hand-off opens a session through the client workspace service')
+  assert.ok(source.includes('whenDraftExists'), 'the prompt must reach the composer, not the run queue')
+  assert.ok(!source.includes('aiResolving'), 'the header no longer runs the model merge itself')
+})
+
 test('the shortcut is explained in the panel and labelled in the settings list', () => {
   for (const key of ['shortcutOpen', 'shortcutToggle', 'shortcutHintBefore', 'shortcutHintAfter']) {
     assert.ok(source.includes(key), 'missing locale copy: ' + key)

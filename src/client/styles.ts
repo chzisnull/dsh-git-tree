@@ -402,6 +402,21 @@ export const CSS = `
   background:var(--dgt-accent-soft);color:var(--dgt-accent-strong);}
 .dgt-diff-action[data-kind='ai']:disabled{opacity:.55;}
 .dgt-diff-action[data-kind='ghost']{background:transparent;color:var(--dsw-alias-label-secondary);}
+.dgt-diff-action-ai{display:inline-flex;align-items:center;gap:6px;}
+.dgt-diff-action-busy{display:inline-flex;align-items:center;gap:6px;}
+.dgt-diff-action-glyph{font-size:11px;line-height:1;color:var(--dgt-accent-strong);}
+.dgt-diff-action[data-busy='true'] .dgt-diff-action-glyph{display:none;}
+.dgt-spinner{width:11px;height:11px;border-radius:50%;border:1.5px solid currentColor;
+  border-top-color:transparent;animation:dgt-spin .7s linear infinite;opacity:.85;}
+@media (prefers-reduced-motion:reduce){.dgt-spinner{animation:none;border-top-color:currentColor;opacity:.55;}}
+
+/* session hand-off fallback: the prompt is portable, so show it to copy out */
+.dgt-dialog.dgt-handoff-dialog{box-sizing:border-box;width:min(620px,92vw);}
+.dgt-handoff-prompt{margin:2px 0 0;padding:10px 12px;max-height:34vh;overflow:auto;
+  border:1px solid var(--dgt-line);border-radius:10px;background:var(--dgt-line-soft);
+  color:var(--dsw-alias-label-secondary);font-family:var(--ds-font-family-code);font-size:11px;
+  line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;}
+.dgt-handoff-prompt:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:1px;}
 /* Resolution preview dialog */
 .dgt-dialog.dgt-conflict-dialog{box-sizing:border-box;width:min(880px,92vw);max-height:86vh;}
 .dgt-conflict-dialog-meta{display:flex;align-items:center;gap:12px;min-width:0;}

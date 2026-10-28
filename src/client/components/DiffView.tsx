@@ -138,7 +138,8 @@ export function DiffView(props: {
   onToggleFile: () => void
   conflict: {
     busy: boolean
-    onResolve: () => void
+    opening: boolean
+    onHandoff: () => void
     onRevert: () => void
     onMarkResolved: () => void
   }
@@ -178,13 +179,26 @@ export function DiffView(props: {
               'button',
               {
                 type: 'button',
-                className: 'dgt-diff-action',
+                className: 'dgt-diff-action dgt-diff-action-ai',
                 'data-kind': 'ai',
-                disabled: props.conflict.busy,
-                title: t('aiResolveTip'),
-                onClick: props.conflict.onResolve,
+                'data-busy': props.conflict.opening || undefined,
+                disabled: props.conflict.busy || props.conflict.opening,
+                title: props.conflict.opening ? t('handoffOpening') : t('handoffTip'),
+                onClick: props.conflict.onHandoff,
               },
-              props.conflict.busy ? t('aiResolving') : t('aiResolve'),
+              props.conflict.opening
+                ? h(
+                    'span',
+                    { className: 'dgt-diff-action-busy' },
+                    h('span', { className: 'dgt-spinner', 'aria-hidden': 'true' }),
+                    t('handoffOpening'),
+                  )
+                : h(
+                    'span',
+                    { className: 'dgt-diff-action-busy' },
+                    h('span', { className: 'dgt-diff-action-glyph', 'aria-hidden': 'true' }, '✦'),
+                    t('handoff'),
+                  ),
             ),
             h(
               'button',
