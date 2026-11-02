@@ -34,7 +34,8 @@ import {
 } from './history.js'
 import { COMMIT_FORMAT, isSafeCommitSha, parseCommitShow, parseNameStatus } from './commit.js'
 import { REF_ARGS, parseRefs } from './refs.js'
-import { realpathSync } from 'node:fs'
+import { lstatSync, realpathSync } from 'node:fs'
+import { isAbsolute, join } from 'node:path'
 import { openArgv } from './open.js'
 import { resolveCwd, safeRepoPath, workspaceRootOf } from './paths.js'
 import { GitError, RequestError } from './errors.js'
@@ -764,19 +765,82 @@ export async function handleDiscard(ctx, request) {
   return json({ ok: true, discarded: paths, side: staged ? 'staged' : 'unstaged' })
 }
 
-/** Remove tracked files (git rm) or untracked files (git clean) from the repo. */
+function literalUntrackedPaths(value) {
+  if (!Array.isArray(value) || value.length === 0) throw new RequestError('缺少 paths 参数')
+  if (value.length > MAX_WRITE_PATHS) {
+    throw new RequestError('一次最多操作 ' + String(MAX_WRITE_PATHS) + ' 个路径', 400, 'too-many-paths')
+  }
+  for (const path of value) {
+    if (typeof path !== 'string' || !path || path.length > 4096 || path.includes('\0') || isAbsolute(path) ||
+        (process.platform === 'win32' && path.includes('\\')) ||
+        path.split('/').some((part) => !part || part === '.' || part === '..')) {
+      throw new RequestError('path 必须是规范的文件路径')
+    }
+  }
+  return value
+}
+
+/** Delete only exact, currently untracked files; never interpret names as pathspecs. */
+async function removeUntracked(subprocess, cwd, paths, signal) {
+  const uniquePaths = [...new Set(paths)]
+  const listed = await git(
+    subprocess,
+    ['--literal-pathspecs', 'ls-files', '--others', '--exclude-standard', '-z', '--', ...uniquePaths],
+    cwd,
+    { maxBytes: MAX_STATUS_BYTES, signal },
+  )
+  const untracked = new Set(listed.split('\0').filter(Boolean))
+  const removed = []
+  const failed = []
+  for (const path of uniquePaths) {
+    if (!untracked.has(path)) {
+      failed.push({ path, code: 'not-untracked', error: '文件不存在、已被跟踪或被忽略' })
+      continue
+    }
+    try {
+      // Refuse directory targets and symlinked parents. Git clean rechecks the
+      // index and ignore rules, which also protects a file staged after listing.
+      const parts = path.split('/')
+      let target = cwd
+      for (let i = 0; i < parts.length; i += 1) {
+        target = join(target, parts[i])
+        const stat = lstatSync(target)
+        if (i < parts.length - 1 ? !stat.isDirectory() : !(stat.isFile() || stat.isSymbolicLink())) {
+          throw new RequestError('只能删除未跟踪的文件或符号链接', 400, 'not-file')
+        }
+      }
+      await git(subprocess, ['--literal-pathspecs', 'clean', '-f', '--', path], cwd, {
+        maxBytes: 256 * 1024,
+        signal,
+      })
+      try {
+        lstatSync(target)
+        throw new RequestError('文件未被删除', 409, 'not-removed')
+      } catch (error) {
+        if (error?.code !== 'ENOENT') throw error
+      }
+      removed.push(path)
+    } catch (error) {
+      failed.push({
+        path,
+        code: typeof error?.code === 'string' ? error.code : 'remove-failed',
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
+  }
+  return json({ ok: failed.length === 0, removed, failed, untracked: true })
+}
+
+/** Remove tracked files (git rm) or exact untracked files from the repo. */
 export async function handleRemove(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
   const body = await readJsonBody(request)
-  const paths = safePathList(body.paths)
   const untracked = body.untracked === true
+  const paths = untracked ? literalUntrackedPaths(body.paths) : safePathList(body.paths)
   const subprocess = subprocessOf(ctx)
 
-  if (untracked) {
-    await git(subprocess, ['clean', '-f', '--', ...paths], cwd, { maxBytes: 256 * 1024 })
-  } else {
-    await git(subprocess, ['rm', '-f', '--quiet', '--', ...paths], cwd, { maxBytes: 256 * 1024 })
-  }
+  if (untracked) return removeUntracked(subprocess, cwd, paths, request.signal)
+  await git(subprocess, ['rm', '-f', '--quiet', '--', ...paths], cwd, { maxBytes: 256 * 1024 })
   return json({ ok: true, removed: paths, untracked })
 }
 

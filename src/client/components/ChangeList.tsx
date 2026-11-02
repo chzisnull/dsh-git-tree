@@ -10,6 +10,8 @@ function Rows(props: {
   rows: GitFileEntry[]
   side: EntrySide
   activeKey: string
+  batchSelected: Set<string>
+  onBatchSelect: (path: string) => void
   t: Translate
   onSelect: (entry: GitFileEntry, side: EntrySide) => void
   onToggle: (entry: GitFileEntry, side: EntrySide) => void
@@ -22,6 +24,8 @@ function Rows(props: {
       entry,
       side: props.side,
       active: props.activeKey === props.side + '\u0000' + entry.path,
+      batchSelected: props.batchSelected.has(entry.path),
+      onBatchSelect: props.onBatchSelect,
       t: props.t,
       onSelect: props.onSelect,
       onToggle: props.onToggle,
@@ -38,6 +42,8 @@ function Region(props: {
   rows: GitFileEntry[]
   side: EntrySide
   activeKey: string
+  batchSelected: Set<string>
+  onBatchSelect: (path: string) => void
   t: Translate
   onSelect: (entry: GitFileEntry, side: EntrySide) => void
   onToggle: (entry: GitFileEntry, side: EntrySide) => void
@@ -62,6 +68,8 @@ function Region(props: {
             rows: props.rows,
             side: props.side,
             activeKey: props.activeKey,
+            batchSelected: props.batchSelected,
+            onBatchSelect: props.onBatchSelect,
             t: props.t,
             onSelect: props.onSelect,
             onToggle: props.onToggle,
@@ -77,6 +85,11 @@ export function ChangeList(props: {
   statusError: string
   rows: { staged: GitFileEntry[]; unstaged: GitFileEntry[]; conflicted: GitFileEntry[] }
   selectedKey: string
+  batchSelected: Set<string>
+  onBatchSelect: (path: string) => void
+  onBatchSelectAll: () => void
+  onBatchClear: () => void
+  onBatchRemove: () => void
   t: Translate
   onSelect: (entry: GitFileEntry, side: EntrySide) => void
   onToggle: (entry: GitFileEntry, side: EntrySide) => void
@@ -85,9 +98,13 @@ export function ChangeList(props: {
 }): any {
   const { status, statusError, rows, t } = props
   const total = (status?.entries ?? []).length
+  const untrackedCount = rows.unstaged.filter((entry) => entry.kind === 'untracked').length
+  const allSelected = untrackedCount > 0 && props.batchSelected.size === untrackedCount
   const empty = rows.staged.length === 0 && rows.unstaged.length === 0 && rows.conflicted.length === 0
   const shared = {
     activeKey: props.selectedKey,
+    batchSelected: props.batchSelected,
+    onBatchSelect: props.onBatchSelect,
     t,
     onSelect: props.onSelect,
     onToggle: props.onToggle,
@@ -105,6 +122,16 @@ export function ChangeList(props: {
       h('span', { className: 'dgt-list-sort' }, t('sortByPath')),
       h('span', { className: 'dgt-group-count' }, String(total) + ' ' + t('itemsUnit')),
     ),
+    untrackedCount > 0
+      ? h('div', { className: 'dgt-batch-bar' },
+          h('button', { type: 'button', onClick: allSelected ? props.onBatchClear : props.onBatchSelectAll },
+            allSelected ? t('clearSelection') : t('selectAllUntracked')),
+          h('span', { className: 'dgt-batch-count', role: 'status' }, String(props.batchSelected.size) + ' ' + t('selectedCount')),
+          props.batchSelected.size > 0 && !allSelected
+            ? h('button', { type: 'button', onClick: props.onBatchClear }, t('clearSelection')) : null,
+          h('button', { type: 'button', 'data-danger': true, disabled: props.batchSelected.size === 0, onClick: props.onBatchRemove }, t('deleteSelected')),
+        )
+      : null,
     status === null && statusError === ''
       ? h('div', { className: 'dgt-placeholder' }, t('loading'))
       : empty

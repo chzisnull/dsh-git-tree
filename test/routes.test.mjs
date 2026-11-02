@@ -4,7 +4,8 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { apply, inject, name } from '../index.js'
@@ -673,21 +674,105 @@ test('discard restores the work tree or both sides with a fixed argv', async () 
   assert.deepEqual(restore2.argv.slice(1), ['restore', '--staged', '--worktree', '--', 'src/app.js'])
 })
 
-test('remove deletes tracked files with git rm and untracked with git clean', async () => {
+test('remove deletes tracked files with git rm', async () => {
   const ctx = fakeContext()
   apply(ctx)
   await call(ctx, '/api/git-tree/remove', { method: 'POST', body: { paths: ['old.md'] } })
   const rm = ctx.spawns.find((spawn) => spawn.argv[1] === 'rm')
   assert.deepEqual(rm.argv.slice(1), ['rm', '-f', '--quiet', '--', 'old.md'])
+})
 
-  const untracked = fakeContext()
-  apply(untracked)
-  await call(untracked, '/api/git-tree/remove', {
+test('untracked removal uses exact literal paths and reports partial failures in a real repository', async (t) => {
+  if (process.platform === 'win32' || spawnSync('git', ['--version']).status !== 0) {
+    t.skip('requires git and POSIX filename semantics')
+    return
+  }
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'dgt-remove-')))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const runGit = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' })
+  runGit('init', '-q')
+  writeFileSync(join(root, '.gitignore'), 'ignored.txt\n')
+  writeFileSync(join(root, 'tracked.txt'), 'tracked')
+  runGit('add', '.gitignore', 'tracked.txt')
+  for (const path of ['a*.txt', 'abc.txt', ':(glob)*.txt', 'ignored.txt', 'selected.txt', '名字\n.txt', '-dash', '~tilde', 'back\\slash']) {
+    writeFileSync(join(root, path), path)
+  }
+  mkdirSync(join(root, 'folder'))
+  writeFileSync(join(root, 'folder', 'child.txt'), 'child')
+  symlinkSync('folder', join(root, 'link'))
+  const ctx = fakeContext({ workspaceRoot: root, registry: () => [] })
+  const subprocess = ctx.get('subprocess')
+  subprocess.resolveExecutable = async () => 'git'
+  subprocess.spawn = ({ argv, cwd }) => {
+    ctx.spawns.push({ argv, cwd })
+    const result = spawnSync(argv[0], argv.slice(1), { cwd, encoding: 'utf8' })
+    return {
+      done: Promise.resolve({ exitCode: result.status, signal: result.signal }),
+      collected: {
+        stdout: { readFrom: () => ({ text: result.stdout || '', lossy: false }) },
+        stderr: { readFrom: () => ({ text: result.stderr || '', lossy: false }) },
+      },
+    }
+  }
+  apply(ctx)
+  const paths = ['a*.txt', ':(glob)*.txt', 'selected.txt', '名字\n.txt', '-dash', '~tilde', 'back\\slash', 'tracked.txt', 'ignored.txt', 'folder', 'missing.txt', 'link/child.txt']
+  const { response, body } = await call(ctx, '/api/git-tree/remove', { method: 'POST', body: { paths, untracked: true } })
+  assert.equal(response.status, 200)
+  assert.equal(body.ok, false)
+  assert.deepEqual(body.removed, paths.slice(0, 7))
+  assert.deepEqual(body.failed.map((item) => item.path), paths.slice(7))
+  for (const path of paths.slice(0, 7)) assert.equal(existsSync(join(root, path)), false, path)
+  for (const path of ['abc.txt', 'tracked.txt', 'ignored.txt', 'folder/child.txt']) {
+    assert.equal(existsSync(join(root, path)), true, path)
+  }
+  assert.ok(ctx.spawns.every(({ argv }) => argv[1] === '--literal-pathspecs'))
+
+  for (const path of ['fails.txt', 'staged-later.txt', 'last.txt']) writeFileSync(join(root, path), path)
+  const realSpawn = subprocess.spawn
+  subprocess.spawn = (options) => {
+    if (options.argv.includes('clean') && options.argv.includes('fails.txt')) {
+      return {
+        done: Promise.resolve({ exitCode: 1 }),
+        collected: {
+          stdout: { readFrom: () => ({ text: '', lossy: false }) },
+          stderr: { readFrom: () => ({ text: 'permission denied', lossy: false }) },
+        },
+      }
+    }
+    if (options.argv.includes('clean') && options.argv.includes('staged-later.txt')) runGit('add', 'staged-later.txt')
+    return realSpawn(options)
+  }
+  const partial = await call(ctx, '/api/git-tree/remove', {
     method: 'POST',
-    body: { paths: ['scratch.txt'], untracked: true },
+    body: { paths: ['fails.txt', 'staged-later.txt', 'last.txt', 'last.txt'], untracked: true },
   })
-  const clean = untracked.spawns.find((spawn) => spawn.argv[1] === 'clean')
-  assert.deepEqual(clean.argv.slice(1), ['clean', '-f', '--', 'scratch.txt'])
+  assert.equal(partial.body.ok, false)
+  assert.deepEqual(partial.body.removed, ['last.txt'])
+  assert.deepEqual(partial.body.failed.map(({ path, code }) => [path, code]), [
+    ['fails.txt', 'git-failed'],
+    ['staged-later.txt', 'not-removed'],
+  ])
+  assert.equal(existsSync(join(root, 'fails.txt')), true)
+  assert.equal(existsSync(join(root, 'staged-later.txt')), true)
+  assert.equal(existsSync(join(root, 'last.txt')), false)
+
+  const allRemoved = await call(ctx, '/api/git-tree/remove', {
+    method: 'POST',
+    body: { paths: ['abc.txt', 'link'], untracked: true },
+  })
+  assert.deepEqual(allRemoved.body, { ok: true, removed: ['abc.txt', 'link'], failed: [], untracked: true })
+  assert.equal(existsSync(join(root, 'folder', 'child.txt')), true)
+})
+
+test('untracked removal validates the entire input before running git', async () => {
+  const ctx = fakeContext()
+  apply(ctx)
+  for (const paths of [[], ['ok', '../escape'], ['ok', '.'], ['ok', 'a//b'], ['ok', 'a/./b'], ['ok', 3], Array(501).fill('x')]) {
+    const { response, body } = await call(ctx, '/api/git-tree/remove', { method: 'POST', body: { paths, untracked: true } })
+    assert.equal(response.status, 400, JSON.stringify(paths))
+    assert.equal(body.ok, false)
+  }
+  assert.equal(ctx.spawns.length, 0)
 })
 
 test('discard and remove refuse unsafe paths before spawning git', async () => {

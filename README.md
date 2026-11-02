@@ -21,6 +21,7 @@ Version 0.13.1 is the **local workbench slice**: file status, history, search an
 - **Sourcetree's change model**: conflict, staged and unstaged groups with counts; renames keep their original path; a file changed on both sides appears in both groups (driven by `git status --porcelain=v2 --branch -z`).
 - **Structured diff**: parsed on the host into files → hunks → lines, rendered with dual line numbers, hunk headers, whole-row tints and `+N −M`.
 - **Stage / unstage / commit**: per-row checkbox, hover menu, file-level action in the diff header, a commit box with author, branch, staged count and ⌘↵ — plus a `--`-guarded, conflict-checked host route for each write.
+- **Delete untracked files in bulk**: select individual files or all shown using the separate selection controls, then confirm Delete selected. Git cannot recover files deleted this way.
 - **History view**: commits newest-first with a lane graph, description / short SHA / author / date columns, an "all branches / current branch only" switch and paged loading (200 per page).
 - **Commit detail**: select a commit to see its message, author, date, parents, refs and changed files; pick a file for its in-commit diff; follow a parent link to jump.
 - **Search view**: find commits by message, author or file path; results reuse the history list and detail.
@@ -128,7 +129,7 @@ POST /api/git-tree/discard                 → { paths[], side } → git restore
 POST /api/git-tree/remove                  → { paths[], untracked } → git rm / git clean
 ```
 
-Git runs without a shell, with `GIT_TERMINAL_PROMPT=0` (never blocks on credentials), `GIT_OPTIONAL_LOCKS=0` (never takes optional locks in your repo), `GIT_CONFIG_COUNT=0` and bounded output and time. A path that is absolute, contains `..`, or starts with `-` is refused before it reaches `argv`, and a `cwd` outside the workspace is refused with 403.
+Git runs without a shell, with `GIT_TERMINAL_PROMPT=0` (never blocks on credentials), `GIT_OPTIONAL_LOCKS=0` (never takes optional locks in your repo), `GIT_CONFIG_COUNT=0` and bounded output and time. Absolute paths and paths containing `..` are refused before they reach `argv`; untracked-file removal uses literal paths and permits filenames beginning with `-`. A `cwd` outside the workspace is refused with 403.
 
 The host mechanism is documented against the installed build in [`docs/dsh-plugin-api.md`](docs/dsh-plugin-api.md) — slot ids, the Fetch-route channel, subprocess safety and theme tokens, all with `file:line` citations into `app.asar`.
 
@@ -164,7 +165,7 @@ npm test           # 78 assertions: manifest, host routes, parsers, client boot,
 
 `build.mjs` resolves esbuild from this package's `node_modules`, then from an installed `dsh-workbench`; if neither is present it stops with the exact command to fix that (`npm i -D esbuild`).
 
-The test suite needs no DSH, no git and no browser:
+The test suite needs no DSH or browser. Most tests need no git; the real-repository deletion test runs when git and POSIX filename semantics are available, and is skipped otherwise:
 
 - `test/manifest.test.mjs` — what the loader validates (platform, exports, patch row, icon, locales).
 - `test/routes.test.mjs` — `apply()` against a fake context: all seven routes, the real change model, workspace switching, `--` before paths, traversal/absolute/option-shaped paths refused, commit pre-checks.

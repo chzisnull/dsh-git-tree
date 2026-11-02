@@ -21,6 +21,7 @@
 - **Sourcetree 的改动模型**：冲突 / 已暂存 / 未暂存三组带计数；重命名保留原路径；同一文件两侧都有改动时两栏各出现一次（数据来自 `git status --porcelain=v2 --branch -z`）。
 - **结构化 diff**：宿主解析成 files → hunks → lines，渲染双行号、hunk 头、整行底色与 `+N −M`。
 - **暂存 / 取消暂存 / 提交**：行内复选框、悬停菜单、diff 头部文件级动作，底部提交区（作者、分支、暂存数、⌘↵）。
+- **批量删除未跟踪文件**：用行内独立选择框或「全选当前列表」选中文件，再点「删除所选」并确认；删除后无法通过 Git 恢复。
 - **历史视图**：提交泳道图 + 描述 / 短 SHA / 作者 / 日期，「所有分支 / 仅当前分支」过滤，每页 200 条分页加载。
 - **提交详情**：选中提交看信息、作者、日期、父级、refs 与变更文件；点文件看该提交内 diff；父级链接可跳转。
 - **搜索视图**：按提交信息 / 作者 / 文件路径搜提交，结果复用历史列表与详情。
@@ -126,7 +127,7 @@ POST /api/git-tree/discard             → { paths[], side } → git restore
 POST /api/git-tree/remove              → { paths[], untracked } → git rm / git clean
 ```
 
-git 不走 shell；子进程环境带 `GIT_TERMINAL_PROMPT=0`（永不卡在认证）、`GIT_OPTIONAL_LOCKS=0`（不在你的仓库里拿可选锁）、`GIT_CONFIG_COUNT=0`，输出与耗时都有上限。绝对路径、含 `..`、以 `-` 开头的路径在进入 `argv` 之前就被拒绝；工作区之外的 `cwd` 一律 403。
+git 不走 shell；子进程环境带 `GIT_TERMINAL_PROMPT=0`（永不卡在认证）、`GIT_OPTIONAL_LOCKS=0`（不在你的仓库里拿可选锁）、`GIT_CONFIG_COUNT=0`，输出与耗时都有上限。绝对路径和含 `..` 的路径在进入 `argv` 之前被拒绝；未跟踪文件删除使用字面路径，允许以 `-` 开头的文件名。工作区之外的 `cwd` 一律 403。
 
 宿主机制的取证（slot id、Fetch 路由通道、subprocess 安全、主题 token）都在 [`docs/dsh-plugin-api.md`](docs/dsh-plugin-api.md)，每条都带 `app.asar` 内的 `file:line` 引用。
 
@@ -162,7 +163,7 @@ npm test           # 78 条断言：清单、宿主路由、解析器、客户�
 
 `build.mjs` 先找本包的 `node_modules` 里的 esbuild，再找已安装的 `dsh-workbench`；都没有就停下并打印修复命令（`npm i -D esbuild`）。
 
-测试不需要 DSH、不需要 git、不需要浏览器：
+测试不需要 DSH 或浏览器；大部分测试不需要 git。真实仓库删除测试在支持 POSIX 文件名且安装 git 时运行，否则跳过：
 
 - `test/manifest.test.mjs` —— 加载器会校验的东西（platform、exports、patch 行、图标、语言包）。
 - `test/routes.test.mjs` —— 用假 context 跑 `apply()`：七条路由、真实改动模型、仓库切换、路径前有 `--`、穿越/绝对/选项形路径被拒、提交前检查。

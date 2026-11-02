@@ -21,6 +21,11 @@ export function StatusView(props: {
   rows: { staged: GitFileEntry[]; unstaged: GitFileEntry[]; conflicted: GitFileEntry[] }
   entries: GitFileEntry[]
   selectedKey: string
+  batchSelected: Set<string>
+  onBatchSelect: (path: string) => void
+  onBatchSelectAll: () => void
+  onBatchClear: () => void
+  onBatchRemove: () => void
   diffSelection: { entry: GitFileEntry; side: EntrySide } | null
   diff: DiffPayload | null
   diffLoading: boolean
@@ -62,6 +67,11 @@ export function StatusView(props: {
         statusError: props.statusError,
         rows: props.rows,
         selectedKey: props.selectedKey,
+        batchSelected: props.batchSelected,
+        onBatchSelect: props.onBatchSelect,
+        onBatchSelectAll: props.onBatchSelectAll,
+        onBatchClear: props.onBatchClear,
+        onBatchRemove: props.onBatchRemove,
         t,
         onSelect: props.onSelect,
         onToggle: props.onToggle,

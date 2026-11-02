@@ -146,6 +146,15 @@ var EN = {
   commitShortcut: "\u2318\u21B5 to commit",
   changes: "Changes",
   pendingFiles: "Pending files",
+  selectUntracked: "Select for deletion",
+  selectAllUntracked: "Select all shown",
+  clearSelection: "Clear",
+  selectedCount: "selected",
+  deleteSelected: "Delete selected",
+  batchRemoveTitle: "Delete untracked files",
+  batchRemoveBody: "untracked files will be deleted from disk and cannot be recovered with Git.",
+  batchRemoveDone: "Files deleted",
+  batchRemoveFailed: "Some files could not be deleted",
   sortByPath: "sorted by path",
   history: "History",
   search: "Search",
@@ -363,6 +372,15 @@ var ZH = {
   commitShortcut: "\u2318\u21B5 \u63D0\u4EA4",
   changes: "\u6539\u52A8",
   pendingFiles: "\u5F85\u5B9A\u7684\u6587\u4EF6",
+  selectUntracked: "\u9009\u62E9\u8981\u5220\u9664\u7684\u6587\u4EF6",
+  selectAllUntracked: "\u5168\u9009\u5F53\u524D\u5217\u8868",
+  clearSelection: "\u6E05\u7A7A\u9009\u62E9",
+  selectedCount: "\u4E2A\u5DF2\u9009",
+  deleteSelected: "\u5220\u9664\u6240\u9009",
+  batchRemoveTitle: "\u5220\u9664\u672A\u8DDF\u8E2A\u6587\u4EF6",
+  batchRemoveBody: "\u4E2A\u672A\u8DDF\u8E2A\u6587\u4EF6\u5C06\u4ECE\u78C1\u76D8\u5220\u9664\uFF0C\u4E14\u65E0\u6CD5\u901A\u8FC7 Git \u6062\u590D\u3002",
+  batchRemoveDone: "\u5DF2\u5220\u9664\u6587\u4EF6",
+  batchRemoveFailed: "\u90E8\u5206\u6587\u4EF6\u672A\u80FD\u5220\u9664",
   sortByPath: "\u5DF2\u4F9D\u7167\u8DEF\u5F84\u6392\u5E8F",
   history: "\u5386\u53F2",
   search: "\u641C\u7D22",
@@ -646,6 +664,12 @@ var CSS = `
 .dgt-group{display:flex;align-items:center;justify-content:space-between;height:28px;padding:0 8px;
   color:var(--dsw-alias-label-tertiary);font-size:10.5px;}
 .dgt-group[data-tone='error']{color:var(--dgt-err);}
+.dgt-batch-bar{display:flex;align-items:center;gap:8px;min-height:28px;padding:0 8px;color:var(--dsw-alias-label-secondary);font-size:10.5px;}
+.dgt-batch-bar button{appearance:none;border:0;background:transparent;padding:2px;color:var(--dgt-accent-strong);font:inherit;cursor:pointer;white-space:nowrap;}
+.dgt-batch-bar button:disabled{opacity:.5;cursor:default;}
+.dgt-batch-bar button[data-danger]{color:var(--dgt-err);}
+.dgt-batch-count{margin-left:auto;white-space:nowrap;}
+.dgt-batch-placeholder{flex:0 0 14px;width:14px;}
 .dgt-row{position:relative;box-sizing:border-box;display:flex;align-items:center;gap:9px;width:100%;height:34px;
   padding:0 9px;border:0;border-radius:9px;background:transparent;color:var(--dsw-alias-label-primary);
   font:inherit;font-size:12.5px;text-align:left;cursor:default;}
@@ -1003,7 +1027,7 @@ var CSS = `
 .dgt-dialog-input{height:30px;padding:0 9px;border:1px solid var(--dgt-line);border-radius:8px;
   background:var(--dgt-page);color:var(--dsw-alias-label-primary);font:inherit;font-size:12.5px;}
 .dgt-dialog-input:focus{outline:none;border-color:var(--dgt-accent);}
-.dgt-dialog-error{font-size:11px;color:var(--dgt-err);}
+.dgt-dialog-error{font-size:11px;color:var(--dgt-err);max-height:35vh;overflow:auto;overflow-wrap:anywhere;}
 .dgt-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:5px;}
 .dgt-danger{background:var(--dgt-err);color:var(--dsw-alias-label-primary-inverted);box-shadow:none;}
 .dgt-toast{position:absolute;right:20px;bottom:132px;z-index:70;max-width:60%;padding:8px 12px;
@@ -2002,6 +2026,16 @@ function FileRow(props) {
         }
       }
     },
+    side === "unstaged" && entry.kind === "untracked" ? h("input", {
+      type: "checkbox",
+      className: "dgt-check dgt-batch-check",
+      checked: props.batchSelected,
+      "aria-label": t("selectUntracked") + ": " + entry.path,
+      title: t("selectUntracked"),
+      onClick: (event) => event.stopPropagation(),
+      onKeyDown: (event) => event.stopPropagation(),
+      onChange: () => props.onBatchSelect(entry.path)
+    }) : side === "unstaged" ? h("span", { className: "dgt-batch-placeholder", "aria-hidden": true }) : null,
     h("input", {
       type: "checkbox",
       className: "dgt-check",
@@ -2042,6 +2076,8 @@ function Rows(props) {
       entry,
       side: props.side,
       active: props.activeKey === props.side + "\0" + entry.path,
+      batchSelected: props.batchSelected.has(entry.path),
+      onBatchSelect: props.onBatchSelect,
       t: props.t,
       onSelect: props.onSelect,
       onToggle: props.onToggle,
@@ -2067,6 +2103,8 @@ function Region(props) {
         rows: props.rows,
         side: props.side,
         activeKey: props.activeKey,
+        batchSelected: props.batchSelected,
+        onBatchSelect: props.onBatchSelect,
         t: props.t,
         onSelect: props.onSelect,
         onToggle: props.onToggle,
@@ -2079,9 +2117,13 @@ function Region(props) {
 function ChangeList(props) {
   const { status, statusError, rows, t } = props;
   const total = (status?.entries ?? []).length;
+  const untrackedCount = rows.unstaged.filter((entry) => entry.kind === "untracked").length;
+  const allSelected = untrackedCount > 0 && props.batchSelected.size === untrackedCount;
   const empty = rows.staged.length === 0 && rows.unstaged.length === 0 && rows.conflicted.length === 0;
   const shared = {
     activeKey: props.selectedKey,
+    batchSelected: props.batchSelected,
+    onBatchSelect: props.onBatchSelect,
     t,
     onSelect: props.onSelect,
     onToggle: props.onToggle,
@@ -2098,6 +2140,18 @@ function ChangeList(props) {
       h("span", { className: "dgt-list-sort" }, t("sortByPath")),
       h("span", { className: "dgt-group-count" }, String(total) + " " + t("itemsUnit"))
     ),
+    untrackedCount > 0 ? h(
+      "div",
+      { className: "dgt-batch-bar" },
+      h(
+        "button",
+        { type: "button", onClick: allSelected ? props.onBatchClear : props.onBatchSelectAll },
+        allSelected ? t("clearSelection") : t("selectAllUntracked")
+      ),
+      h("span", { className: "dgt-batch-count", role: "status" }, String(props.batchSelected.size) + " " + t("selectedCount")),
+      props.batchSelected.size > 0 && !allSelected ? h("button", { type: "button", onClick: props.onBatchClear }, t("clearSelection")) : null,
+      h("button", { type: "button", "data-danger": true, disabled: props.batchSelected.size === 0, onClick: props.onBatchRemove }, t("deleteSelected"))
+    ) : null,
     status === null && statusError === "" ? h("div", { className: "dgt-placeholder" }, t("loading")) : empty ? h(
       "div",
       { className: "dgt-empty" },
@@ -2564,6 +2618,11 @@ function StatusView(props) {
         statusError: props.statusError,
         rows: props.rows,
         selectedKey: props.selectedKey,
+        batchSelected: props.batchSelected,
+        onBatchSelect: props.onBatchSelect,
+        onBatchSelectAll: props.onBatchSelectAll,
+        onBatchClear: props.onBatchClear,
+        onBatchRemove: props.onBatchRemove,
         t,
         onSelect: props.onSelect,
         onToggle: props.onToggle,
@@ -3340,6 +3399,7 @@ function Workspace(props) {
   const [dialogError, setDialogError] = React.useState("");
   const [statusError, setStatusError] = React.useState("");
   const [selected, setSelected] = React.useState(null);
+  const [batchSelected, setBatchSelected] = React.useState(() => /* @__PURE__ */ new Set());
   const [diff, setDiff] = React.useState(null);
   const [diffLoading, setDiffLoading] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
@@ -3352,6 +3412,7 @@ function Workspace(props) {
   const [toast, setToast] = React.useState("");
   const [notice, setNotice] = React.useState("");
   const busyRef = React.useRef(false);
+  const repoGeneration = React.useRef(0);
   const wakePollRef = React.useRef(null);
   const handoffTimer = React.useRef(null);
   const commitInput = React.useRef(null);
@@ -3394,11 +3455,15 @@ function Workspace(props) {
     if (!overlayOpen) return void 0;
     return holdShortcut();
   }, [overlayOpen]);
+  const statusGeneration = repoGeneration.current;
   const loadStatus = React.useCallback(
     async (options) => {
+      const generation = statusGeneration;
+      if (generation !== repoGeneration.current) return null;
       if (!options?.silent) setRefreshing(true);
       try {
         const next = await fetchStatus(repoPath || void 0);
+        if (generation !== repoGeneration.current) return null;
         if (next.ok) {
           setStatus(next);
           setStatusError("");
@@ -3408,14 +3473,15 @@ function Workspace(props) {
         }
         return next;
       } catch (error) {
+        if (generation !== repoGeneration.current) return null;
         setStatus(null);
         setStatusError(error instanceof Error ? error.message : String(error));
         return null;
       } finally {
-        if (!options?.silent) setRefreshing(false);
+        if (!options?.silent && generation === repoGeneration.current) setRefreshing(false);
       }
     },
-    [repoPath, t]
+    [repoPath, statusGeneration, t]
   );
   const loadRefs = React.useCallback(async (branch) => {
     try {
@@ -3746,11 +3812,20 @@ function Workspace(props) {
   }, []);
   React.useEffect(() => {
     let cancelled = false;
+    const generation = repoGeneration.current;
     void (async () => {
       const list = await loadWorkspaces();
-      if (cancelled) return;
+      if (cancelled || generation !== repoGeneration.current) return;
       const saved = typeof localStorage !== "undefined" ? localStorage.getItem(REPO_KEY) : null;
-      if (saved && list.some((workspace) => workspace.path === saved)) setRepoPath(saved);
+      if (saved && list.some((workspace) => workspace.path === saved)) {
+        repoGeneration.current += 1;
+        setStatus(null);
+        setBatchSelected(/* @__PURE__ */ new Set());
+        setDialog(null);
+        setSelected(null);
+        setDiff(null);
+        setRepoPath(saved);
+      }
     })();
     return () => {
       cancelled = true;
@@ -3814,12 +3889,14 @@ function Workspace(props) {
         setActionError(t("conflictsBlockCommit"));
         return;
       }
+      const generation = statusGeneration;
       setBusy(true);
       setActionError("");
       try {
         const result = side === "staged" ? await unstagePaths([entry.path], repoPath || void 0) : await stagePaths([entry.path], repoPath || void 0);
         if (!result.ok) throw new Error(result.error || (side === "staged" ? t("unstageFailed") : t("stageFailed")));
         const next = await fetchStatus(repoPath || void 0);
+        if (generation !== repoGeneration.current) return;
         if (next.ok) setStatus(next);
         if (selected?.path === entry.path && next.ok) {
           const updated = findEntry(next, entry.path);
@@ -3831,7 +3908,7 @@ function Workspace(props) {
         setBusy(false);
       }
     },
-    [openDiff, repoPath, selected, t]
+    [openDiff, repoPath, selected, statusGeneration, t]
   );
   const copyPath = React.useCallback(
     (entry) => {
@@ -3912,7 +3989,7 @@ function Workspace(props) {
     setDialogError("");
     try {
       const result = await removePaths([path], untracked, repoPath || void 0);
-      if (!result.ok) throw new Error(result.error || t("branchActionFailed"));
+      if (!result.ok) throw new Error(result.error || result.failed?.[0]?.error || t("branchActionFailed"));
       closeDialog();
       showToast(t("removeDone") + " \xB7 " + path);
       setSelected(null);
@@ -3924,6 +4001,53 @@ function Workspace(props) {
       setDialogBusy(false);
     }
   }, [closeDialog, dialog?.kind, dialog?.path, loadStatus, repoPath, showToast, t]);
+  const submitBatchRemove = React.useCallback(async () => {
+    const paths = dialog?.paths ?? [];
+    if (paths.length === 0 || dialog?.generation !== repoGeneration.current || statusGeneration !== repoGeneration.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setDialogBusy(true);
+    setDialogError("");
+    let remaining = paths.slice();
+    const failures = [];
+    const retryPaths = [];
+    let removedCount = 0;
+    try {
+      while (remaining.length > 0) {
+        if (statusGeneration !== repoGeneration.current) return;
+        const chunk = remaining.slice(0, 500);
+        const result = await removePaths(chunk, true, repoPath || void 0);
+        if (statusGeneration !== repoGeneration.current) return;
+        if (!result.ok && !result.failed) throw new Error(result.error || t("batchRemoveFailed"));
+        removedCount += (result.removed ?? []).length;
+        failures.push(...(result.failed ?? []).map((item) => item.path + (item.error ? " \u2014 " + item.error : "")));
+        const failedPaths = (result.failed ?? []).map((item) => item.path);
+        remaining = remaining.slice(chunk.length);
+        if (failedPaths.length) {
+          retryPaths.push(...failedPaths);
+        }
+      }
+      if (failures.length) throw new Error(t("batchRemoveFailed") + ": " + failures.join("; "));
+      closeDialog();
+      setBatchSelected(/* @__PURE__ */ new Set());
+      showToast(t("batchRemoveDone") + " \xB7 " + String(removedCount));
+      if (selected && paths.includes(selected.path)) {
+        setSelected(null);
+        setDiff(null);
+      }
+    } catch (error) {
+      if (statusGeneration !== repoGeneration.current) return;
+      const pending = [...retryPaths, ...remaining];
+      setDialog((current) => current?.kind === "remove-untracked-batch" ? { ...current, paths: pending } : current);
+      setBatchSelected(new Set(pending));
+      setDialogError((removedCount ? t("batchRemoveDone") + ": " + removedCount + ". " : "") + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      await loadStatus();
+      busyRef.current = false;
+      setBusy(false);
+      setDialogBusy(false);
+    }
+  }, [closeDialog, dialog?.generation, dialog?.paths, loadStatus, repoPath, selected, showToast, statusGeneration, t]);
   const submitPush = React.useCallback(async () => {
     setDialogBusy(true);
     setDialogError("");
@@ -4151,13 +4275,16 @@ function Workspace(props) {
   }, [copyText, handoffDialog, t]);
   const refreshAfterConflict = React.useCallback(
     async (path) => {
+      const generation = statusGeneration;
+      if (generation !== repoGeneration.current) return;
       await loadStatus({ silent: true });
       const next = await fetchStatus(repoPath || void 0);
+      if (generation !== repoGeneration.current) return;
       if (next.ok) setStatus(next);
       const updated = next.ok ? findEntry(next, path) : null;
       if (updated) await openDiff(updated, "conflicted");
     },
-    [openDiff, repoPath, loadStatus]
+    [openDiff, repoPath, loadStatus, statusGeneration]
   );
   const applyConflictResolution = React.useCallback(async () => {
     const pending = conflictResolve;
@@ -4299,7 +4426,12 @@ function Workspace(props) {
   const switchWorkspace = React.useCallback(
     (path) => {
       if (path === repoPath) return;
+      repoGeneration.current += 1;
+      setStatus(null);
+      setStatusError("");
+      setDialog(null);
       setRepoPath(path);
+      setBatchSelected(/* @__PURE__ */ new Set());
       try {
         if (typeof localStorage !== "undefined") localStorage.setItem(REPO_KEY, path);
       } catch {
@@ -4330,6 +4462,14 @@ function Workspace(props) {
     },
     [loadWorkspaces, showToast, t]
   );
+  React.useEffect(() => {
+    if (!status) return;
+    const eligible = new Set((status.entries ?? []).filter((entry) => entry.kind === "untracked").map((entry) => entry.path));
+    setBatchSelected((current) => {
+      const next = new Set([...current].filter((path) => eligible.has(path)));
+      return next.size === current.size ? current : next;
+    });
+  }, [status]);
   const entries = status?.entries ?? [];
   const rows = splitEntries(entries);
   const selectedKey = selected ? rowKey(selected.path, selected.side) : "";
@@ -4412,6 +4552,20 @@ function Workspace(props) {
           rows,
           entries,
           selectedKey,
+          batchSelected,
+          onBatchSelect: (path) => setBatchSelected((current) => {
+            const next = new Set(current);
+            if (next.has(path)) next.delete(path);
+            else next.add(path);
+            return next;
+          }),
+          onBatchSelectAll: () => setBatchSelected(new Set(rows.unstaged.filter((entry) => entry.kind === "untracked").map((entry) => entry.path))),
+          onBatchClear: () => setBatchSelected(/* @__PURE__ */ new Set()),
+          onBatchRemove: () => {
+            if (batchSelected.size === 0) return;
+            setDialogError("");
+            setDialog({ kind: "remove-untracked-batch", paths: [...batchSelected], generation: statusGeneration });
+          },
           diffSelection,
           diff,
           diffLoading,
@@ -4624,6 +4778,18 @@ function Workspace(props) {
       t,
       onCancel: closeDialog,
       onConfirm: () => void submitConflictRevert()
+    }) : null,
+    dialog?.kind === "remove-untracked-batch" ? h(ConfirmDialog, {
+      title: t("batchRemoveTitle"),
+      body: String(dialog.paths?.length ?? 0) + " " + t("batchRemoveBody"),
+      submitLabel: t("deleteSelected"),
+      busy: dialogBusy,
+      error: dialogError,
+      t,
+      onCancel: () => {
+        if (!dialogBusy) closeDialog();
+      },
+      onConfirm: () => void submitBatchRemove()
     }) : null,
     dialog?.kind === "remove" || dialog?.kind === "remove-untracked" ? h(ConfirmDialog, {
       title: t("removeTitle"),

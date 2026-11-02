@@ -13,6 +13,8 @@ export function FileRow(props: {
   entry: GitFileEntry
   side: EntrySide
   active: boolean
+  batchSelected: boolean
+  onBatchSelect: (path: string) => void
   t: Translate
   onSelect: (entry: GitFileEntry, side: EntrySide) => void
   onToggle: (entry: GitFileEntry, side: EntrySide) => void
@@ -56,6 +58,18 @@ export function FileRow(props: {
         }
       },
     },
+    side === 'unstaged' && entry.kind === 'untracked'
+      ? h('input', {
+          type: 'checkbox',
+          className: 'dgt-check dgt-batch-check',
+          checked: props.batchSelected,
+          'aria-label': t('selectUntracked') + ': ' + entry.path,
+          title: t('selectUntracked'),
+          onClick: (event: any) => event.stopPropagation(),
+          onKeyDown: (event: any) => event.stopPropagation(),
+          onChange: () => props.onBatchSelect(entry.path),
+        })
+      : side === 'unstaged' ? h('span', { className: 'dgt-batch-placeholder', 'aria-hidden': true }) : null,
     h('input', {
       type: 'checkbox',
       className: 'dgt-check',

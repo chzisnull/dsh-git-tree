@@ -125,6 +125,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       | 'discard'
       | 'remove'
       | 'remove-untracked'
+      | 'remove-untracked-batch'
       | 'merge'
       | 'push'
       | 'conflict-revert'
@@ -132,6 +133,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     branch?: string
     start?: string
     path?: string
+    paths?: string[]
+    generation?: number
     side?: EntrySide
   } | null>(null)
   const [contextMenu, setContextMenu] = React.useState<ContextMenuState | null>(null)
@@ -171,6 +174,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   const [dialogError, setDialogError] = React.useState('')
   const [statusError, setStatusError] = React.useState('')
   const [selected, setSelected] = React.useState<{ path: string; side: EntrySide } | null>(null)
+  const [batchSelected, setBatchSelected] = React.useState<Set<string>>(() => new Set())
   const [diff, setDiff] = React.useState<DiffPayload | null>(null)
   const [diffLoading, setDiffLoading] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
@@ -184,6 +188,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   const [notice, setNotice] = React.useState('')
 
   const busyRef = React.useRef(false)
+  const repoGeneration = React.useRef(0)
   // Set by the poll loop: a pointer entering the panel is a signal to refresh.
   const wakePollRef = React.useRef<(() => void) | null>(null)
   const handoffTimer = React.useRef<any>(null)
@@ -243,11 +248,15 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     return holdShortcut()
   }, [overlayOpen])
 
+  const statusGeneration = repoGeneration.current
   const loadStatus = React.useCallback(
     async (options?: { silent?: boolean }): Promise<GitStatusPayload | null> => {
+      const generation = statusGeneration
+      if (generation !== repoGeneration.current) return null
       if (!options?.silent) setRefreshing(true)
       try {
         const next = await fetchStatus(repoPath || undefined)
+        if (generation !== repoGeneration.current) return null
         if (next.ok) {
           setStatus(next)
           setStatusError('')
@@ -257,14 +266,15 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
         }
         return next
       } catch (error) {
+        if (generation !== repoGeneration.current) return null
         setStatus(null)
         setStatusError(error instanceof Error ? error.message : String(error))
         return null
       } finally {
-        if (!options?.silent) setRefreshing(false)
+        if (!options?.silent && generation === repoGeneration.current) setRefreshing(false)
       }
     },
-    [repoPath, t],
+    [repoPath, statusGeneration, t],
   )
 
   const loadRefs = React.useCallback(async (branch?: string) => {
@@ -636,11 +646,20 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   // Registered workspaces for the toolbar switcher; restore the last choice.
   React.useEffect(() => {
     let cancelled = false
+    const generation = repoGeneration.current
     void (async () => {
       const list = await loadWorkspaces()
-      if (cancelled) return
+      if (cancelled || generation !== repoGeneration.current) return
       const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(REPO_KEY) : null
-      if (saved && list.some((workspace) => workspace.path === saved)) setRepoPath(saved)
+      if (saved && list.some((workspace) => workspace.path === saved)) {
+        repoGeneration.current += 1
+        setStatus(null)
+        setBatchSelected(new Set())
+        setDialog(null)
+        setSelected(null)
+        setDiff(null)
+        setRepoPath(saved)
+      }
     })()
     return () => {
       cancelled = true
@@ -719,6 +738,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
         setActionError(t('conflictsBlockCommit'))
         return
       }
+      const generation = statusGeneration
       setBusy(true)
       setActionError('')
       try {
@@ -728,6 +748,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
             : await stagePaths([entry.path], repoPath || undefined)
         if (!result.ok) throw new Error(result.error || (side === 'staged' ? t('unstageFailed') : t('stageFailed')))
         const next = await fetchStatus(repoPath || undefined)
+        if (generation !== repoGeneration.current) return
         if (next.ok) setStatus(next)
         if (selected?.path === entry.path && next.ok) {
           const updated = findEntry(next, entry.path)
@@ -739,7 +760,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
         setBusy(false)
       }
     },
-    [openDiff, repoPath, selected, t],
+    [openDiff, repoPath, selected, statusGeneration, t],
   )
 
   const copyPath = React.useCallback(
@@ -825,7 +846,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     setDialogError('')
     try {
       const result = await removePaths([path], untracked, repoPath || undefined)
-      if (!result.ok) throw new Error(result.error || t('branchActionFailed'))
+      if (!result.ok) throw new Error(result.error || result.failed?.[0]?.error || t('branchActionFailed'))
       closeDialog()
       showToast(t('removeDone') + ' · ' + path)
       setSelected(null)
@@ -837,6 +858,56 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       setDialogBusy(false)
     }
   }, [closeDialog, dialog?.kind, dialog?.path, loadStatus, repoPath, showToast, t])
+
+  const submitBatchRemove = React.useCallback(async () => {
+    const paths = dialog?.paths ?? []
+    if (paths.length === 0 || dialog?.generation !== repoGeneration.current || statusGeneration !== repoGeneration.current) return
+    busyRef.current = true
+    setBusy(true)
+    setDialogBusy(true)
+    setDialogError('')
+    let remaining = paths.slice()
+    const failures: string[] = []
+    const retryPaths: string[] = []
+    let removedCount = 0
+    try {
+      while (remaining.length > 0) {
+        if (statusGeneration !== repoGeneration.current) return
+        const chunk = remaining.slice(0, 500)
+        const result = await removePaths(chunk, true, repoPath || undefined)
+        if (statusGeneration !== repoGeneration.current) return
+        if (!result.ok && !result.failed) throw new Error(result.error || t('batchRemoveFailed'))
+        removedCount += (result.removed ?? []).length
+        failures.push(...(result.failed ?? []).map((item) => item.path + (item.error ? ' — ' + item.error : '')))
+        const failedPaths = (result.failed ?? []).map((item) => item.path)
+        remaining = remaining.slice(chunk.length)
+        if (failedPaths.length) {
+          // Process later chunks too, but keep failed paths for the retry dialog.
+          retryPaths.push(...failedPaths)
+        }
+      }
+      if (failures.length) throw new Error(t('batchRemoveFailed') + ': ' + failures.join('; '))
+      closeDialog()
+      setBatchSelected(new Set())
+      showToast(t('batchRemoveDone') + ' · ' + String(removedCount))
+      if (selected && paths.includes(selected.path)) {
+        setSelected(null)
+        setDiff(null)
+      }
+    } catch (error) {
+      if (statusGeneration !== repoGeneration.current) return
+      const pending = [...retryPaths, ...remaining]
+      setDialog((current) => current?.kind === 'remove-untracked-batch' ? { ...current, paths: pending } : current)
+      setBatchSelected(new Set(pending))
+      setDialogError((removedCount ? t('batchRemoveDone') + ': ' + removedCount + '. ' : '') +
+        (error instanceof Error ? error.message : String(error)))
+    } finally {
+      await loadStatus()
+      busyRef.current = false
+      setBusy(false)
+      setDialogBusy(false)
+    }
+  }, [closeDialog, dialog?.generation, dialog?.paths, loadStatus, repoPath, selected, showToast, statusGeneration, t])
 
   const submitPush = React.useCallback(async () => {
     setDialogBusy(true)
@@ -1086,13 +1157,16 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
 
   const refreshAfterConflict = React.useCallback(
     async (path: string) => {
+      const generation = statusGeneration
+      if (generation !== repoGeneration.current) return
       await loadStatus({ silent: true })
       const next = await fetchStatus(repoPath || undefined)
+      if (generation !== repoGeneration.current) return
       if (next.ok) setStatus(next)
       const updated = next.ok ? findEntry(next, path) : null
       if (updated) await openDiff(updated, 'conflicted')
     },
-    [openDiff, repoPath, loadStatus],
+    [openDiff, repoPath, loadStatus, statusGeneration],
   )
 
   const applyConflictResolution = React.useCallback(async () => {
@@ -1245,7 +1319,12 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   const switchWorkspace = React.useCallback(
     (path: string) => {
       if (path === repoPath) return
+      repoGeneration.current += 1
+      setStatus(null)
+      setStatusError('')
+      setDialog(null)
       setRepoPath(path)
+      setBatchSelected(new Set())
     try {
       if (typeof localStorage !== 'undefined') localStorage.setItem(REPO_KEY, path)
     } catch {
@@ -1280,6 +1359,15 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     },
     [loadWorkspaces, showToast, t],
   )
+
+  React.useEffect(() => {
+    if (!status) return
+    const eligible = new Set((status.entries ?? []).filter((entry) => entry.kind === 'untracked').map((entry) => entry.path))
+    setBatchSelected((current) => {
+      const next = new Set([...current].filter((path) => eligible.has(path)))
+      return next.size === current.size ? current : next
+    })
+  }, [status])
 
   const entries = status?.entries ?? []
   const rows = splitEntries(entries)
@@ -1380,6 +1468,20 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
           rows,
           entries,
           selectedKey,
+          batchSelected,
+          onBatchSelect: (path: string) => setBatchSelected((current) => {
+            const next = new Set(current)
+            if (next.has(path)) next.delete(path)
+            else next.add(path)
+            return next
+          }),
+          onBatchSelectAll: () => setBatchSelected(new Set(rows.unstaged.filter((entry) => entry.kind === 'untracked').map((entry) => entry.path))),
+          onBatchClear: () => setBatchSelected(new Set()),
+          onBatchRemove: () => {
+            if (batchSelected.size === 0) return
+            setDialogError('')
+            setDialog({ kind: 'remove-untracked-batch', paths: [...batchSelected], generation: statusGeneration })
+          },
           diffSelection,
           diff,
           diffLoading,
@@ -1632,6 +1734,18 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
           t,
           onCancel: closeDialog,
           onConfirm: () => void submitConflictRevert(),
+        })
+      : null,
+    dialog?.kind === 'remove-untracked-batch'
+      ? h(ConfirmDialog, {
+          title: t('batchRemoveTitle'),
+          body: String(dialog.paths?.length ?? 0) + ' ' + t('batchRemoveBody'),
+          submitLabel: t('deleteSelected'),
+          busy: dialogBusy,
+          error: dialogError,
+          t,
+          onCancel: () => { if (!dialogBusy) closeDialog() },
+          onConfirm: () => void submitBatchRemove(),
         })
       : null,
     dialog?.kind === 'remove' || dialog?.kind === 'remove-untracked'

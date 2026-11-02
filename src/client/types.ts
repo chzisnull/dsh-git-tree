@@ -246,6 +246,8 @@ export interface MutationPayload {
   shortSha?: string
   subject?: string
   staged?: string[]
+  removed?: string[]
+  failed?: { path: string; code?: string; error?: string }[]
   unstaged?: string[]
   branch?: string
   upstream?: string
