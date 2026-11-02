@@ -145,18 +145,25 @@ var EN = {
   commitMessageEmpty: "Write a message to commit.",
   commitShortcut: "\u2318\u21B5 to commit",
   changes: "Changes",
-  pendingFiles: "Pending files",
-  selectUntracked: "Select for deletion",
-  selectAllUntracked: "Select all",
-  batchSelectHint: "Select untracked files",
+  pendingFiles: "Changes",
+  selectFile: "Select file",
+  selectAllUnstaged: "Select all",
+  batchSelectHint: "Select files",
   clearSelection: "Clear",
-  selectedCount: "untracked selected",
-  deleteSelected: "Delete selected",
+  selectedCount: "selected",
+  stageSelected: "Stage selected",
+  copySelectedPaths: "Copy paths",
+  copiedPaths: "Paths copied",
+  copyFailed: "Could not copy paths",
+  deleteSelectedUntracked: "Delete untracked",
+  batchStageDone: "Files staged",
+  batchStageConfirmed: "Confirmed staged",
+  batchStagePartial: "Staging stopped; review the refreshed list",
+  batchStaging: "Staging\u2026",
   batchRemoveTitle: "Delete untracked files",
   batchRemoveBody: "untracked files will be deleted from disk and cannot be recovered with Git.",
   batchRemoveDone: "Files deleted",
   batchRemoveFailed: "Some files could not be deleted",
-  sortByPath: "sorted by path",
   history: "History",
   search: "Search",
   searchPlaceholder: "Search commit messages",
@@ -196,6 +203,8 @@ var EN = {
   commitFailed: "Commit failed",
   stageFailed: "Stage failed",
   conflict: "Conflict",
+  resolveConflict: "Resolve\u2026",
+  resolveConflictHint: "Inspect and resolve in the diff pane",
   commitThis: "Commit\u2026",
   discardChanges: "Discard changes",
   removeFile: "Delete file",
@@ -218,6 +227,7 @@ var EN = {
   behind: "behind",
   noChanges: "No changes",
   filesChanged: "files",
+  twoSidedHint: "A file changed on both sides appears in both groups",
   code: "Code",
   aiGenerate: "AI write",
   aiGenerating: "Writing\u2026",
@@ -372,18 +382,25 @@ var ZH = {
   commitMessageEmpty: "\u586B\u5199\u63D0\u4EA4\u4FE1\u606F\u540E\u53EF\u63D0\u4EA4\u3002",
   commitShortcut: "\u2318\u21B5 \u63D0\u4EA4",
   changes: "\u6539\u52A8",
-  pendingFiles: "\u5F85\u5B9A\u7684\u6587\u4EF6",
-  selectUntracked: "\u9009\u62E9\u8981\u5220\u9664\u7684\u6587\u4EF6",
-  selectAllUntracked: "\u5168\u9009",
-  batchSelectHint: "\u9009\u62E9\u672A\u8DDF\u8E2A\u6587\u4EF6",
+  pendingFiles: "\u5F85\u63D0\u4EA4\u7684\u66F4\u6539",
+  selectFile: "\u9009\u62E9\u6587\u4EF6",
+  selectAllUnstaged: "\u5168\u9009",
+  batchSelectHint: "\u9009\u62E9\u672A\u6682\u5B58\u6587\u4EF6",
   clearSelection: "\u6E05\u7A7A\u9009\u62E9",
-  selectedCount: "\u4E2A\u672A\u8DDF\u8E2A\u6587\u4EF6\u5DF2\u9009",
-  deleteSelected: "\u5220\u9664\u6240\u9009",
+  selectedCount: "\u4E2A\u6587\u4EF6\u5DF2\u9009",
+  stageSelected: "\u6682\u5B58\u6240\u9009",
+  copySelectedPaths: "\u590D\u5236\u8DEF\u5F84",
+  copiedPaths: "\u8DEF\u5F84\u5DF2\u590D\u5236",
+  copyFailed: "\u590D\u5236\u8DEF\u5F84\u5931\u8D25",
+  deleteSelectedUntracked: "\u5220\u9664\u672A\u8DDF\u8E2A",
+  batchStageDone: "\u5DF2\u6682\u5B58\u6587\u4EF6",
+  batchStageConfirmed: "\u5DF2\u786E\u8BA4\u6682\u5B58",
+  batchStagePartial: "\u6682\u5B58\u5DF2\u505C\u6B62\uFF0C\u8BF7\u68C0\u67E5\u5237\u65B0\u540E\u7684\u6587\u4EF6\u5217\u8868",
+  batchStaging: "\u6B63\u5728\u6682\u5B58\u2026",
   batchRemoveTitle: "\u5220\u9664\u672A\u8DDF\u8E2A\u6587\u4EF6",
   batchRemoveBody: "\u4E2A\u672A\u8DDF\u8E2A\u6587\u4EF6\u5C06\u4ECE\u78C1\u76D8\u5220\u9664\uFF0C\u4E14\u65E0\u6CD5\u901A\u8FC7 Git \u6062\u590D\u3002",
   batchRemoveDone: "\u5DF2\u5220\u9664\u6587\u4EF6",
   batchRemoveFailed: "\u90E8\u5206\u6587\u4EF6\u672A\u80FD\u5220\u9664",
-  sortByPath: "\u5DF2\u4F9D\u7167\u8DEF\u5F84\u6392\u5E8F",
   history: "\u5386\u53F2",
   search: "\u641C\u7D22",
   searchPlaceholder: "\u641C\u7D22\u63D0\u4EA4\u4FE1\u606F",
@@ -423,6 +440,8 @@ var ZH = {
   commitFailed: "\u63D0\u4EA4\u5931\u8D25",
   stageFailed: "\u6682\u5B58\u5931\u8D25",
   conflict: "\u51B2\u7A81",
+  resolveConflict: "\u89E3\u51B3\u2026",
+  resolveConflictHint: "\u5728\u53F3\u4FA7\u67E5\u770B\u5E76\u89E3\u51B3\u51B2\u7A81",
   commitThis: "\u63D0\u4EA4\u2026",
   discardChanges: "\u653E\u5F03\u66F4\u6539",
   removeFile: "\u5220\u9664\u6587\u4EF6",
@@ -445,6 +464,7 @@ var ZH = {
   behind: "\u843D\u540E",
   noChanges: "\u6CA1\u6709\u6539\u52A8",
   filesChanged: "\u4E2A\u6587\u4EF6",
+  twoSidedHint: "\u540C\u4E00\u6587\u4EF6\u4E24\u4FA7\u90FD\u6709\u6539\u52A8\u65F6\u4F1A\u540C\u65F6\u51FA\u73B0\u5728\u4E24\u7EC4",
   code: "\u4EE3\u7801",
   aiGenerate: "AI \u751F\u6210",
   aiGenerating: "\u751F\u6210\u4E2D\u2026",
@@ -655,47 +675,64 @@ var CSS = `
   height:44px;padding:0 16px;color:var(--dsw-alias-label-tertiary);font-size:11px;}
 .dgt-list-head b,:where(.dgt-list-head) span:first-child{color:var(--dsw-alias-label-primary);
   font-size:12.5px;font-weight:600;}
-.dgt-list-sort{margin-left:auto;margin-right:10px;color:var(--dsw-alias-label-tertiary);font-size:10.5px;font-weight:400;}
-.dgt-group-count{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums;font-weight:400;font-size:10.5px;}
+.dgt-group-count{color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;font-weight:400;font-size:10.5px;}
 .dgt-regions{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;padding:0 8px;}
 .dgt-region{display:flex;flex-direction:column;min-height:0;}
-.dgt-region[data-kind='conflicted']{flex:0 1 auto;max-height:34%;border-bottom:1px solid var(--dgt-line-soft);}
-.dgt-region[data-kind='staged']{flex:1 1 40%;min-height:104px;border-bottom:1px solid var(--dgt-line-soft);padding-bottom:6px;}
-.dgt-region[data-kind='unstaged']{flex:1 1 60%;padding-top:2px;}
+/* Content height, not a fixed share: an almost-empty group must not push the
+   other one to the far end of the pane. */
+.dgt-region[data-kind='conflicted']{flex:0 0 auto;max-height:34%;border-bottom:1px solid var(--dgt-line-soft);}
+.dgt-region[data-kind='staged']{flex:0 1 auto;max-height:60%;border-bottom:1px solid var(--dgt-line-soft);padding-bottom:6px;}
+.dgt-region[data-kind='unstaged']{flex:1 1 auto;padding-top:2px;}
 .dgt-region[data-empty='true']{flex:0 0 auto;min-height:0;}
 .dgt-region[data-empty='true'] .dgt-region-scroll{display:none;}
 .dgt-region-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding:0;}
 .dgt-group{display:flex;align-items:center;justify-content:space-between;flex:0 0 34px;padding:0 8px;
   color:var(--dsw-alias-label-secondary);font-size:11.5px;font-weight:600;}
 .dgt-group[data-tone='error']{color:var(--dgt-err);}
-.dgt-batch-bar{display:flex;align-items:center;gap:4px;flex:0 0 auto;min-height:34px;margin:0 4px 5px;padding:3px 6px 3px 10px;
-  border:1px solid var(--dgt-line-soft);border-radius:8px;background:var(--dgt-rail-bg);color:var(--dsw-alias-label-secondary);font-size:11px;}
-.dgt-batch-bar[data-selected='true']{border-color:var(--dgt-accent-soft);background:var(--dgt-accent-soft);}
+.dgt-batch-bar{display:flex;flex-direction:column;align-items:stretch;gap:2px;flex:0 0 auto;margin:0 4px 5px;padding:4px 6px 4px 10px;
+  border:1px solid var(--dgt-line);border-radius:8px;background:var(--dgt-rail-bg);color:var(--dsw-alias-label-secondary);font-size:11px;
+  transition:background-color .12s ease,border-color .12s ease;}
+.dgt-batch-summary,.dgt-batch-actions{display:flex;align-items:center;gap:6px;min-width:0;}
+/* The action row is always rendered at its own height: inserting it on the
+   first tick would shift every row (and the \u5168\u9009 link) under the pointer. */
+.dgt-batch-actions{min-height:22px;border-top:1px solid var(--dgt-line-soft);padding-top:2px;}
+.dgt-batch-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-batch-bar[data-selected='true']{border-color:color-mix(in srgb, var(--dgt-accent) 35%, var(--dgt-line));
+  background:color-mix(in srgb, var(--dgt-accent) 6%, var(--dgt-card));}
 .dgt-batch-count{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.dgt-batch-bar button{appearance:none;flex:0 0 auto;border:0;border-radius:5px;background:transparent;padding:4px 6px;
-  color:var(--dgt-accent-strong);font:inherit;cursor:pointer;white-space:nowrap;}
-.dgt-batch-bar button:hover{background:var(--dgt-card);}
+.dgt-batch-bar button{appearance:none;flex:0 0 auto;border:0;border-radius:6px;background:transparent;padding:3px 6px;
+  color:var(--dgt-accent-strong);font:inherit;font-size:11px;cursor:pointer;white-space:nowrap;}
+.dgt-batch-bar button:hover{background:color-mix(in srgb, var(--dgt-accent) 12%, var(--dgt-card));}
 .dgt-batch-bar button:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:1px;}
+.dgt-batch-bar button[data-primary]{background:var(--dgt-accent-strong);color:var(--dgt-card);font-weight:600;}
+.dgt-batch-bar button[data-primary]:hover{background:var(--dgt-accent);color:var(--dgt-card);}
 .dgt-batch-bar button[data-danger]{color:var(--dgt-err);}
-.dgt-batch-placeholder{flex:0 0 14px;width:14px;}
+.dgt-batch-bar button[data-danger]:hover{background:color-mix(in srgb, var(--dgt-err) 12%, var(--dgt-card));}
+.dgt-batch-bar button:disabled{opacity:.5;cursor:default;}
+.dgt-batch-sep{flex:0 0 1px;align-self:stretch;margin:1px 3px;background:var(--dgt-line);}
+.dgt-batch-busy{display:inline-flex;align-items:center;gap:6px;color:var(--dsw-alias-label-secondary);}
 .dgt-row{position:relative;box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;height:36px;
   padding:0 9px;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-primary);
   font:inherit;font-size:12.5px;text-align:left;cursor:default;}
 .dgt-row:hover{background:var(--dgt-line-soft);}
 .dgt-row:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:-2px;}
-.dgt-row[data-batch-selected='true']{background:var(--dgt-line-soft);}
-.dgt-row[data-active='true']{background:var(--dgt-accent-soft);box-shadow:inset 3px 0 0 var(--dgt-accent);}
+.dgt-row[data-batch-selected='true']{background:var(--dgt-accent-soft);}
+.dgt-row[data-active='true']{background:var(--dgt-accent-soft);box-shadow:inset 3px 0 0 var(--dgt-accent-strong);}
 .dgt-row[data-active='true'] .dgt-path-name{font-weight:600;}
 .dgt-row[data-menu='true']{background:var(--dgt-line-soft);}
 .dgt-check{flex:0 0 auto;width:14px;height:14px;margin:0;accent-color:var(--dgt-accent-strong);cursor:pointer;}
+/* Same width for the staged/conflicted rows, which have no batch checkbox:
+   without it the two groups' badges and paths sit 22px apart. */
+.dgt-batch-placeholder{flex:0 0 14px;width:14px;height:14px;}
 .dgt-stage-control{display:inline-flex;align-items:center;justify-content:flex-end;gap:4px;flex:0 0 auto;}
-.dgt-stage-check{appearance:none;position:relative;width:23px;height:14px;border:1px solid var(--dgt-line);border-radius:8px;
-  background:var(--dgt-line);}
-.dgt-stage-check::before{content:'';position:absolute;top:1px;left:1px;width:10px;height:10px;border-radius:50%;background:var(--dgt-card);}
-.dgt-stage-check:checked{border-color:var(--dgt-accent-strong);background:var(--dgt-accent-strong);}
+.dgt-stage-check{appearance:none;position:relative;width:23px;height:14px;border:0;border-radius:8px;
+  background:color-mix(in srgb, var(--dsw-alias-label-tertiary) 85%, var(--dgt-card));cursor:pointer;}
+.dgt-stage-check::before{content:'';position:absolute;top:1px;left:1px;width:10px;height:10px;border-radius:50%;background:var(--dgt-card);transition:left .12s ease;}
+.dgt-stage-check:checked{background:var(--dgt-accent-strong);}
 .dgt-stage-check:checked::before{left:10px;}
 .dgt-stage-check:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:2px;}
 .dgt-stage-check:disabled{opacity:.45;cursor:default;}
+@media (prefers-reduced-motion:reduce){.dgt-batch-bar,.dgt-stage-check::before{transition:none;}}
 .dgt-badge{flex:0 0 auto;display:inline-grid;place-items:center;width:16px;height:16px;border-radius:5px;
   font-family:var(--ds-font-family-code);font-size:10px;font-weight:600;color:var(--dsw-alias-label-secondary);
   background:var(--dgt-line-soft);}
@@ -710,7 +747,8 @@ var CSS = `
 .dgt-rowact{appearance:none;flex:0 0 auto;margin-left:auto;padding:1px 8px;border:0;border-radius:6px;
   background:transparent;color:var(--dgt-accent-strong);font:inherit;font-size:11.5px;cursor:pointer;opacity:1;white-space:nowrap;}
 .dgt-row:hover .dgt-rowact,.dgt-row:focus-within .dgt-rowact{opacity:1;}
-.dgt-rowact:hover{background:var(--dgt-accent-soft);}
+.dgt-rowact:disabled{opacity:.5;cursor:default;}
+.dgt-rowact:hover:not(:disabled){background:var(--dgt-accent-soft);}
 .dgt-rowact[data-disabled]{opacity:1;color:var(--dgt-warn);cursor:default;}
 
 /* diff */
@@ -748,7 +786,7 @@ var CSS = `
 .dgt-placeholder{padding:14px 12px;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px;}
 .dgt-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   height:100%;min-height:120px;color:var(--dsw-alias-label-secondary);font-size:12.5px;}
-.dgt-empty-hint{color:var(--dsw-alias-label-tertiary);font-size:11.5px;}
+.dgt-empty-hint{color:var(--dsw-alias-label-secondary);font-size:11.5px;}
 
 /* keyboard shortcut: toolbar badge + empty-pane hint */
 .dgt-kbd{appearance:none;display:inline-flex;align-items:center;height:26px;margin-left:8px;
@@ -2044,16 +2082,20 @@ function FileRow(props) {
         }
       }
     },
-    side === "unstaged" && entry.kind === "untracked" ? h("input", {
+    // The first cell is always there, so the badges, paths and switches of the
+    // staged and the unstaged groups start on the same edge. Only unstaged rows
+    // are selectable; the rest hold the column with an empty placeholder.
+    side === "unstaged" ? h("input", {
       type: "checkbox",
       className: "dgt-check dgt-batch-check",
       checked: props.batchSelected,
-      "aria-label": t("selectUntracked") + ": " + entry.path,
-      title: t("selectUntracked"),
+      disabled: props.batchBusy,
+      "aria-label": t("selectFile") + ": " + entry.path,
+      title: t("selectFile"),
       onClick: (event) => event.stopPropagation(),
       onKeyDown: (event) => event.stopPropagation(),
       onChange: () => props.onBatchSelect(entry.path)
-    }) : side === "unstaged" ? h("span", { className: "dgt-batch-placeholder", "aria-hidden": true }) : null,
+    }) : h("span", { className: "dgt-batch-placeholder", "aria-hidden": true }),
     h("span", { className: "dgt-badge", "data-tone": tone }, letter),
     h(
       "span",
@@ -2068,18 +2110,35 @@ function FileRow(props) {
         type: "checkbox",
         className: "dgt-check dgt-stage-check",
         checked: side === "staged",
-        disabled: conflict,
+        disabled: conflict || props.batchBusy,
         "aria-label": side === "staged" ? t("unstageFile") : t("stageFile"),
         title: conflict ? t("conflictsBlockCommit") : actionLabel,
         onClick: (event) => event.stopPropagation(),
         onKeyDown: (event) => event.stopPropagation(),
         onChange: () => props.onToggle(entry, side)
       }),
-      conflict ? h("span", { className: "dgt-rowact", "data-disabled": true, title: t("conflictsBlockCommit") }, t("conflict")) : h(
+      conflict ? h(
         "button",
         {
           type: "button",
           className: "dgt-rowact",
+          "data-resolve": true,
+          title: t("resolveConflictHint"),
+          // Selecting the row is all this does: the resolution itself lives
+          // in the diff pane, never in the list.
+          onClick: (event) => {
+            event.stopPropagation();
+            props.onSelect(entry, side);
+          },
+          onKeyDown: (event) => event.stopPropagation()
+        },
+        t("resolveConflict")
+      ) : h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-rowact",
+          disabled: props.batchBusy,
           onClick: (event) => {
             event.stopPropagation();
             props.onToggle(entry, side);
@@ -2093,14 +2152,16 @@ function FileRow(props) {
 }
 
 // src/client/components/ChangeList.tsx
+var Row = React.memo(FileRow);
 function Rows(props) {
   return props.rows.map(
-    (entry) => h(FileRow, {
+    (entry) => h(Row, {
       key: props.side + ":" + entry.path,
       entry,
       side: props.side,
       active: props.activeKey === props.side + "\0" + entry.path,
-      batchSelected: props.batchSelected.has(entry.path),
+      batchSelected: props.side === "unstaged" && props.batchSelected.has(entry.path),
+      batchBusy: props.batchBusy,
       onBatchSelect: props.onBatchSelect,
       t: props.t,
       onSelect: props.onSelect,
@@ -2129,6 +2190,7 @@ function Region(props) {
         side: props.side,
         activeKey: props.activeKey,
         batchSelected: props.batchSelected,
+        batchBusy: props.batchBusy,
         onBatchSelect: props.onBatchSelect,
         t: props.t,
         onSelect: props.onSelect,
@@ -2141,30 +2203,64 @@ function Region(props) {
 }
 function ChangeList(props) {
   const { status, statusError, rows, t } = props;
-  const total = (status?.entries ?? []).length;
-  const untrackedCount = rows.unstaged.filter((entry) => entry.kind === "untracked").length;
-  const allSelected = untrackedCount > 0 && props.batchSelected.size === untrackedCount;
+  const entries = status?.entries ?? [];
+  const total = new Set(entries.map((entry) => entry.path)).size;
+  const records = rows.conflicted.length + rows.staged.length + rows.unstaged.length;
+  const selected = props.batchSelected.size;
+  const untrackedSelected = rows.unstaged.filter((entry) => entry.kind === "untracked" && props.batchSelected.has(entry.path)).length;
+  const allSelected = rows.unstaged.length > 0 && rows.unstaged.every((entry) => props.batchSelected.has(entry.path));
   const empty = rows.staged.length === 0 && rows.unstaged.length === 0 && rows.conflicted.length === 0;
-  const batchBar = untrackedCount > 0 ? h(
+  const batchBar = rows.unstaged.length > 0 ? h(
     "div",
-    { className: "dgt-batch-bar", "data-selected": props.batchSelected.size > 0 || void 0 },
+    { className: "dgt-batch-bar", "data-selected": selected > 0 || void 0 },
     h(
-      "span",
-      { className: "dgt-batch-count", role: "status" },
-      props.batchSelected.size > 0 ? String(props.batchSelected.size) + " " + t("selectedCount") : t("batchSelectHint")
+      "div",
+      { className: "dgt-batch-summary" },
+      h(
+        "span",
+        { className: "dgt-batch-count", role: "status" },
+        selected > 0 ? String(selected) + " " + t("selectedCount") : ""
+      ),
+      // Clear sits to the left of select-all so the rightmost button keeps
+      // its position and a double click cannot turn 全选 into 清空.
+      selected > 0 && !allSelected ? h("button", {
+        type: "button",
+        className: "dgt-batch-action",
+        "data-clear": true,
+        disabled: props.batchBusy,
+        onClick: props.onBatchClear
+      }, t("clearSelection")) : null,
+      h("button", {
+        type: "button",
+        className: "dgt-batch-action",
+        "data-select-all": true,
+        disabled: props.batchBusy,
+        onClick: allSelected ? props.onBatchClear : props.onBatchSelectAll,
+        title: allSelected ? t("clearSelection") : t("selectAllUnstaged")
+      }, allSelected ? t("clearSelection") : t("selectAllUnstaged"))
     ),
-    h("button", {
-      type: "button",
-      className: "dgt-batch-action",
-      onClick: allSelected ? props.onBatchClear : props.onBatchSelectAll,
-      title: t("batchSelectHint")
-    }, allSelected ? t("clearSelection") : t("selectAllUntracked")),
-    props.batchSelected.size > 0 && !allSelected ? h("button", { type: "button", className: "dgt-batch-action", onClick: props.onBatchClear }, t("clearSelection")) : null,
-    props.batchSelected.size > 0 ? h("button", { type: "button", className: "dgt-batch-action", "data-danger": true, onClick: props.onBatchRemove }, t("deleteSelected")) : null
+    // Same height with or without a selection, so the rows below never jump;
+    // idle it carries the hint instead of an empty band.
+    h(
+      "div",
+      { className: "dgt-batch-actions" },
+      props.batchBusy ? h(
+        "span",
+        { className: "dgt-batch-busy", role: "status" },
+        h("span", { className: "dgt-spinner", "aria-hidden": "true" }),
+        " " + t("batchStaging")
+      ) : selected === 0 ? h("span", { className: "dgt-batch-hint" }, t("batchSelectHint")) : [
+        h("button", { key: "stage", type: "button", className: "dgt-batch-action", "data-primary": true, onClick: props.onBatchStage }, t("stageSelected")),
+        h("button", { key: "copy", type: "button", className: "dgt-batch-action", onClick: props.onBatchCopy }, t("copySelectedPaths")),
+        h("span", { key: "sep", className: "dgt-batch-sep", "aria-hidden": "true" }),
+        untrackedSelected > 0 ? h("button", { key: "remove", type: "button", className: "dgt-batch-action", "data-danger": true, onClick: props.onBatchRemove }, t("deleteSelectedUntracked") + " (" + String(untrackedSelected) + ")") : null
+      ]
+    )
   ) : null;
   const shared = {
     activeKey: props.selectedKey,
     batchSelected: props.batchSelected,
+    batchBusy: props.batchBusy,
     onBatchSelect: props.onBatchSelect,
     t,
     onSelect: props.onSelect,
@@ -2179,8 +2275,14 @@ function ChangeList(props) {
       "div",
       { className: "dgt-list-head" },
       h("span", null, t("pendingFiles")),
-      h("span", { className: "dgt-list-sort" }, t("sortByPath")),
-      h("span", { className: "dgt-group-count" }, String(total) + " " + t("itemsUnit"))
+      h(
+        "span",
+        {
+          className: "dgt-group-count",
+          title: records !== total ? t("twoSidedHint") : void 0
+        },
+        String(total) + " " + t("filesChanged") + (records !== total ? " \xB7 " + String(records) + " " + t("itemsUnit") : "")
+      )
     ),
     status === null && statusError === "" ? h("div", { className: "dgt-placeholder" }, t("loading")) : empty ? h(
       "div",
@@ -2300,10 +2402,10 @@ function ConflictBody(props) {
     conflict.lines.map((line, index) => h(ConflictLineRow, { key: "cf:" + String(index), line, index }))
   );
 }
-function DiffView(props) {
-  const { selected, diff, loading, t } = props;
-  const entry = selected?.entry ?? null;
-  const side = selected?.side ?? "unstaged";
+var DiffView = React.memo(function DiffView2(props) {
+  const { diff, loading, t } = props;
+  const entry = props.entry;
+  const side = props.side;
   const stats = diff?.stats;
   const conflicted = entry !== null && entry.conflicted;
   const actionLabel = side === "staged" ? t("unstageFile") : t("stageFile");
@@ -2378,7 +2480,9 @@ function DiffView(props) {
           type: "button",
           className: "dgt-diff-action",
           "data-kind": side === "staged" ? "unstage" : "stage",
-          onClick: props.onToggleFile
+          onClick: () => {
+            if (entry) props.onToggle(entry, side);
+          }
         },
         actionLabel
       )
@@ -2398,7 +2502,7 @@ function DiffView(props) {
       )
     )
   );
-}
+});
 
 // src/client/components/CommitBox.tsx
 function initials(name) {
@@ -2636,8 +2740,47 @@ function CommitBox(props) {
 }
 
 // src/client/components/views/StatusView.tsx
+var MemoCommitBox = React.memo(CommitBox);
 function StatusView(props) {
   const { t } = props;
+  const conflict = React.useMemo(
+    () => ({
+      busy: props.conflict.busy,
+      opening: props.conflict.opening,
+      onHandoff: props.conflict.onHandoff,
+      onRevert: props.conflict.onRevert,
+      onMarkResolved: props.conflict.onMarkResolved
+    }),
+    [
+      props.conflict.busy,
+      props.conflict.opening,
+      props.conflict.onHandoff,
+      props.conflict.onRevert,
+      props.conflict.onMarkResolved
+    ]
+  );
+  const ai = React.useMemo(
+    () => ({
+      loading: props.ai.loading,
+      busy: props.ai.busy,
+      groups: props.ai.groups,
+      failures: props.ai.failures,
+      active: props.ai.active,
+      error: props.ai.error,
+      onGenerate: props.ai.onGenerate,
+      onSelect: props.ai.onSelect
+    }),
+    [
+      props.ai.loading,
+      props.ai.busy,
+      props.ai.groups,
+      props.ai.failures,
+      props.ai.active,
+      props.ai.error,
+      props.ai.onGenerate,
+      props.ai.onSelect
+    ]
+  );
   return h(
     "div",
     { className: "dgt-main" },
@@ -2653,7 +2796,10 @@ function StatusView(props) {
         onBatchSelect: props.onBatchSelect,
         onBatchSelectAll: props.onBatchSelectAll,
         onBatchClear: props.onBatchClear,
+        onBatchStage: props.onBatchStage,
+        onBatchCopy: props.onBatchCopy,
         onBatchRemove: props.onBatchRemove,
+        batchBusy: props.busy,
         t,
         onSelect: props.onSelect,
         onToggle: props.onToggle,
@@ -2664,17 +2810,16 @@ function StatusView(props) {
         "div",
         { className: "dgt-right" },
         h(DiffView, {
-          selected: props.diffSelection,
+          entry: props.diffSelection ? props.diffSelection.entry : null,
+          side: props.diffSelection ? props.diffSelection.side : "unstaged",
           diff: props.diff,
           loading: props.diffLoading,
           hasChanges: props.entries.length > 0,
           t,
-          onToggleFile: () => {
-            if (props.diffSelection) props.onToggle(props.diffSelection.entry, props.diffSelection.side);
-          },
-          conflict: props.conflict
+          onToggle: props.onToggle,
+          conflict
         }),
-        h(CommitBox, {
+        h(MemoCommitBox, {
           status: props.status,
           message: props.message,
           busy: props.busy,
@@ -2689,7 +2834,7 @@ function StatusView(props) {
           onCommit: props.onCommit,
           collapsed: props.commitCollapsed,
           onToggleCollapsed: props.onToggleCommitCollapsed,
-          ai: props.ai
+          ai
         })
       )
     )
@@ -3444,6 +3589,11 @@ function Workspace(props) {
   const [notice, setNotice] = React.useState("");
   const busyRef = React.useRef(false);
   const repoGeneration = React.useRef(0);
+  const statusRequest = React.useRef(0);
+  const statusWritten = React.useRef({
+    generation: -1,
+    signature: ""
+  });
   const wakePollRef = React.useRef(null);
   const handoffTimer = React.useRef(null);
   const commitInput = React.useRef(null);
@@ -3464,6 +3614,7 @@ function Workspace(props) {
     } catch {
     }
   }, []);
+  const toggleCommitFold = React.useCallback(() => setCommitFold(!commitCollapsed), [commitCollapsed, setCommitFold]);
   const showToast = React.useCallback((text) => {
     setToast(text);
     if (toastTimer.current) clearTimeout(toastTimer.current);
@@ -3491,20 +3642,28 @@ function Workspace(props) {
     async (options) => {
       const generation = statusGeneration;
       if (generation !== repoGeneration.current) return null;
+      const request = ++statusRequest.current;
       if (!options?.silent) setRefreshing(true);
       try {
         const next = await fetchStatus(repoPath || void 0);
-        if (generation !== repoGeneration.current) return null;
+        if (generation !== repoGeneration.current || request !== statusRequest.current) return null;
         if (next.ok) {
-          setStatus(next);
+          const signature = statusSignature(next);
+          const written = statusWritten.current;
+          if (written.generation !== generation || written.signature !== signature) {
+            statusWritten.current = { generation, signature };
+            setStatus(next);
+          }
           setStatusError("");
         } else {
+          statusWritten.current = { generation, signature: "" };
           setStatus(null);
           setStatusError(next.error || t("statusFailed"));
         }
         return next;
       } catch (error) {
-        if (generation !== repoGeneration.current) return null;
+        if (generation !== repoGeneration.current || request !== statusRequest.current) return null;
+        statusWritten.current = { generation, signature: "" };
         setStatus(null);
         setStatusError(error instanceof Error ? error.message : String(error));
         return null;
@@ -3590,8 +3749,8 @@ function Workspace(props) {
     failures: aiModels?.failures ?? [],
     active: aiModels?.active ?? null,
     error: aiModels?.error || (aiModels && aiModels.ok === false ? t("aiFailed") : ""),
-    onGenerate: () => void generateMessage(),
-    onSelect: (provider, model) => void selectAiModel(provider, model)
+    onGenerate: generateMessage,
+    onSelect: selectAiModel
   };
   const openDiff = React.useCallback(async (entry, side) => {
     setSelected({ path: entry.path, side });
@@ -3916,30 +4075,32 @@ function Workspace(props) {
   }, [loadStatus, loadRefs]);
   const toggle = React.useCallback(
     async (entry, side) => {
+      if (busyRef.current) return;
       if (entry.conflicted || side === "conflicted") {
         setActionError(t("conflictsBlockCommit"));
         return;
       }
       const generation = statusGeneration;
+      busyRef.current = true;
       setBusy(true);
       setActionError("");
       try {
         const result = side === "staged" ? await unstagePaths([entry.path], repoPath || void 0) : await stagePaths([entry.path], repoPath || void 0);
         if (!result.ok) throw new Error(result.error || (side === "staged" ? t("unstageFailed") : t("stageFailed")));
-        const next = await fetchStatus(repoPath || void 0);
+        const next = await loadStatus({ silent: true });
         if (generation !== repoGeneration.current) return;
-        if (next.ok) setStatus(next);
-        if (selected?.path === entry.path && next.ok) {
+        if (selected?.path === entry.path && next?.ok) {
           const updated = findEntry(next, entry.path);
           if (updated) await openDiff(updated, sideOf(updated));
         }
       } catch (error) {
         setActionError(error instanceof Error ? error.message : String(error));
       } finally {
+        busyRef.current = false;
         setBusy(false);
       }
     },
-    [openDiff, repoPath, selected, statusGeneration, t]
+    [loadStatus, openDiff, repoPath, selected, statusGeneration, t]
   );
   const copyPath = React.useCallback(
     (entry) => {
@@ -3973,7 +4134,8 @@ function Workspace(props) {
   );
   const commitThis = React.useCallback(
     async (entry, side) => {
-      if (entry.conflicted) return;
+      if (entry.conflicted || busyRef.current) return;
+      busyRef.current = true;
       setBusy(true);
       setActionError("");
       try {
@@ -3989,6 +4151,7 @@ function Workspace(props) {
       } catch (error) {
         setActionError(error instanceof Error ? error.message : String(error));
       } finally {
+        busyRef.current = false;
         setBusy(false);
       }
     },
@@ -4032,6 +4195,47 @@ function Workspace(props) {
       setDialogBusy(false);
     }
   }, [closeDialog, dialog?.kind, dialog?.path, loadStatus, repoPath, showToast, t]);
+  const submitBatchStage = React.useCallback(async () => {
+    const paths = (status?.entries ?? []).filter((entry) => entry.unstaged && !entry.conflicted && batchSelected.has(entry.path)).map((entry) => entry.path);
+    if (paths.length === 0 || busyRef.current || statusGeneration !== repoGeneration.current) return;
+    const encoder = new TextEncoder();
+    let remaining = paths.slice();
+    let stagedCount = 0;
+    busyRef.current = true;
+    setBusy(true);
+    setActionError("");
+    try {
+      while (remaining.length > 0) {
+        if (statusGeneration !== repoGeneration.current) return;
+        const chunk = [];
+        let bytes = 0;
+        for (const path of remaining) {
+          const nextBytes = encoder.encode(path).length + 1;
+          if (chunk.length > 0 && (chunk.length >= 500 || bytes + nextBytes > 48 * 1024)) break;
+          chunk.push(path);
+          bytes += nextBytes;
+        }
+        const result = await stagePaths(chunk, repoPath || void 0);
+        if (statusGeneration !== repoGeneration.current) return;
+        if (!result.ok) throw new Error(result.error || t("stageFailed"));
+        stagedCount += chunk.length;
+        remaining = remaining.slice(chunk.length);
+        const done = new Set(chunk);
+        setBatchSelected((current) => new Set([...current].filter((path) => !done.has(path))));
+      }
+      showToast(t("batchStageDone") + " \xB7 " + String(stagedCount));
+    } catch (error) {
+      if (statusGeneration !== repoGeneration.current) return;
+      const detail = error instanceof Error ? error.message : String(error);
+      const message2 = t("batchStagePartial") + " \xB7 " + t("batchStageConfirmed") + ": " + String(stagedCount) + " \xB7 " + detail;
+      setActionError(message2);
+      showToast(message2);
+    } finally {
+      await loadStatus();
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }, [batchSelected, loadStatus, repoPath, showToast, status, statusGeneration, t]);
   const submitBatchRemove = React.useCallback(async () => {
     const paths = dialog?.paths ?? [];
     if (paths.length === 0 || dialog?.generation !== repoGeneration.current || statusGeneration !== repoGeneration.current) return;
@@ -4060,7 +4264,8 @@ function Workspace(props) {
       }
       if (failures.length) throw new Error(t("batchRemoveFailed") + ": " + failures.join("; "));
       closeDialog();
-      setBatchSelected(/* @__PURE__ */ new Set());
+      const deleted = new Set(paths);
+      setBatchSelected((current) => new Set([...current].filter((path) => !deleted.has(path))));
       showToast(t("batchRemoveDone") + " \xB7 " + String(removedCount));
       if (selected && paths.includes(selected.path)) {
         setSelected(null);
@@ -4069,8 +4274,10 @@ function Workspace(props) {
     } catch (error) {
       if (statusGeneration !== repoGeneration.current) return;
       const pending = [...retryPaths, ...remaining];
+      const pendingSet = new Set(pending);
+      const removed = new Set(paths.filter((path) => !pendingSet.has(path)));
       setDialog((current) => current?.kind === "remove-untracked-batch" ? { ...current, paths: pending } : current);
-      setBatchSelected(new Set(pending));
+      setBatchSelected((current) => new Set([...current].filter((path) => !removed.has(path))));
       setDialogError((removedCount ? t("batchRemoveDone") + ": " + removedCount + ". " : "") + (error instanceof Error ? error.message : String(error)));
     } finally {
       await loadStatus();
@@ -4117,58 +4324,6 @@ function Workspace(props) {
       setDialogBusy(false);
     }
   }, [closeDialog, dialog?.branch, loadHistory, loadRefs, loadStatus, repoPath, showToast, t, view]);
-  const fileMenu = (entry, side, event) => {
-    const conflict = side === "conflicted" || entry.conflicted;
-    const untracked = entry.kind === "untracked";
-    const items = [];
-    if (conflict) {
-      items.push({ label: t("handoff"), onSelect: () => void handoffConflict(entry.path) });
-      items.push({
-        label: t("modelMergePreview"),
-        disabled: conflictBusy !== "",
-        onSelect: () => void resolveConflictWithAi(entry.path)
-      });
-      items.push({ divider: true });
-    }
-    items.push(
-      {
-        label: t("commitThis"),
-        disabled: conflict,
-        hint: conflict ? t("conflictsBlockCommit") : "\u2318\u21B5",
-        onSelect: () => void commitThis(entry, side)
-      },
-      { divider: true }
-    );
-    if (!conflict) {
-      items.push({
-        label: side === "staged" ? t("unstageFile") : t("stageFile"),
-        onSelect: () => void toggle(entry, side)
-      });
-    }
-    if (!untracked) {
-      items.push({
-        label: t("discardChanges"),
-        danger: true,
-        disabled: conflict,
-        hint: conflict ? t("conflictsBlockCommit") : void 0,
-        onSelect: () => {
-          setDialogError("");
-          setDialog({ kind: "discard", path: entry.path, side });
-        }
-      });
-    }
-    items.push({
-      label: untracked ? t("removeUntracked") : t("removeFile"),
-      danger: true,
-      onSelect: () => {
-        setDialogError("");
-        setDialog({ kind: untracked ? "remove-untracked" : "remove", path: entry.path });
-      }
-    });
-    items.push({ divider: true });
-    items.push({ label: t("copyPath"), onSelect: () => copyPath(entry) });
-    setContextMenu({ x: event.clientX, y: event.clientY, title: entry.path, items });
-  };
   const refMenu = (record, kind, event) => {
     const items = kind === "tag" ? [
       { label: t("copyRefName"), onSelect: () => copyText(record.name, t("copiedPath")) },
@@ -4308,11 +4463,9 @@ function Workspace(props) {
     async (path) => {
       const generation = statusGeneration;
       if (generation !== repoGeneration.current) return;
-      await loadStatus({ silent: true });
-      const next = await fetchStatus(repoPath || void 0);
+      const next = await loadStatus({ silent: true });
       if (generation !== repoGeneration.current) return;
-      if (next.ok) setStatus(next);
-      const updated = next.ok ? findEntry(next, path) : null;
+      const updated = next?.ok ? findEntry(next, path) : null;
       if (updated) await openDiff(updated, "conflicted");
     },
     [openDiff, repoPath, loadStatus, statusGeneration]
@@ -4370,6 +4523,73 @@ function Workspace(props) {
       }
     },
     [loadRefs, refreshAfterConflict, repoPath, showToast, t]
+  );
+  const conflictHandoff = React.useCallback(() => {
+    if (selected) void handoffConflict(selected.path);
+  }, [handoffConflict, selected]);
+  const conflictRevert = React.useCallback(() => {
+    if (!selected) return;
+    setDialogError("");
+    setDialog({ kind: "conflict-revert", path: selected.path });
+  }, [selected]);
+  const conflictMarkResolved = React.useCallback(() => {
+    if (selected) void markResolved(selected.path);
+  }, [markResolved, selected]);
+  const fileMenu = React.useCallback(
+    (entry, side, event) => {
+      if (busyRef.current) return;
+      const conflict = side === "conflicted" || entry.conflicted;
+      const untracked = entry.kind === "untracked";
+      const items = [];
+      if (conflict) {
+        items.push({ label: t("handoff"), onSelect: () => void handoffConflict(entry.path) });
+        items.push({
+          label: t("modelMergePreview"),
+          disabled: conflictBusy !== "",
+          onSelect: () => void resolveConflictWithAi(entry.path)
+        });
+        items.push({ divider: true });
+      }
+      items.push(
+        {
+          label: t("commitThis"),
+          disabled: conflict,
+          hint: conflict ? t("conflictsBlockCommit") : "\u2318\u21B5",
+          onSelect: () => void commitThis(entry, side)
+        },
+        { divider: true }
+      );
+      if (!conflict) {
+        items.push({
+          label: side === "staged" ? t("unstageFile") : t("stageFile"),
+          onSelect: () => void toggle(entry, side)
+        });
+      }
+      if (!untracked) {
+        items.push({
+          label: t("discardChanges"),
+          danger: true,
+          disabled: conflict,
+          hint: conflict ? t("conflictsBlockCommit") : void 0,
+          onSelect: () => {
+            setDialogError("");
+            setDialog({ kind: "discard", path: entry.path, side });
+          }
+        });
+      }
+      items.push({
+        label: untracked ? t("removeUntracked") : t("removeFile"),
+        danger: true,
+        onSelect: () => {
+          setDialogError("");
+          setDialog({ kind: untracked ? "remove-untracked" : "remove", path: entry.path });
+        }
+      });
+      items.push({ divider: true });
+      items.push({ label: t("copyPath"), onSelect: () => copyPath(entry) });
+      setContextMenu({ x: event.clientX, y: event.clientY, title: entry.path, items });
+    },
+    [commitThis, conflictBusy, copyPath, handoffConflict, resolveConflictWithAi, t, toggle]
   );
   const fetchNow = React.useCallback(
     async (options) => {
@@ -4454,6 +4674,9 @@ function Workspace(props) {
       setBusy(false);
     }
   }, [afterPush, message, pushAfter, repoPath, showToast, status, t]);
+  const commitAction = React.useCallback(() => {
+    void commit();
+  }, [commit]);
   const switchWorkspace = React.useCallback(
     (path) => {
       if (path === repoPath) return;
@@ -4495,7 +4718,7 @@ function Workspace(props) {
   );
   React.useEffect(() => {
     if (!status) return;
-    const eligible = new Set((status.entries ?? []).filter((entry) => entry.kind === "untracked").map((entry) => entry.path));
+    const eligible = new Set((status.entries ?? []).filter((entry) => entry.unstaged && !entry.conflicted).map((entry) => entry.path));
     setBatchSelected((current) => {
       const next = new Set([...current].filter((path) => eligible.has(path)));
       return next.size === current.size ? current : next;
@@ -4503,6 +4726,32 @@ function Workspace(props) {
   }, [status]);
   const entries = status?.entries ?? [];
   const rows = splitEntries(entries);
+  const toggleBatchPath = React.useCallback((path) => {
+    if (busyRef.current) return;
+    setBatchSelected((current) => {
+      const next = new Set(current);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+  const selectAllUnstaged = React.useCallback(() => {
+    if (!busyRef.current) setBatchSelected(new Set(rows.unstaged.map((entry) => entry.path)));
+  }, [rows]);
+  const clearBatchSelection = React.useCallback(() => {
+    if (!busyRef.current) setBatchSelected(/* @__PURE__ */ new Set());
+  }, []);
+  const stageBatch = React.useCallback(() => void submitBatchStage(), [submitBatchStage]);
+  const copyBatchPaths = React.useCallback(
+    () => void copyText([...batchSelected].join("\n"), t("copiedPaths"), t("copyFailed")),
+    [batchSelected, copyText, t]
+  );
+  const removeBatch = React.useCallback(() => {
+    const paths = rows.unstaged.filter((entry) => entry.kind === "untracked" && batchSelected.has(entry.path)).map((entry) => entry.path);
+    if (paths.length === 0) return;
+    setDialogError("");
+    setDialog({ kind: "remove-untracked-batch", paths, generation: statusGeneration });
+  }, [batchSelected, rows, statusGeneration]);
   const selectedKey = selected ? rowKey(selected.path, selected.side) : "";
   const selectedEntry = selected ? findEntry(status, selected.path) : null;
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null;
@@ -4584,19 +4833,12 @@ function Workspace(props) {
           entries,
           selectedKey,
           batchSelected,
-          onBatchSelect: (path) => setBatchSelected((current) => {
-            const next = new Set(current);
-            if (next.has(path)) next.delete(path);
-            else next.add(path);
-            return next;
-          }),
-          onBatchSelectAll: () => setBatchSelected(new Set(rows.unstaged.filter((entry) => entry.kind === "untracked").map((entry) => entry.path))),
-          onBatchClear: () => setBatchSelected(/* @__PURE__ */ new Set()),
-          onBatchRemove: () => {
-            if (batchSelected.size === 0) return;
-            setDialogError("");
-            setDialog({ kind: "remove-untracked-batch", paths: [...batchSelected], generation: statusGeneration });
-          },
+          onBatchSelect: toggleBatchPath,
+          onBatchSelectAll: selectAllUnstaged,
+          onBatchClear: clearBatchSelection,
+          onBatchStage: stageBatch,
+          onBatchCopy: copyBatchPaths,
+          onBatchRemove: removeBatch,
           diffSelection,
           diff,
           diffLoading,
@@ -4606,31 +4848,26 @@ function Workspace(props) {
           t,
           commitInputRef: commitInput,
           commitCollapsed,
-          onToggleCommitCollapsed: () => setCommitFold(!commitCollapsed),
+          onToggleCommitCollapsed: toggleCommitFold,
           conflict: {
             busy: conflictBusy !== "",
             opening: handoffBusy,
-            onHandoff: () => {
-              if (selected) void handoffConflict(selected.path);
-            },
-            onRevert: () => {
-              if (!selected) return;
-              setDialogError("");
-              setDialog({ kind: "conflict-revert", path: selected.path });
-            },
-            onMarkResolved: () => {
-              if (selected) void markResolved(selected.path);
-            }
+            onHandoff: conflictHandoff,
+            onRevert: conflictRevert,
+            onMarkResolved: conflictMarkResolved
           },
-          onSelect: (entry, side) => void openDiff(entry, side),
-          onToggle: (entry, side) => void toggle(entry, side),
+          // Stable callbacks, not arrows: the diff pane and the commit card are
+          // memoised on their props. `openDiff`/`toggle`/`copyPath`/`fileMenu` are
+          // the useCallbacks themselves, so a list-only render leaves both alone.
+          onSelect: openDiff,
+          onToggle: toggle,
           onCopyPath: copyPath,
-          onContextMenu: (entry, side, event) => fileMenu(entry, side, event),
+          onContextMenu: fileMenu,
           canPush,
           pushAfter,
           onPushAfter: setPushAfter,
           onMessage: setMessage,
-          onCommit: () => void commit(),
+          onCommit: commitAction,
           ai: aiCommit
         });
     }
@@ -4813,7 +5050,7 @@ function Workspace(props) {
     dialog?.kind === "remove-untracked-batch" ? h(ConfirmDialog, {
       title: t("batchRemoveTitle"),
       body: String(dialog.paths?.length ?? 0) + " " + t("batchRemoveBody"),
-      submitLabel: t("deleteSelected"),
+      submitLabel: t("deleteSelectedUntracked"),
       busy: dialogBusy,
       error: dialogError,
       t,

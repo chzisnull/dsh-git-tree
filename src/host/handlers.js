@@ -55,6 +55,7 @@ import {
 import { json, readJsonBody } from './http.js'
 
 const MAX_WRITE_PATHS = 500
+const MAX_STAGE_PATH_BYTES = 48 * 1024
 const MAX_COMMIT_MESSAGE = 8192
 
 /** Resolve the request cwd once, refusing anything outside the workspace. */
@@ -726,23 +727,60 @@ function safePathList(value) {
   return value.map(safeRepoPath)
 }
 
+function assertWriteFiles(cwd, paths) {
+  for (const path of paths) {
+    try {
+      if (lstatSync(join(cwd, path)).isDirectory()) throw new RequestError('只能操作文件路径')
+    } catch (error) {
+      if (error instanceof RequestError) throw error
+      if (error?.code !== 'ENOENT' && error?.code !== 'ENOTDIR') throw error
+    }
+  }
+}
+
+async function writeRepoRoot(ctx, subprocess, cwd) {
+  const output = await git(subprocess, ['rev-parse', '--show-toplevel'], cwd, { maxBytes: 64 * 1024 })
+  const root = output.replace(/\n$/, '')
+  if (!isAbsolute(root)) throw new GitError('无法确定仓库根目录')
+  return resolveCwd(ctx, root)
+}
+
+async function assertExactWritePaths(subprocess, cwd, paths) {
+  assertWriteFiles(cwd, paths)
+  // A missing directory can still match tracked descendants in the index.
+  const listed = await git(subprocess, ['--literal-pathspecs', 'ls-files', '--cached', '--others', '--exclude-standard', '-z', '--', ...paths], cwd, { maxBytes: MAX_STATUS_BYTES })
+  const prefixes = paths.map((path) => path + '/')
+  if (listed.split('\0').some((path) => prefixes.some((prefix) => path.startsWith(prefix)))) {
+    throw new RequestError('只能操作文件路径')
+  }
+}
+
 export async function handleStage(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
   const body = await readJsonBody(request)
-  const paths = safePathList(body.paths)
+  const paths = literalPaths(body.paths)
+  if (paths.reduce((total, path) => total + Buffer.byteLength(path, 'utf8'), 0) > MAX_STAGE_PATH_BYTES) {
+    throw new RequestError('暂存路径总字节数不能超过 ' + String(MAX_STAGE_PATH_BYTES), 400, 'paths-too-large')
+  }
   const subprocess = subprocessOf(ctx)
-
-  await git(subprocess, ['add', '-A', '--', ...paths], cwd, { maxBytes: 256 * 1024 })
+  const repoRoot = await writeRepoRoot(ctx, subprocess, cwd)
+  await assertExactWritePaths(subprocess, repoRoot, paths)
+  const unmerged = await git(subprocess, ['--literal-pathspecs', 'ls-files', '--unmerged', '-z', '--', ...paths], repoRoot, { maxBytes: MAX_STATUS_BYTES })
+  if (unmerged) throw new RequestError('存在未合并文件，请先解决冲突', 409, 'conflicts-present')
+  assertWriteFiles(repoRoot, paths)
+  await git(subprocess, ['--literal-pathspecs', 'add', '-A', '--', ...paths], repoRoot, { maxBytes: 256 * 1024 })
   return json({ ok: true, staged: paths })
 }
 
 export async function handleUnstage(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
   const body = await readJsonBody(request)
-  const paths = safePathList(body.paths)
+  const paths = literalPaths(body.paths)
   const subprocess = subprocessOf(ctx)
-
-  await git(subprocess, ['reset', '--quiet', 'HEAD', '--', ...paths], cwd, { maxBytes: 256 * 1024 })
+  const repoRoot = await writeRepoRoot(ctx, subprocess, cwd)
+  await assertExactWritePaths(subprocess, repoRoot, paths)
+  assertWriteFiles(repoRoot, paths)
+  await git(subprocess, ['--literal-pathspecs', 'reset', '--quiet', 'HEAD', '--', ...paths], repoRoot, { maxBytes: 256 * 1024 })
   return json({ ok: true, unstaged: paths })
 }
 
@@ -765,7 +803,7 @@ export async function handleDiscard(ctx, request) {
   return json({ ok: true, discarded: paths, side: staged ? 'staged' : 'unstaged' })
 }
 
-function literalUntrackedPaths(value) {
+function literalPaths(value) {
   if (!Array.isArray(value) || value.length === 0) throw new RequestError('缺少 paths 参数')
   if (value.length > MAX_WRITE_PATHS) {
     throw new RequestError('一次最多操作 ' + String(MAX_WRITE_PATHS) + ' 个路径', 400, 'too-many-paths')
@@ -836,10 +874,13 @@ export async function handleRemove(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
   const body = await readJsonBody(request)
   const untracked = body.untracked === true
-  const paths = untracked ? literalUntrackedPaths(body.paths) : safePathList(body.paths)
+  const paths = untracked ? literalPaths(body.paths) : safePathList(body.paths)
   const subprocess = subprocessOf(ctx)
 
-  if (untracked) return removeUntracked(subprocess, cwd, paths, request.signal)
+  if (untracked) {
+    const repoRoot = await writeRepoRoot(ctx, subprocess, cwd)
+    return removeUntracked(subprocess, repoRoot, paths, request.signal)
+  }
   await git(subprocess, ['rm', '-f', '--quiet', '--', ...paths], cwd, { maxBytes: 256 * 1024 })
   return json({ ok: true, removed: paths, untracked })
 }

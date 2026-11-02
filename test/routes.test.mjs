@@ -4,7 +4,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -725,7 +725,8 @@ test('untracked removal uses exact literal paths and reports partial failures in
   for (const path of ['abc.txt', 'tracked.txt', 'ignored.txt', 'folder/child.txt']) {
     assert.equal(existsSync(join(root, path)), true, path)
   }
-  assert.ok(ctx.spawns.every(({ argv }) => argv[1] === '--literal-pathspecs'))
+  assert.deepEqual(ctx.spawns[0].argv.slice(1), ['rev-parse', '--show-toplevel'])
+  assert.ok(ctx.spawns.slice(1).every(({ argv }) => argv[1] === '--literal-pathspecs'))
 
   for (const path of ['fails.txt', 'staged-later.txt', 'last.txt']) writeFileSync(join(root, path), path)
   const realSpawn = subprocess.spawn
@@ -762,6 +763,33 @@ test('untracked removal uses exact literal paths and reports partial failures in
   })
   assert.deepEqual(allRemoved.body, { ok: true, removed: ['abc.txt', 'link'], failed: [], untracked: true })
   assert.equal(existsSync(join(root, 'folder', 'child.txt')), true)
+
+  mkdirSync(join(root, 'sub', 'sub'), { recursive: true })
+  writeFileSync(join(root, 'sub', 'file'), 'selected')
+  writeFileSync(join(root, 'sub', 'sub', 'file'), 'neighbor')
+  const subUrl = '?cwd=' + encodeURIComponent(join(root, 'sub'))
+  const subStatus = await call(ctx, '/api/git-tree/status' + subUrl)
+  assert.ok(subStatus.body.entries.some((entry) => entry.path === 'sub/file'))
+  const selected = await call(ctx, '/api/git-tree/remove' + subUrl, {
+    method: 'POST', body: { paths: ['sub/file'], untracked: true },
+  })
+  assert.deepEqual(selected.body, { ok: true, removed: ['sub/file'], failed: [], untracked: true })
+  assert.equal(existsSync(join(root, 'sub', 'file')), false)
+  assert.equal(existsSync(join(root, 'sub', 'sub', 'file')), true)
+
+  writeFileSync(join(root, 'sub', 'file'), 'selected again')
+  const restricted = fakeContext({ workspaceRoot: join(root, 'sub'), registry: () => [] })
+  const restrictedSubprocess = restricted.get('subprocess')
+  restrictedSubprocess.resolveExecutable = subprocess.resolveExecutable
+  restrictedSubprocess.spawn = realSpawn
+  apply(restricted)
+  const denied = await call(restricted, '/api/git-tree/remove', {
+    method: 'POST', body: { paths: ['sub/file'], untracked: true },
+  })
+  assert.equal(denied.response.status, 403)
+  assert.equal(denied.body.code, 'outside-workspace')
+  assert.equal(existsSync(join(root, 'sub', 'file')), true)
+  assert.equal(existsSync(join(root, 'sub', 'sub', 'file')), true)
 })
 
 test('untracked removal validates the entire input before running git', async () => {
@@ -1038,15 +1066,156 @@ test('stage route passes paths after -- and refuses unsafe ones', async () => {
     body: { paths: ['src/app.js', 'docs/new-note.md'] },
   })
   assert.equal(body.ok, true)
-  const callRecord = ctx.spawns.find((spawn) => spawn.argv[1] === 'add')
+  const callRecord = ctx.spawns.find((spawn) => spawn.argv[2] === 'add')
   assert.ok(callRecord, 'stage must run git add')
-  const dashDash = callRecord.argv.indexOf('--')
-  assert.deepEqual(callRecord.argv.slice(dashDash + 1), ['src/app.js', 'docs/new-note.md'])
+  assert.deepEqual(callRecord.argv.slice(1), ['--literal-pathspecs', 'add', '-A', '--', 'src/app.js', 'docs/new-note.md'])
 
   const before = ctx.spawns.length
-  const bad = await call(ctx, '/api/git-tree/stage', { method: 'POST', body: { paths: ['../escape'] } })
-  assert.equal(bad.body.ok, false)
-  assert.equal(ctx.spawns.length, before, 'no git process may run for a rejected path')
+  for (const paths of [['../escape'], ['ok', '/absolute'], ['ok', 'a//b'], ['ok', 'a/./b'], ['ok', 'a/../b'], ['ok', 'a\0b'], ['ok', 1], Array(501).fill('x')]) {
+    const bad = await call(ctx, '/api/git-tree/stage', { method: 'POST', body: { paths } })
+    assert.equal(bad.response.status, 400, JSON.stringify(paths))
+    assert.equal(bad.body.ok, false)
+    assert.equal(ctx.spawns.length, before, 'no git process may run for a rejected path')
+  }
+
+  const tooLarge = await call(ctx, '/api/git-tree/stage', {
+    method: 'POST', body: { paths: Array(17).fill('字'.repeat(1000)) },
+  })
+  assert.equal(tooLarge.response.status, 400)
+  assert.equal(tooLarge.body.code, 'paths-too-large')
+  assert.equal(ctx.spawns.length, before, 'no git process may run for an oversized batch')
+})
+
+test('stage selects exact files, including deletions and renamed status entries, in a real repository', async (t) => {
+  if (process.platform === 'win32' || spawnSync('git', ['--version']).status !== 0) {
+    t.skip('requires git and POSIX filename semantics')
+    return
+  }
+  const root = realpathSync.native(mkdtempSync(join(tmpdir(), 'dgt-stage-')))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const runGit = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' }).toString()
+  runGit('init', '-q')
+  mkdirSync(join(root, 'removed-dir'))
+  mkdirSync(join(root, 'folder'))
+  for (const path of ['tracked.txt', 'untouched.txt', 'deleted.txt', 'old-name.txt', 'staged-old.txt', 'conflict.txt', 'removed-dir/child.txt', 'folder/child.txt']) {
+    writeFileSync(join(root, path), 'original\n')
+  }
+  writeFileSync(join(root, '.gitignore'), 'ignored.txt\n')
+  runGit('add', '.')
+  runGit('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', 'initial')
+  runGit('mv', 'staged-old.txt', 'staged-new.txt')
+  writeFileSync(join(root, 'staged-new.txt'), 'changed after rename\n')
+  renameSync(join(root, 'old-name.txt'), join(root, 'new-name.txt'))
+  rmSync(join(root, 'deleted.txt'))
+  rmSync(join(root, 'removed-dir'), { recursive: true })
+  for (const path of ['tracked.txt', 'untouched.txt', 'folder/child.txt', 'a*.txt', 'abc.txt', ':(glob)*.txt', '-dash', '~tilde', 'back\\slash', '名字\n.txt', 'ignored.txt']) {
+    writeFileSync(join(root, path), 'changed\n')
+  }
+
+  const ctx = fakeContext({ workspaceRoot: root, registry: () => [] })
+  const subprocess = ctx.get('subprocess')
+  subprocess.resolveExecutable = async () => 'git'
+  subprocess.spawn = ({ argv, cwd }) => {
+    ctx.spawns.push({ argv, cwd })
+    const result = spawnSync(argv[0], argv.slice(1), { cwd, encoding: 'utf8' })
+    return {
+      done: Promise.resolve({ exitCode: result.status, signal: result.signal }),
+      collected: {
+        stdout: { readFrom: () => ({ text: result.stdout || '', lossy: false }) },
+        stderr: { readFrom: () => ({ text: result.stderr || '', lossy: false }) },
+      },
+    }
+  }
+  apply(ctx)
+  const status = await call(ctx, '/api/git-tree/status')
+  const renamed = status.body.entries.find((entry) => entry.path === 'staged-new.txt')
+  assert.equal(renamed.kind, 'renamed')
+  assert.equal(renamed.origPath, 'staged-old.txt')
+  assert.equal(renamed.unstaged, true)
+  const paths = ['tracked.txt', 'deleted.txt', 'old-name.txt', 'new-name.txt', 'staged-new.txt', 'a*.txt', ':(glob)*.txt', '-dash', '~tilde', 'back\\slash', '名字\n.txt']
+  const result = await call(ctx, '/api/git-tree/stage', { method: 'POST', body: { paths } })
+  assert.deepEqual(result.body, { ok: true, staged: paths })
+  const staged = runGit('diff', '--cached', '--name-only', '--no-renames', '-z').split('\0').filter(Boolean).sort()
+  assert.deepEqual(staged, [...paths, 'staged-old.txt'].sort())
+  assert.equal(runGit('show', ':staged-new.txt'), 'changed after rename\n')
+  assert.equal(runGit('show', ':untouched.txt'), 'original\n')
+  assert.equal(runGit('show', ':folder/child.txt'), 'original\n')
+  assert.ok(!staged.includes('abc.txt'))
+
+  runGit('add', '--', 'abc.txt')
+  const special = ['a*.txt', ':(glob)*.txt', '-dash', '~tilde', 'back\\slash', '名字\n.txt']
+  const unstaged = await call(ctx, '/api/git-tree/unstage', { method: 'POST', body: { paths: special } })
+  assert.deepEqual(unstaged.body, { ok: true, unstaged: special })
+  const afterUnstage = runGit('diff', '--cached', '--name-only', '--no-renames', '-z').split('\0')
+  for (const path of special) assert.ok(!afterUnstage.includes(path), path)
+  assert.ok(afterUnstage.includes('abc.txt'), 'a glob-like name must not unstage its neighbor')
+
+  mkdirSync(join(root, 'sub', 'sub'), { recursive: true })
+  writeFileSync(join(root, 'sub', 'file'), 'selected\n')
+  writeFileSync(join(root, 'sub', 'sub', 'file'), 'neighbor\n')
+  const subUrl = '?cwd=' + encodeURIComponent(join(root, 'sub'))
+  const subStatus = await call(ctx, '/api/git-tree/status' + subUrl)
+  assert.ok(subStatus.body.entries.some((entry) => entry.path === 'sub/file'))
+  const subStage = await call(ctx, '/api/git-tree/stage' + subUrl, { method: 'POST', body: { paths: ['sub/file'] } })
+  assert.equal(subStage.body.ok, true)
+  assert.equal(runGit('show', ':sub/file'), 'selected\n')
+  assert.equal(runGit('ls-files', '--', 'sub/sub/file'), '')
+  const subUnstage = await call(ctx, '/api/git-tree/unstage' + subUrl, { method: 'POST', body: { paths: ['sub/file'] } })
+  assert.equal(subUnstage.body.ok, true)
+  assert.equal(runGit('ls-files', '--', 'sub/file'), '')
+
+  const restricted = fakeContext({ workspaceRoot: join(root, 'sub'), registry: () => [] })
+  const restrictedSubprocess = restricted.get('subprocess')
+  restrictedSubprocess.resolveExecutable = subprocess.resolveExecutable
+  restrictedSubprocess.spawn = subprocess.spawn
+  apply(restricted)
+  for (const route of ['stage', 'unstage']) {
+    const denied = await call(restricted, '/api/git-tree/' + route, { method: 'POST', body: { paths: ['sub/file'] } })
+    assert.equal(denied.response.status, 403, route)
+    assert.equal(denied.body.code, 'outside-workspace')
+  }
+
+  writeFileSync(join(root, 'racing'), 'file')
+  const realSpawn = subprocess.spawn
+  subprocess.spawn = (options) => {
+    const result = realSpawn(options)
+    if (options.argv.includes('--unmerged') && options.argv.includes('racing')) {
+      rmSync(join(root, 'racing'))
+      mkdirSync(join(root, 'racing'))
+      writeFileSync(join(root, 'racing', 'child'), 'not selected')
+    }
+    return result
+  }
+  const race = await call(ctx, '/api/git-tree/stage', { method: 'POST', body: { paths: ['untouched.txt', 'racing'] } })
+  assert.equal(race.response.status, 400)
+  assert.equal(runGit('show', ':untouched.txt'), 'original\n')
+  assert.equal(runGit('ls-files', '--', 'racing'), '')
+  subprocess.spawn = realSpawn
+
+  // A file can become conflicted after the client selected it.
+  const blob = runGit('rev-parse', 'HEAD:conflict.txt').trim()
+  runGit('update-index', '--force-remove', 'conflict.txt')
+  execFileSync('git', ['update-index', '--index-info'], {
+    cwd: root, input: [1, 2, 3].map((stage) => `100644 ${blob} ${stage}\tconflict.txt\n`).join(''),
+  })
+  const conflict = await call(ctx, '/api/git-tree/stage', { method: 'POST', body: { paths: ['untouched.txt', 'conflict.txt'] } })
+  assert.equal(conflict.response.status, 409)
+  assert.equal(conflict.body.code, 'conflicts-present')
+  assert.equal(runGit('show', ':untouched.txt'), 'original\n')
+  assert.equal(runGit('ls-files', '-u', '--', 'conflict.txt').trim().split('\n').length, 3)
+
+  for (const route of ['stage', 'unstage']) {
+    for (const path of ['folder', 'removed-dir']) {
+      const before = runGit('diff', '--cached', '--name-only', '--no-renames', '-z')
+      const rejected = await call(ctx, '/api/git-tree/' + route, { method: 'POST', body: { paths: ['untouched.txt', path] } })
+      assert.equal(rejected.response.status, 400, route + ': ' + path)
+      assert.equal(runGit('diff', '--cached', '--name-only', '--no-renames', '-z'), before)
+    }
+  }
+  for (const path of ['missing.txt', 'ignored.txt']) {
+    const rejected = await call(ctx, '/api/git-tree/stage', { method: 'POST', body: { paths: [path] } })
+    assert.equal(rejected.body.code, 'git-failed', path)
+  }
 })
 
 test('unstage route resets the index without touching the work tree', async () => {
@@ -1057,9 +1226,8 @@ test('unstage route resets the index without touching the work tree', async () =
     body: { paths: ['src/staged.js'] },
   })
   assert.equal(body.ok, true)
-  const callRecord = ctx.spawns.find((spawn) => spawn.argv[1] === 'reset')
-  assert.deepEqual(callRecord.argv.slice(1, 4), ['reset', '--quiet', 'HEAD'])
-  assert.deepEqual(callRecord.argv.slice(callRecord.argv.indexOf('--') + 1), ['src/staged.js'])
+  const callRecord = ctx.spawns.find((spawn) => spawn.argv[2] === 'reset')
+  assert.deepEqual(callRecord.argv.slice(1), ['--literal-pathspecs', 'reset', '--quiet', 'HEAD', '--', 'src/staged.js'])
 })
 
 test('commit route refuses an empty message before calling git', async () => {

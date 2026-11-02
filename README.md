@@ -12,7 +12,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.14.0 provides a Git workspace with file status, history, search, local branches, fetch and pull, and an AI-assisted commit message. It also supports selecting and deleting untracked files in bulk.
+Version 0.15.0 provides a Git workspace with file status, history, search, local branches, fetch and pull, and an AI-assisted commit message. Unstaged files can be selected in bulk to stage them, copy their paths, or delete the untracked ones; the change list keeps its layout compact and stops redrawing when a poll finds nothing new.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Keyboard shortcut**: `⇧⌘V` (`Ctrl+Shift+V` on Windows) opens the panel from anywhere and closes it again when it is already open. The command is registered through DSH's own shortcut service, so it is listed and rebindable in Settings → Keyboard shortcuts (`⌘/`); the keycap badge in the toolbar and the hint in the empty diff pane always show the binding you actually have. Panel-owned dialogs and the AI conflict preview hold it still, and the commit draft is kept per repository, so a stray press never drops work; when the command has no binding the empty pane points at Settings instead of showing keys.
@@ -21,7 +21,7 @@ Version 0.14.0 provides a Git workspace with file status, history, search, local
 - **Sourcetree's change model**: conflict, staged and unstaged groups with counts; renames keep their original path; a file changed on both sides appears in both groups (driven by `git status --porcelain=v2 --branch -z`).
 - **Structured diff**: parsed on the host into files → hunks → lines, rendered with dual line numbers, hunk headers, whole-row tints and `+N −M`.
 - **Stage / unstage / commit**: per-row checkbox, hover menu, file-level action in the diff header, a commit box with author, branch, staged count and ⌘↵ — plus a `--`-guarded, conflict-checked host route for each write.
-- **Delete untracked files in bulk**: select individual files or all shown using the separate selection controls, then confirm Delete selected. Git cannot recover files deleted this way.
+- **Work with files in bulk**: select unstaged files to stage them or copy their paths. Selected untracked files can also be deleted after confirmation; Git cannot recover files deleted this way.
 - **History view**: commits newest-first with a lane graph, description / short SHA / author / date columns, an "all branches / current branch only" switch and paged loading (200 per page).
 - **Commit detail**: select a commit to see its message, author, date, parents, refs and changed files; pick a file for its in-commit diff; follow a parent link to jump.
 - **Search view**: find commits by message, author or file path; results reuse the history list and detail.
@@ -40,7 +40,7 @@ Version 0.14.0 provides a Git workspace with file status, history, search, local
 
 ## Status
 
-| Area | 0.14.0 |
+| Area | 0.15.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | keyboard shortcut (`⇧⌘V`) | done |

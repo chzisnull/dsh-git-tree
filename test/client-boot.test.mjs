@@ -21,6 +21,9 @@ const react = {
   useState: (value) => [value, () => {}],
   useEffect: () => {},
   useCallback: (fn) => fn,
+  // The panel memoises its diff pane and commit card at module load; without
+  // this the bundle would fail to evaluate before any hook is reached.
+  memo: (component) => component,
   Fragment: 'Fragment',
 }
 

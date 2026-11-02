@@ -13,7 +13,7 @@
 // user stares at when nothing is selected, and it disappears together with the
 // badge when the keybinding is unbound.
 
-import { h } from '../react'
+import { h, React } from '../react'
 import type {
   ConflictLine,
   ConflictPayload,
@@ -131,13 +131,18 @@ function ConflictBody(props: { conflict: ConflictPayload; t: Translate }): any {
   )
 }
 
-export function DiffView(props: {
-  selected: { entry: GitFileEntry; side: EntrySide } | null
+// Memoised: the shell re-renders on every status read, and a 20 000-line diff
+// costs ~390 ms to build. The pane only redraws when the file, its payload or a
+// conflict action actually moved; the caller passes entry and side separately
+// rather than a fresh `{ entry, side }` object, so identity is preserved.
+export const DiffView = React.memo(function DiffView(props: {
+  entry: GitFileEntry | null
+  side: EntrySide
   diff: DiffPayload | null
   loading: boolean
   hasChanges: boolean
   t: Translate
-  onToggleFile: () => void
+  onToggle: (entry: GitFileEntry, side: EntrySide) => void
   conflict: {
     busy: boolean
     opening: boolean
@@ -146,9 +151,9 @@ export function DiffView(props: {
     onMarkResolved: () => void
   }
 }): any {
-  const { selected, diff, loading, t } = props
-  const entry = selected?.entry ?? null
-  const side = selected?.side ?? 'unstaged'
+  const { diff, loading, t } = props
+  const entry = props.entry
+  const side = props.side
   const stats = diff?.stats
   const conflicted = entry !== null && entry.conflicted
   const actionLabel = side === 'staged' ? t('unstageFile') : t('stageFile')
@@ -232,7 +237,9 @@ export function DiffView(props: {
               type: 'button',
               className: 'dgt-diff-action',
               'data-kind': side === 'staged' ? 'unstage' : 'stage',
-              onClick: props.onToggleFile,
+              onClick: () => {
+                if (entry) props.onToggle(entry, side)
+              },
             },
             actionLabel,
           ),
@@ -264,4 +271,4 @@ export function DiffView(props: {
                     ),
     ),
   )
-}
+})

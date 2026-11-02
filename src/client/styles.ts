@@ -152,47 +152,64 @@ export const CSS = `
   height:44px;padding:0 16px;color:var(--dsw-alias-label-tertiary);font-size:11px;}
 .dgt-list-head b,:where(.dgt-list-head) span:first-child{color:var(--dsw-alias-label-primary);
   font-size:12.5px;font-weight:600;}
-.dgt-list-sort{margin-left:auto;margin-right:10px;color:var(--dsw-alias-label-tertiary);font-size:10.5px;font-weight:400;}
-.dgt-group-count{color:var(--dsw-alias-label-tertiary);font-variant-numeric:tabular-nums;font-weight:400;font-size:10.5px;}
+.dgt-group-count{color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;font-weight:400;font-size:10.5px;}
 .dgt-regions{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;padding:0 8px;}
 .dgt-region{display:flex;flex-direction:column;min-height:0;}
-.dgt-region[data-kind='conflicted']{flex:0 1 auto;max-height:34%;border-bottom:1px solid var(--dgt-line-soft);}
-.dgt-region[data-kind='staged']{flex:1 1 40%;min-height:104px;border-bottom:1px solid var(--dgt-line-soft);padding-bottom:6px;}
-.dgt-region[data-kind='unstaged']{flex:1 1 60%;padding-top:2px;}
+/* Content height, not a fixed share: an almost-empty group must not push the
+   other one to the far end of the pane. */
+.dgt-region[data-kind='conflicted']{flex:0 0 auto;max-height:34%;border-bottom:1px solid var(--dgt-line-soft);}
+.dgt-region[data-kind='staged']{flex:0 1 auto;max-height:60%;border-bottom:1px solid var(--dgt-line-soft);padding-bottom:6px;}
+.dgt-region[data-kind='unstaged']{flex:1 1 auto;padding-top:2px;}
 .dgt-region[data-empty='true']{flex:0 0 auto;min-height:0;}
 .dgt-region[data-empty='true'] .dgt-region-scroll{display:none;}
 .dgt-region-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding:0;}
 .dgt-group{display:flex;align-items:center;justify-content:space-between;flex:0 0 34px;padding:0 8px;
   color:var(--dsw-alias-label-secondary);font-size:11.5px;font-weight:600;}
 .dgt-group[data-tone='error']{color:var(--dgt-err);}
-.dgt-batch-bar{display:flex;align-items:center;gap:4px;flex:0 0 auto;min-height:34px;margin:0 4px 5px;padding:3px 6px 3px 10px;
-  border:1px solid var(--dgt-line-soft);border-radius:8px;background:var(--dgt-rail-bg);color:var(--dsw-alias-label-secondary);font-size:11px;}
-.dgt-batch-bar[data-selected='true']{border-color:var(--dgt-accent-soft);background:var(--dgt-accent-soft);}
+.dgt-batch-bar{display:flex;flex-direction:column;align-items:stretch;gap:2px;flex:0 0 auto;margin:0 4px 5px;padding:4px 6px 4px 10px;
+  border:1px solid var(--dgt-line);border-radius:8px;background:var(--dgt-rail-bg);color:var(--dsw-alias-label-secondary);font-size:11px;
+  transition:background-color .12s ease,border-color .12s ease;}
+.dgt-batch-summary,.dgt-batch-actions{display:flex;align-items:center;gap:6px;min-width:0;}
+/* The action row is always rendered at its own height: inserting it on the
+   first tick would shift every row (and the 全选 link) under the pointer. */
+.dgt-batch-actions{min-height:22px;border-top:1px solid var(--dgt-line-soft);padding-top:2px;}
+.dgt-batch-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-batch-bar[data-selected='true']{border-color:color-mix(in srgb, var(--dgt-accent) 35%, var(--dgt-line));
+  background:color-mix(in srgb, var(--dgt-accent) 6%, var(--dgt-card));}
 .dgt-batch-count{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.dgt-batch-bar button{appearance:none;flex:0 0 auto;border:0;border-radius:5px;background:transparent;padding:4px 6px;
-  color:var(--dgt-accent-strong);font:inherit;cursor:pointer;white-space:nowrap;}
-.dgt-batch-bar button:hover{background:var(--dgt-card);}
+.dgt-batch-bar button{appearance:none;flex:0 0 auto;border:0;border-radius:6px;background:transparent;padding:3px 6px;
+  color:var(--dgt-accent-strong);font:inherit;font-size:11px;cursor:pointer;white-space:nowrap;}
+.dgt-batch-bar button:hover{background:color-mix(in srgb, var(--dgt-accent) 12%, var(--dgt-card));}
 .dgt-batch-bar button:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:1px;}
+.dgt-batch-bar button[data-primary]{background:var(--dgt-accent-strong);color:var(--dgt-card);font-weight:600;}
+.dgt-batch-bar button[data-primary]:hover{background:var(--dgt-accent);color:var(--dgt-card);}
 .dgt-batch-bar button[data-danger]{color:var(--dgt-err);}
-.dgt-batch-placeholder{flex:0 0 14px;width:14px;}
+.dgt-batch-bar button[data-danger]:hover{background:color-mix(in srgb, var(--dgt-err) 12%, var(--dgt-card));}
+.dgt-batch-bar button:disabled{opacity:.5;cursor:default;}
+.dgt-batch-sep{flex:0 0 1px;align-self:stretch;margin:1px 3px;background:var(--dgt-line);}
+.dgt-batch-busy{display:inline-flex;align-items:center;gap:6px;color:var(--dsw-alias-label-secondary);}
 .dgt-row{position:relative;box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;height:36px;
   padding:0 9px;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-primary);
   font:inherit;font-size:12.5px;text-align:left;cursor:default;}
 .dgt-row:hover{background:var(--dgt-line-soft);}
 .dgt-row:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:-2px;}
-.dgt-row[data-batch-selected='true']{background:var(--dgt-line-soft);}
-.dgt-row[data-active='true']{background:var(--dgt-accent-soft);box-shadow:inset 3px 0 0 var(--dgt-accent);}
+.dgt-row[data-batch-selected='true']{background:var(--dgt-accent-soft);}
+.dgt-row[data-active='true']{background:var(--dgt-accent-soft);box-shadow:inset 3px 0 0 var(--dgt-accent-strong);}
 .dgt-row[data-active='true'] .dgt-path-name{font-weight:600;}
 .dgt-row[data-menu='true']{background:var(--dgt-line-soft);}
 .dgt-check{flex:0 0 auto;width:14px;height:14px;margin:0;accent-color:var(--dgt-accent-strong);cursor:pointer;}
+/* Same width for the staged/conflicted rows, which have no batch checkbox:
+   without it the two groups' badges and paths sit 22px apart. */
+.dgt-batch-placeholder{flex:0 0 14px;width:14px;height:14px;}
 .dgt-stage-control{display:inline-flex;align-items:center;justify-content:flex-end;gap:4px;flex:0 0 auto;}
-.dgt-stage-check{appearance:none;position:relative;width:23px;height:14px;border:1px solid var(--dgt-line);border-radius:8px;
-  background:var(--dgt-line);}
-.dgt-stage-check::before{content:'';position:absolute;top:1px;left:1px;width:10px;height:10px;border-radius:50%;background:var(--dgt-card);}
-.dgt-stage-check:checked{border-color:var(--dgt-accent-strong);background:var(--dgt-accent-strong);}
+.dgt-stage-check{appearance:none;position:relative;width:23px;height:14px;border:0;border-radius:8px;
+  background:color-mix(in srgb, var(--dsw-alias-label-tertiary) 85%, var(--dgt-card));cursor:pointer;}
+.dgt-stage-check::before{content:'';position:absolute;top:1px;left:1px;width:10px;height:10px;border-radius:50%;background:var(--dgt-card);transition:left .12s ease;}
+.dgt-stage-check:checked{background:var(--dgt-accent-strong);}
 .dgt-stage-check:checked::before{left:10px;}
 .dgt-stage-check:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:2px;}
 .dgt-stage-check:disabled{opacity:.45;cursor:default;}
+@media (prefers-reduced-motion:reduce){.dgt-batch-bar,.dgt-stage-check::before{transition:none;}}
 .dgt-badge{flex:0 0 auto;display:inline-grid;place-items:center;width:16px;height:16px;border-radius:5px;
   font-family:var(--ds-font-family-code);font-size:10px;font-weight:600;color:var(--dsw-alias-label-secondary);
   background:var(--dgt-line-soft);}
@@ -207,7 +224,8 @@ export const CSS = `
 .dgt-rowact{appearance:none;flex:0 0 auto;margin-left:auto;padding:1px 8px;border:0;border-radius:6px;
   background:transparent;color:var(--dgt-accent-strong);font:inherit;font-size:11.5px;cursor:pointer;opacity:1;white-space:nowrap;}
 .dgt-row:hover .dgt-rowact,.dgt-row:focus-within .dgt-rowact{opacity:1;}
-.dgt-rowact:hover{background:var(--dgt-accent-soft);}
+.dgt-rowact:disabled{opacity:.5;cursor:default;}
+.dgt-rowact:hover:not(:disabled){background:var(--dgt-accent-soft);}
 .dgt-rowact[data-disabled]{opacity:1;color:var(--dgt-warn);cursor:default;}
 
 /* diff */
@@ -245,7 +263,7 @@ export const CSS = `
 .dgt-placeholder{padding:14px 12px;color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px;}
 .dgt-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
   height:100%;min-height:120px;color:var(--dsw-alias-label-secondary);font-size:12.5px;}
-.dgt-empty-hint{color:var(--dsw-alias-label-tertiary);font-size:11.5px;}
+.dgt-empty-hint{color:var(--dsw-alias-label-secondary);font-size:11.5px;}
 
 /* keyboard shortcut: toolbar badge + empty-pane hint */
 .dgt-kbd{appearance:none;display:inline-flex;align-items:center;height:26px;margin-left:8px;

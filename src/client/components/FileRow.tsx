@@ -14,6 +14,7 @@ export function FileRow(props: {
   side: EntrySide
   active: boolean
   batchSelected: boolean
+  batchBusy: boolean
   onBatchSelect: (path: string) => void
   t: Translate
   onSelect: (entry: GitFileEntry, side: EntrySide) => void
@@ -59,18 +60,22 @@ export function FileRow(props: {
         }
       },
     },
-    side === 'unstaged' && entry.kind === 'untracked'
+    // The first cell is always there, so the badges, paths and switches of the
+    // staged and the unstaged groups start on the same edge. Only unstaged rows
+    // are selectable; the rest hold the column with an empty placeholder.
+    side === 'unstaged'
       ? h('input', {
           type: 'checkbox',
           className: 'dgt-check dgt-batch-check',
           checked: props.batchSelected,
-          'aria-label': t('selectUntracked') + ': ' + entry.path,
-          title: t('selectUntracked'),
+          disabled: props.batchBusy,
+          'aria-label': t('selectFile') + ': ' + entry.path,
+          title: t('selectFile'),
           onClick: (event: any) => event.stopPropagation(),
           onKeyDown: (event: any) => event.stopPropagation(),
           onChange: () => props.onBatchSelect(entry.path),
         })
-      : side === 'unstaged' ? h('span', { className: 'dgt-batch-placeholder', 'aria-hidden': true }) : null,
+      : h('span', { className: 'dgt-batch-placeholder', 'aria-hidden': true }),
     h('span', { className: 'dgt-badge', 'data-tone': tone }, letter),
     h(
       'span',
@@ -85,7 +90,7 @@ export function FileRow(props: {
         type: 'checkbox',
         className: 'dgt-check dgt-stage-check',
         checked: side === 'staged',
-        disabled: conflict,
+        disabled: conflict || props.batchBusy,
         'aria-label': side === 'staged' ? t('unstageFile') : t('stageFile'),
         title: conflict ? t('conflictsBlockCommit') : actionLabel,
         onClick: (event: any) => event.stopPropagation(),
@@ -93,12 +98,29 @@ export function FileRow(props: {
         onChange: () => props.onToggle(entry, side),
       }),
       conflict
-        ? h('span', { className: 'dgt-rowact', 'data-disabled': true, title: t('conflictsBlockCommit') }, t('conflict'))
+        ? h(
+            'button',
+            {
+              type: 'button',
+              className: 'dgt-rowact',
+              'data-resolve': true,
+              title: t('resolveConflictHint'),
+              // Selecting the row is all this does: the resolution itself lives
+              // in the diff pane, never in the list.
+              onClick: (event: any) => {
+                event.stopPropagation()
+                props.onSelect(entry, side)
+              },
+              onKeyDown: (event: any) => event.stopPropagation(),
+            },
+            t('resolveConflict'),
+          )
         : h(
             'button',
             {
               type: 'button',
               className: 'dgt-rowact',
+              disabled: props.batchBusy,
               onClick: (event: any) => {
                 event.stopPropagation()
                 props.onToggle(entry, side)

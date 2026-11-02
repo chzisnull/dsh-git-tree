@@ -60,7 +60,7 @@ import { ConflictDialog, ConfirmDialog, HandoffDialog, PromptDialog } from './Di
 import { ContextMenu } from './ContextMenu'
 import type { ContextMenuEntry, ContextMenuState } from './ContextMenu'
 import { holdShortcut } from '../shortcut'
-import { startPollLoop } from '../poll'
+import { startPollLoop, statusSignature } from '../poll'
 import { buildConflictPrompt } from '../handoff'
 import type { HandoffBridge, HandoffFailure, HandoffResult } from '../handoff'
 import type { ViewKind } from '../types'
@@ -189,6 +189,16 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
 
   const busyRef = React.useRef(false)
   const repoGeneration = React.useRef(0)
+  const statusRequest = React.useRef(0)
+  // The status the panel is already showing, per repository generation. A poll
+  // that reads the same content again must not write it back: every write
+  // re-renders the whole change list for a screen that has not changed (138 ms
+  // at 5000 changes). A new generation — a repository switch — invalidates it,
+  // so the first read there is always written.
+  const statusWritten = React.useRef<{ generation: number; signature: string }>({
+    generation: -1,
+    signature: '',
+  })
   // Set by the poll loop: a pointer entering the panel is a signal to refresh.
   const wakePollRef = React.useRef<(() => void) | null>(null)
   const handoffTimer = React.useRef<any>(null)
@@ -212,6 +222,9 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       /* storage may be unavailable; the fold still holds for this mount */
     }
   }, [])
+
+  // Stable for the memoised commit card: it only changes when the fold does.
+  const toggleCommitFold = React.useCallback(() => setCommitFold(!commitCollapsed), [commitCollapsed, setCommitFold])
 
   const showToast = React.useCallback((text: string) => {
     setToast(text)
@@ -253,20 +266,35 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     async (options?: { silent?: boolean }): Promise<GitStatusPayload | null> => {
       const generation = statusGeneration
       if (generation !== repoGeneration.current) return null
+      const request = ++statusRequest.current
       if (!options?.silent) setRefreshing(true)
       try {
         const next = await fetchStatus(repoPath || undefined)
-        if (generation !== repoGeneration.current) return null
+        if (generation !== repoGeneration.current || request !== statusRequest.current) return null
         if (next.ok) {
-          setStatus(next)
+          // Only write what the panel is not already showing. The signature covers
+          // everything the rail, the list and the commit card draw from, so an
+          // unchanged one means the poll found nothing to show — and the caller
+          // still gets the fresh payload back. After a write the content moved, so
+          // the signature differs and the refresh goes through.
+          const signature = statusSignature(next)
+          const written = statusWritten.current
+          if (written.generation !== generation || written.signature !== signature) {
+            statusWritten.current = { generation, signature }
+            setStatus(next)
+          }
           setStatusError('')
         } else {
+          // Nothing is on screen now, so a later success has to be written even
+          // if it matches the last thing that was.
+          statusWritten.current = { generation, signature: '' }
           setStatus(null)
           setStatusError(next.error || t('statusFailed'))
         }
         return next
       } catch (error) {
-        if (generation !== repoGeneration.current) return null
+        if (generation !== repoGeneration.current || request !== statusRequest.current) return null
+        statusWritten.current = { generation, signature: '' }
         setStatus(null)
         setStatusError(error instanceof Error ? error.message : String(error))
         return null
@@ -358,6 +386,9 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     [loadAiModels, showToast, t],
   )
 
+  // The two handlers are the `useCallback`s themselves rather than fresh arrows:
+  // the commit card is memoised on this object, and an arrow here would redraw
+  // it on every status render for no change at all.
   const aiCommit: AiCommitProps = {
     loading: aiLoading,
     busy: aiBusy,
@@ -365,8 +396,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     failures: aiModels?.failures ?? [],
     active: aiModels?.active ?? null,
     error: aiModels?.error || (aiModels && aiModels.ok === false ? t('aiFailed') : ''),
-    onGenerate: () => void generateMessage(),
-    onSelect: (provider: string, model: string) => void selectAiModel(provider, model),
+    onGenerate: generateMessage,
+    onSelect: selectAiModel,
   }
 
   const openDiff = React.useCallback(async (entry: GitFileEntry, side: EntrySide) => {
@@ -734,11 +765,13 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
 
   const toggle = React.useCallback(
     async (entry: GitFileEntry, side: EntrySide) => {
+      if (busyRef.current) return
       if (entry.conflicted || side === 'conflicted') {
         setActionError(t('conflictsBlockCommit'))
         return
       }
       const generation = statusGeneration
+      busyRef.current = true
       setBusy(true)
       setActionError('')
       try {
@@ -747,20 +780,20 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
             ? await unstagePaths([entry.path], repoPath || undefined)
             : await stagePaths([entry.path], repoPath || undefined)
         if (!result.ok) throw new Error(result.error || (side === 'staged' ? t('unstageFailed') : t('stageFailed')))
-        const next = await fetchStatus(repoPath || undefined)
+        const next = await loadStatus({ silent: true })
         if (generation !== repoGeneration.current) return
-        if (next.ok) setStatus(next)
-        if (selected?.path === entry.path && next.ok) {
+        if (selected?.path === entry.path && next?.ok) {
           const updated = findEntry(next, entry.path)
           if (updated) await openDiff(updated, sideOf(updated))
         }
       } catch (error) {
         setActionError(error instanceof Error ? error.message : String(error))
       } finally {
+        busyRef.current = false
         setBusy(false)
       }
     },
-    [openDiff, repoPath, selected, statusGeneration, t],
+    [loadStatus, openDiff, repoPath, selected, statusGeneration, t],
   )
 
   const copyPath = React.useCallback(
@@ -797,7 +830,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
 
   const commitThis = React.useCallback(
     async (entry: GitFileEntry, side: EntrySide) => {
-      if (entry.conflicted) return
+      if (entry.conflicted || busyRef.current) return
+      busyRef.current = true
       setBusy(true)
       setActionError('')
       try {
@@ -813,6 +847,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       } catch (error) {
         setActionError(error instanceof Error ? error.message : String(error))
       } finally {
+        busyRef.current = false
         setBusy(false)
       }
     },
@@ -859,6 +894,50 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     }
   }, [closeDialog, dialog?.kind, dialog?.path, loadStatus, repoPath, showToast, t])
 
+  const submitBatchStage = React.useCallback(async () => {
+    const paths = (status?.entries ?? [])
+      .filter((entry) => entry.unstaged && !entry.conflicted && batchSelected.has(entry.path))
+      .map((entry) => entry.path)
+    if (paths.length === 0 || busyRef.current || statusGeneration !== repoGeneration.current) return
+    const encoder = new TextEncoder()
+    let remaining = paths.slice()
+    let stagedCount = 0
+    busyRef.current = true
+    setBusy(true)
+    setActionError('')
+    try {
+      while (remaining.length > 0) {
+        if (statusGeneration !== repoGeneration.current) return
+        const chunk: string[] = []
+        let bytes = 0
+        for (const path of remaining) {
+          const nextBytes = encoder.encode(path).length + 1
+          if (chunk.length > 0 && (chunk.length >= 500 || bytes + nextBytes > 48 * 1024)) break
+          chunk.push(path)
+          bytes += nextBytes
+        }
+        const result = await stagePaths(chunk, repoPath || undefined)
+        if (statusGeneration !== repoGeneration.current) return
+        if (!result.ok) throw new Error(result.error || t('stageFailed'))
+        stagedCount += chunk.length
+        remaining = remaining.slice(chunk.length)
+        const done = new Set(chunk)
+        setBatchSelected((current) => new Set([...current].filter((path) => !done.has(path))))
+      }
+      showToast(t('batchStageDone') + ' · ' + String(stagedCount))
+    } catch (error) {
+      if (statusGeneration !== repoGeneration.current) return
+      const detail = error instanceof Error ? error.message : String(error)
+      const message = t('batchStagePartial') + ' · ' + t('batchStageConfirmed') + ': ' + String(stagedCount) + ' · ' + detail
+      setActionError(message)
+      showToast(message)
+    } finally {
+      await loadStatus()
+      busyRef.current = false
+      setBusy(false)
+    }
+  }, [batchSelected, loadStatus, repoPath, showToast, status, statusGeneration, t])
+
   const submitBatchRemove = React.useCallback(async () => {
     const paths = dialog?.paths ?? []
     if (paths.length === 0 || dialog?.generation !== repoGeneration.current || statusGeneration !== repoGeneration.current) return
@@ -888,7 +967,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       }
       if (failures.length) throw new Error(t('batchRemoveFailed') + ': ' + failures.join('; '))
       closeDialog()
-      setBatchSelected(new Set())
+      const deleted = new Set(paths)
+      setBatchSelected((current) => new Set([...current].filter((path) => !deleted.has(path))))
       showToast(t('batchRemoveDone') + ' · ' + String(removedCount))
       if (selected && paths.includes(selected.path)) {
         setSelected(null)
@@ -897,8 +977,10 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     } catch (error) {
       if (statusGeneration !== repoGeneration.current) return
       const pending = [...retryPaths, ...remaining]
+      const pendingSet = new Set(pending)
+      const removed = new Set(paths.filter((path) => !pendingSet.has(path)))
       setDialog((current) => current?.kind === 'remove-untracked-batch' ? { ...current, paths: pending } : current)
-      setBatchSelected(new Set(pending))
+      setBatchSelected((current) => new Set([...current].filter((path) => !removed.has(path))))
       setDialogError((removedCount ? t('batchRemoveDone') + ': ' + removedCount + '. ' : '') +
         (error instanceof Error ? error.message : String(error)))
     } finally {
@@ -948,61 +1030,6 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       setDialogBusy(false)
     }
   }, [closeDialog, dialog?.branch, loadHistory, loadRefs, loadStatus, repoPath, showToast, t, view])
-
-  const fileMenu = (entry: GitFileEntry, side: EntrySide, event: any) => {
-    const conflict = side === 'conflicted' || entry.conflicted
-    const untracked = entry.kind === 'untracked'
-    const items: ContextMenuEntry[] = []
-    if (conflict) {
-      // One primary hand-off, plus the older in-panel model merge kept as a
-      // deliberate secondary (it writes the file itself, the session does not).
-      items.push({ label: t('handoff'), onSelect: () => void handoffConflict(entry.path) })
-      items.push({
-        label: t('modelMergePreview'),
-        disabled: conflictBusy !== '',
-        onSelect: () => void resolveConflictWithAi(entry.path),
-      })
-      items.push({ divider: true })
-    }
-    items.push(
-      {
-        label: t('commitThis'),
-        disabled: conflict,
-        hint: conflict ? t('conflictsBlockCommit') : '⌘↵',
-        onSelect: () => void commitThis(entry, side),
-      },
-      { divider: true },
-    )
-    if (!conflict) {
-      items.push({
-        label: side === 'staged' ? t('unstageFile') : t('stageFile'),
-        onSelect: () => void toggle(entry, side),
-      })
-    }
-    if (!untracked) {
-      items.push({
-        label: t('discardChanges'),
-        danger: true,
-        disabled: conflict,
-        hint: conflict ? t('conflictsBlockCommit') : undefined,
-        onSelect: () => {
-          setDialogError('')
-          setDialog({ kind: 'discard', path: entry.path, side })
-        },
-      })
-    }
-    items.push({
-      label: untracked ? t('removeUntracked') : t('removeFile'),
-      danger: true,
-      onSelect: () => {
-        setDialogError('')
-        setDialog({ kind: untracked ? 'remove-untracked' : 'remove', path: entry.path })
-      },
-    })
-    items.push({ divider: true })
-    items.push({ label: t('copyPath'), onSelect: () => copyPath(entry) })
-    setContextMenu({ x: event.clientX, y: event.clientY, title: entry.path, items })
-  }
 
   const refMenu = (record: RefRecord, kind: 'branch' | 'tag', event: any) => {
     const items: ContextMenuEntry[] =
@@ -1159,11 +1186,9 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     async (path: string) => {
       const generation = statusGeneration
       if (generation !== repoGeneration.current) return
-      await loadStatus({ silent: true })
-      const next = await fetchStatus(repoPath || undefined)
+      const next = await loadStatus({ silent: true })
       if (generation !== repoGeneration.current) return
-      if (next.ok) setStatus(next)
-      const updated = next.ok ? findEntry(next, path) : null
+      const updated = next?.ok ? findEntry(next, path) : null
       if (updated) await openDiff(updated, 'conflicted')
     },
     [openDiff, repoPath, loadStatus, statusGeneration],
@@ -1224,6 +1249,82 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       }
     },
     [loadRefs, refreshAfterConflict, repoPath, showToast, t],
+  )
+
+  // The diff header's conflict actions: one stable handler each, so the memoised
+  // pane keeps its identity while the list around it re-renders.
+  const conflictHandoff = React.useCallback(() => {
+    if (selected) void handoffConflict(selected.path)
+  }, [handoffConflict, selected])
+
+  const conflictRevert = React.useCallback(() => {
+    if (!selected) return
+    setDialogError('')
+    setDialog({ kind: 'conflict-revert', path: selected.path })
+  }, [selected])
+
+  const conflictMarkResolved = React.useCallback(() => {
+    if (selected) void markResolved(selected.path)
+  }, [markResolved, selected])
+
+  /** Right-click menu for one row. Stable: the list hands it to every row. */
+  const fileMenu = React.useCallback(
+    (entry: GitFileEntry, side: EntrySide, event: any) => {
+      if (busyRef.current) return
+      const conflict = side === 'conflicted' || entry.conflicted
+      const untracked = entry.kind === 'untracked'
+      const items: ContextMenuEntry[] = []
+      if (conflict) {
+        // One primary hand-off, plus the older in-panel model merge kept as a
+        // deliberate secondary (it writes the file itself, the session does not).
+        items.push({ label: t('handoff'), onSelect: () => void handoffConflict(entry.path) })
+        items.push({
+          label: t('modelMergePreview'),
+          disabled: conflictBusy !== '',
+          onSelect: () => void resolveConflictWithAi(entry.path),
+        })
+        items.push({ divider: true })
+      }
+      items.push(
+        {
+          label: t('commitThis'),
+          disabled: conflict,
+          hint: conflict ? t('conflictsBlockCommit') : '⌘↵',
+          onSelect: () => void commitThis(entry, side),
+        },
+        { divider: true },
+      )
+      if (!conflict) {
+        items.push({
+          label: side === 'staged' ? t('unstageFile') : t('stageFile'),
+          onSelect: () => void toggle(entry, side),
+        })
+      }
+      if (!untracked) {
+        items.push({
+          label: t('discardChanges'),
+          danger: true,
+          disabled: conflict,
+          hint: conflict ? t('conflictsBlockCommit') : undefined,
+          onSelect: () => {
+            setDialogError('')
+            setDialog({ kind: 'discard', path: entry.path, side })
+          },
+        })
+      }
+      items.push({
+        label: untracked ? t('removeUntracked') : t('removeFile'),
+        danger: true,
+        onSelect: () => {
+          setDialogError('')
+          setDialog({ kind: untracked ? 'remove-untracked' : 'remove', path: entry.path })
+        },
+      })
+      items.push({ divider: true })
+      items.push({ label: t('copyPath'), onSelect: () => copyPath(entry) })
+      setContextMenu({ x: event.clientX, y: event.clientY, title: entry.path, items })
+    },
+    [commitThis, conflictBusy, copyPath, handoffConflict, resolveConflictWithAi, t, toggle],
   )
 
   /** Fetch only: updates ahead/behind and remote-tracking refs, never the tree. */
@@ -1316,6 +1417,12 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     }
   }, [afterPush, message, pushAfter, repoPath, showToast, status, t])
 
+  // One arrow for the commit card's primary button: `commit` changes whenever the
+  // draft or the status it commits changes, so this stays put between those.
+  const commitAction = React.useCallback(() => {
+    void commit()
+  }, [commit])
+
   const switchWorkspace = React.useCallback(
     (path: string) => {
       if (path === repoPath) return
@@ -1362,7 +1469,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
 
   React.useEffect(() => {
     if (!status) return
-    const eligible = new Set((status.entries ?? []).filter((entry) => entry.kind === 'untracked').map((entry) => entry.path))
+    const eligible = new Set((status.entries ?? []).filter((entry) => entry.unstaged && !entry.conflicted).map((entry) => entry.path))
     setBatchSelected((current) => {
       const next = new Set([...current].filter((path) => eligible.has(path)))
       return next.size === current.size ? current : next
@@ -1371,6 +1478,34 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
 
   const entries = status?.entries ?? []
   const rows = splitEntries(entries)
+  // Stable identities for the row props: the change list re-renders on every
+  // selection tick, and each row can skip that unless its own flag moved.
+  const toggleBatchPath = React.useCallback((path: string) => {
+    if (busyRef.current) return
+    setBatchSelected((current) => {
+      const next = new Set(current)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
+  const selectAllUnstaged = React.useCallback(() => {
+    if (!busyRef.current) setBatchSelected(new Set(rows.unstaged.map((entry) => entry.path)))
+  }, [rows])
+  const clearBatchSelection = React.useCallback(() => {
+    if (!busyRef.current) setBatchSelected(new Set())
+  }, [])
+  const stageBatch = React.useCallback(() => void submitBatchStage(), [submitBatchStage])
+  const copyBatchPaths = React.useCallback(
+    () => void copyText([...batchSelected].join('\n'), t('copiedPaths'), t('copyFailed')),
+    [batchSelected, copyText, t],
+  )
+  const removeBatch = React.useCallback(() => {
+    const paths = rows.unstaged.filter((entry) => entry.kind === 'untracked' && batchSelected.has(entry.path)).map((entry) => entry.path)
+    if (paths.length === 0) return
+    setDialogError('')
+    setDialog({ kind: 'remove-untracked-batch', paths, generation: statusGeneration })
+  }, [batchSelected, rows, statusGeneration])
   const selectedKey = selected ? rowKey(selected.path, selected.side) : ''
   const selectedEntry = selected ? findEntry(status, selected.path) : null
   const diffSelection = selected && selectedEntry ? { entry: selectedEntry, side: selected.side } : null
@@ -1469,19 +1604,12 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
           entries,
           selectedKey,
           batchSelected,
-          onBatchSelect: (path: string) => setBatchSelected((current) => {
-            const next = new Set(current)
-            if (next.has(path)) next.delete(path)
-            else next.add(path)
-            return next
-          }),
-          onBatchSelectAll: () => setBatchSelected(new Set(rows.unstaged.filter((entry) => entry.kind === 'untracked').map((entry) => entry.path))),
-          onBatchClear: () => setBatchSelected(new Set()),
-          onBatchRemove: () => {
-            if (batchSelected.size === 0) return
-            setDialogError('')
-            setDialog({ kind: 'remove-untracked-batch', paths: [...batchSelected], generation: statusGeneration })
-          },
+          onBatchSelect: toggleBatchPath,
+          onBatchSelectAll: selectAllUnstaged,
+          onBatchClear: clearBatchSelection,
+          onBatchStage: stageBatch,
+          onBatchCopy: copyBatchPaths,
+          onBatchRemove: removeBatch,
           diffSelection,
           diff,
           diffLoading,
@@ -1491,31 +1619,26 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
           t,
           commitInputRef: commitInput,
           commitCollapsed,
-          onToggleCommitCollapsed: () => setCommitFold(!commitCollapsed),
+          onToggleCommitCollapsed: toggleCommitFold,
           conflict: {
             busy: conflictBusy !== '',
             opening: handoffBusy,
-            onHandoff: () => {
-              if (selected) void handoffConflict(selected.path)
-            },
-            onRevert: () => {
-              if (!selected) return
-              setDialogError('')
-              setDialog({ kind: 'conflict-revert', path: selected.path })
-            },
-            onMarkResolved: () => {
-              if (selected) void markResolved(selected.path)
-            },
+            onHandoff: conflictHandoff,
+            onRevert: conflictRevert,
+            onMarkResolved: conflictMarkResolved,
           },
-          onSelect: (entry: GitFileEntry, side: EntrySide) => void openDiff(entry, side),
-          onToggle: (entry: GitFileEntry, side: EntrySide) => void toggle(entry, side),
+          // Stable callbacks, not arrows: the diff pane and the commit card are
+          // memoised on their props. `openDiff`/`toggle`/`copyPath`/`fileMenu` are
+          // the useCallbacks themselves, so a list-only render leaves both alone.
+          onSelect: openDiff,
+          onToggle: toggle,
           onCopyPath: copyPath,
-          onContextMenu: (entry: GitFileEntry, side: EntrySide, event: any) => fileMenu(entry, side, event),
+          onContextMenu: fileMenu,
           canPush,
           pushAfter,
           onPushAfter: setPushAfter,
           onMessage: setMessage,
-          onCommit: () => void commit(),
+          onCommit: commitAction,
           ai: aiCommit,
         })
     }
@@ -1740,7 +1863,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       ? h(ConfirmDialog, {
           title: t('batchRemoveTitle'),
           body: String(dialog.paths?.length ?? 0) + ' ' + t('batchRemoveBody'),
-          submitLabel: t('deleteSelected'),
+          submitLabel: t('deleteSelectedUntracked'),
           busy: dialogBusy,
           error: dialogError,
           t,
