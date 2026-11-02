@@ -40,6 +40,7 @@ export function FileRow(props: {
     {
       className: 'dgt-row',
       'data-active': props.active || undefined,
+      'data-batch-selected': props.batchSelected || undefined,
       'data-side': side,
       role: 'button',
       tabIndex: 0,
@@ -70,16 +71,6 @@ export function FileRow(props: {
           onChange: () => props.onBatchSelect(entry.path),
         })
       : side === 'unstaged' ? h('span', { className: 'dgt-batch-placeholder', 'aria-hidden': true }) : null,
-    h('input', {
-      type: 'checkbox',
-      className: 'dgt-check',
-      checked: side === 'staged',
-      disabled: conflict,
-      'aria-label': side === 'staged' ? t('unstageFile') : t('stageFile'),
-      title: conflict ? t('conflictsBlockCommit') : actionLabel,
-      onClick: (event: any) => event.stopPropagation(),
-      onChange: () => props.onToggle(entry, side),
-    }),
     h('span', { className: 'dgt-badge', 'data-tone': tone }, letter),
     h(
       'span',
@@ -87,19 +78,35 @@ export function FileRow(props: {
       dir ? h('span', { className: 'dgt-path-dir' }, dir) : null,
       h('span', { className: 'dgt-path-name' }, name),
     ),
-    conflict
-      ? h('span', { className: 'dgt-rowact', 'data-disabled': true, title: t('conflictsBlockCommit') }, t('conflict'))
-      : h(
-          'button',
-          {
-            type: 'button',
-            className: 'dgt-rowact',
-            onClick: (event: any) => {
-              event.stopPropagation()
-              props.onToggle(entry, side)
+    h(
+      'span',
+      { className: 'dgt-stage-control' },
+      h('input', {
+        type: 'checkbox',
+        className: 'dgt-check dgt-stage-check',
+        checked: side === 'staged',
+        disabled: conflict,
+        'aria-label': side === 'staged' ? t('unstageFile') : t('stageFile'),
+        title: conflict ? t('conflictsBlockCommit') : actionLabel,
+        onClick: (event: any) => event.stopPropagation(),
+        onKeyDown: (event: any) => event.stopPropagation(),
+        onChange: () => props.onToggle(entry, side),
+      }),
+      conflict
+        ? h('span', { className: 'dgt-rowact', 'data-disabled': true, title: t('conflictsBlockCommit') }, t('conflict'))
+        : h(
+            'button',
+            {
+              type: 'button',
+              className: 'dgt-rowact',
+              onClick: (event: any) => {
+                event.stopPropagation()
+                props.onToggle(entry, side)
+              },
+              onKeyDown: (event: any) => event.stopPropagation(),
             },
-          },
-          actionLabel,
-        ),
+            actionLabel,
+          ),
+    ),
   )
 }

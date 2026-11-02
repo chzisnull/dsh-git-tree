@@ -147,9 +147,10 @@ var EN = {
   changes: "Changes",
   pendingFiles: "Pending files",
   selectUntracked: "Select for deletion",
-  selectAllUntracked: "Select all shown",
+  selectAllUntracked: "Select all",
+  batchSelectHint: "Select untracked files",
   clearSelection: "Clear",
-  selectedCount: "selected",
+  selectedCount: "untracked selected",
   deleteSelected: "Delete selected",
   batchRemoveTitle: "Delete untracked files",
   batchRemoveBody: "untracked files will be deleted from disk and cannot be recovered with Git.",
@@ -373,9 +374,10 @@ var ZH = {
   changes: "\u6539\u52A8",
   pendingFiles: "\u5F85\u5B9A\u7684\u6587\u4EF6",
   selectUntracked: "\u9009\u62E9\u8981\u5220\u9664\u7684\u6587\u4EF6",
-  selectAllUntracked: "\u5168\u9009\u5F53\u524D\u5217\u8868",
+  selectAllUntracked: "\u5168\u9009",
+  batchSelectHint: "\u9009\u62E9\u672A\u8DDF\u8E2A\u6587\u4EF6",
   clearSelection: "\u6E05\u7A7A\u9009\u62E9",
-  selectedCount: "\u4E2A\u5DF2\u9009",
+  selectedCount: "\u4E2A\u672A\u8DDF\u8E2A\u6587\u4EF6\u5DF2\u9009",
   deleteSelected: "\u5220\u9664\u6240\u9009",
   batchRemoveTitle: "\u5220\u9664\u672A\u8DDF\u8E2A\u6587\u4EF6",
   batchRemoveBody: "\u4E2A\u672A\u8DDF\u8E2A\u6587\u4EF6\u5C06\u4ECE\u78C1\u76D8\u5220\u9664\uFF0C\u4E14\u65E0\u6CD5\u901A\u8FC7 Git \u6062\u590D\u3002",
@@ -660,25 +662,40 @@ var CSS = `
 .dgt-region[data-kind='conflicted']{flex:0 1 auto;max-height:34%;border-bottom:1px solid var(--dgt-line-soft);}
 .dgt-region[data-kind='staged']{flex:1 1 40%;min-height:104px;border-bottom:1px solid var(--dgt-line-soft);padding-bottom:6px;}
 .dgt-region[data-kind='unstaged']{flex:1 1 60%;padding-top:2px;}
+.dgt-region[data-empty='true']{flex:0 0 auto;min-height:0;}
+.dgt-region[data-empty='true'] .dgt-region-scroll{display:none;}
 .dgt-region-scroll{flex:1 1 auto;min-height:0;overflow:auto;padding:0;}
-.dgt-group{display:flex;align-items:center;justify-content:space-between;height:28px;padding:0 8px;
-  color:var(--dsw-alias-label-tertiary);font-size:10.5px;}
+.dgt-group{display:flex;align-items:center;justify-content:space-between;flex:0 0 34px;padding:0 8px;
+  color:var(--dsw-alias-label-secondary);font-size:11.5px;font-weight:600;}
 .dgt-group[data-tone='error']{color:var(--dgt-err);}
-.dgt-batch-bar{display:flex;align-items:center;gap:8px;min-height:28px;padding:0 8px;color:var(--dsw-alias-label-secondary);font-size:10.5px;}
-.dgt-batch-bar button{appearance:none;border:0;background:transparent;padding:2px;color:var(--dgt-accent-strong);font:inherit;cursor:pointer;white-space:nowrap;}
-.dgt-batch-bar button:disabled{opacity:.5;cursor:default;}
+.dgt-batch-bar{display:flex;align-items:center;gap:4px;flex:0 0 auto;min-height:34px;margin:0 4px 5px;padding:3px 6px 3px 10px;
+  border:1px solid var(--dgt-line-soft);border-radius:8px;background:var(--dgt-rail-bg);color:var(--dsw-alias-label-secondary);font-size:11px;}
+.dgt-batch-bar[data-selected='true']{border-color:var(--dgt-accent-soft);background:var(--dgt-accent-soft);}
+.dgt-batch-count{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-batch-bar button{appearance:none;flex:0 0 auto;border:0;border-radius:5px;background:transparent;padding:4px 6px;
+  color:var(--dgt-accent-strong);font:inherit;cursor:pointer;white-space:nowrap;}
+.dgt-batch-bar button:hover{background:var(--dgt-card);}
+.dgt-batch-bar button:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:1px;}
 .dgt-batch-bar button[data-danger]{color:var(--dgt-err);}
-.dgt-batch-count{margin-left:auto;white-space:nowrap;}
 .dgt-batch-placeholder{flex:0 0 14px;width:14px;}
-.dgt-row{position:relative;box-sizing:border-box;display:flex;align-items:center;gap:9px;width:100%;height:34px;
-  padding:0 9px;border:0;border-radius:9px;background:transparent;color:var(--dsw-alias-label-primary);
+.dgt-row{position:relative;box-sizing:border-box;display:flex;align-items:center;gap:8px;width:100%;height:36px;
+  padding:0 9px;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-primary);
   font:inherit;font-size:12.5px;text-align:left;cursor:default;}
 .dgt-row:hover{background:var(--dgt-line-soft);}
 .dgt-row:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:-2px;}
-.dgt-row[data-active='true']{background:var(--dgt-accent-soft);}
+.dgt-row[data-batch-selected='true']{background:var(--dgt-line-soft);}
+.dgt-row[data-active='true']{background:var(--dgt-accent-soft);box-shadow:inset 3px 0 0 var(--dgt-accent);}
 .dgt-row[data-active='true'] .dgt-path-name{font-weight:600;}
 .dgt-row[data-menu='true']{background:var(--dgt-line-soft);}
 .dgt-check{flex:0 0 auto;width:14px;height:14px;margin:0;accent-color:var(--dgt-accent-strong);cursor:pointer;}
+.dgt-stage-control{display:inline-flex;align-items:center;justify-content:flex-end;gap:4px;flex:0 0 auto;}
+.dgt-stage-check{appearance:none;position:relative;width:23px;height:14px;border:1px solid var(--dgt-line);border-radius:8px;
+  background:var(--dgt-line);}
+.dgt-stage-check::before{content:'';position:absolute;top:1px;left:1px;width:10px;height:10px;border-radius:50%;background:var(--dgt-card);}
+.dgt-stage-check:checked{border-color:var(--dgt-accent-strong);background:var(--dgt-accent-strong);}
+.dgt-stage-check:checked::before{left:10px;}
+.dgt-stage-check:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:2px;}
+.dgt-stage-check:disabled{opacity:.45;cursor:default;}
 .dgt-badge{flex:0 0 auto;display:inline-grid;place-items:center;width:16px;height:16px;border-radius:5px;
   font-family:var(--ds-font-family-code);font-size:10px;font-weight:600;color:var(--dsw-alias-label-secondary);
   background:var(--dgt-line-soft);}
@@ -688,10 +705,10 @@ var CSS = `
 .dgt-badge[data-tone='accent']{background:var(--dgt-accent-soft);color:var(--dgt-accent-strong);}
 .dgt-badge[data-tone='muted']{background:var(--dgt-line-soft);color:var(--dsw-alias-label-secondary);}
 .dgt-path{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left;}
-.dgt-path-dir{color:var(--dsw-alias-label-tertiary);}
+.dgt-path-dir{color:var(--dsw-alias-label-secondary);}
 .dgt-path-name{color:var(--dsw-alias-label-primary);}
 .dgt-rowact{appearance:none;flex:0 0 auto;margin-left:auto;padding:1px 8px;border:0;border-radius:6px;
-  background:transparent;color:var(--dgt-accent-strong);font:inherit;font-size:11px;cursor:pointer;opacity:.85;white-space:nowrap;}
+  background:transparent;color:var(--dgt-accent-strong);font:inherit;font-size:11.5px;cursor:pointer;opacity:1;white-space:nowrap;}
 .dgt-row:hover .dgt-rowact,.dgt-row:focus-within .dgt-rowact{opacity:1;}
 .dgt-rowact:hover{background:var(--dgt-accent-soft);}
 .dgt-rowact[data-disabled]{opacity:1;color:var(--dgt-warn);cursor:default;}
@@ -2007,6 +2024,7 @@ function FileRow(props) {
     {
       className: "dgt-row",
       "data-active": props.active || void 0,
+      "data-batch-selected": props.batchSelected || void 0,
       "data-side": side,
       role: "button",
       tabIndex: 0,
@@ -2036,16 +2054,6 @@ function FileRow(props) {
       onKeyDown: (event) => event.stopPropagation(),
       onChange: () => props.onBatchSelect(entry.path)
     }) : side === "unstaged" ? h("span", { className: "dgt-batch-placeholder", "aria-hidden": true }) : null,
-    h("input", {
-      type: "checkbox",
-      className: "dgt-check",
-      checked: side === "staged",
-      disabled: conflict,
-      "aria-label": side === "staged" ? t("unstageFile") : t("stageFile"),
-      title: conflict ? t("conflictsBlockCommit") : actionLabel,
-      onClick: (event) => event.stopPropagation(),
-      onChange: () => props.onToggle(entry, side)
-    }),
     h("span", { className: "dgt-badge", "data-tone": tone }, letter),
     h(
       "span",
@@ -2053,17 +2061,33 @@ function FileRow(props) {
       dir ? h("span", { className: "dgt-path-dir" }, dir) : null,
       h("span", { className: "dgt-path-name" }, name)
     ),
-    conflict ? h("span", { className: "dgt-rowact", "data-disabled": true, title: t("conflictsBlockCommit") }, t("conflict")) : h(
-      "button",
-      {
-        type: "button",
-        className: "dgt-rowact",
-        onClick: (event) => {
-          event.stopPropagation();
-          props.onToggle(entry, side);
-        }
-      },
-      actionLabel
+    h(
+      "span",
+      { className: "dgt-stage-control" },
+      h("input", {
+        type: "checkbox",
+        className: "dgt-check dgt-stage-check",
+        checked: side === "staged",
+        disabled: conflict,
+        "aria-label": side === "staged" ? t("unstageFile") : t("stageFile"),
+        title: conflict ? t("conflictsBlockCommit") : actionLabel,
+        onClick: (event) => event.stopPropagation(),
+        onKeyDown: (event) => event.stopPropagation(),
+        onChange: () => props.onToggle(entry, side)
+      }),
+      conflict ? h("span", { className: "dgt-rowact", "data-disabled": true, title: t("conflictsBlockCommit") }, t("conflict")) : h(
+        "button",
+        {
+          type: "button",
+          className: "dgt-rowact",
+          onClick: (event) => {
+            event.stopPropagation();
+            props.onToggle(entry, side);
+          },
+          onKeyDown: (event) => event.stopPropagation()
+        },
+        actionLabel
+      )
     )
   );
 }
@@ -2089,13 +2113,14 @@ function Rows(props) {
 function Region(props) {
   return h(
     "div",
-    { className: "dgt-region", "data-kind": props.side },
+    { className: "dgt-region", "data-kind": props.side, "data-empty": props.count === 0 || void 0 },
     h(
       "div",
       { className: "dgt-group", "data-tone": props.tone },
       h("span", null, props.label),
       h("span", { className: "dgt-group-count" }, String(props.count))
     ),
+    props.batchBar ?? null,
     h(
       "div",
       { className: "dgt-region-scroll" },
@@ -2120,6 +2145,23 @@ function ChangeList(props) {
   const untrackedCount = rows.unstaged.filter((entry) => entry.kind === "untracked").length;
   const allSelected = untrackedCount > 0 && props.batchSelected.size === untrackedCount;
   const empty = rows.staged.length === 0 && rows.unstaged.length === 0 && rows.conflicted.length === 0;
+  const batchBar = untrackedCount > 0 ? h(
+    "div",
+    { className: "dgt-batch-bar", "data-selected": props.batchSelected.size > 0 || void 0 },
+    h(
+      "span",
+      { className: "dgt-batch-count", role: "status" },
+      props.batchSelected.size > 0 ? String(props.batchSelected.size) + " " + t("selectedCount") : t("batchSelectHint")
+    ),
+    h("button", {
+      type: "button",
+      className: "dgt-batch-action",
+      onClick: allSelected ? props.onBatchClear : props.onBatchSelectAll,
+      title: t("batchSelectHint")
+    }, allSelected ? t("clearSelection") : t("selectAllUntracked")),
+    props.batchSelected.size > 0 && !allSelected ? h("button", { type: "button", className: "dgt-batch-action", onClick: props.onBatchClear }, t("clearSelection")) : null,
+    props.batchSelected.size > 0 ? h("button", { type: "button", className: "dgt-batch-action", "data-danger": true, onClick: props.onBatchRemove }, t("deleteSelected")) : null
+  ) : null;
   const shared = {
     activeKey: props.selectedKey,
     batchSelected: props.batchSelected,
@@ -2140,18 +2182,6 @@ function ChangeList(props) {
       h("span", { className: "dgt-list-sort" }, t("sortByPath")),
       h("span", { className: "dgt-group-count" }, String(total) + " " + t("itemsUnit"))
     ),
-    untrackedCount > 0 ? h(
-      "div",
-      { className: "dgt-batch-bar" },
-      h(
-        "button",
-        { type: "button", onClick: allSelected ? props.onBatchClear : props.onBatchSelectAll },
-        allSelected ? t("clearSelection") : t("selectAllUntracked")
-      ),
-      h("span", { className: "dgt-batch-count", role: "status" }, String(props.batchSelected.size) + " " + t("selectedCount")),
-      props.batchSelected.size > 0 && !allSelected ? h("button", { type: "button", onClick: props.onBatchClear }, t("clearSelection")) : null,
-      h("button", { type: "button", "data-danger": true, disabled: props.batchSelected.size === 0, onClick: props.onBatchRemove }, t("deleteSelected"))
-    ) : null,
     status === null && statusError === "" ? h("div", { className: "dgt-placeholder" }, t("loading")) : empty ? h(
       "div",
       { className: "dgt-empty" },
@@ -2180,6 +2210,7 @@ function ChangeList(props) {
         count: rows.unstaged.length,
         rows: rows.unstaged,
         side: "unstaged",
+        batchBar,
         ...shared
       })
     )

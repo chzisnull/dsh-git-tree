@@ -12,7 +12,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.13.1 is the **local workbench slice**: file status, history, search and local branches — read, stage, commit, switch branches and inspect any commit inside the panel, push the current branch, and let a DSH model write the commit message. Fetch/pull, remote branches and remote management are not implemented yet.
+Version 0.14.0 provides a Git workspace with file status, history, search, local branches, fetch and pull, and an AI-assisted commit message. It also supports selecting and deleting untracked files in bulk.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Keyboard shortcut**: `⇧⌘V` (`Ctrl+Shift+V` on Windows) opens the panel from anywhere and closes it again when it is already open. The command is registered through DSH's own shortcut service, so it is listed and rebindable in Settings → Keyboard shortcuts (`⌘/`); the keycap badge in the toolbar and the hint in the empty diff pane always show the binding you actually have. Panel-owned dialogs and the AI conflict preview hold it still, and the commit draft is kept per repository, so a stray press never drops work; when the command has no binding the empty pane points at Settings instead of showing keys.
@@ -40,7 +40,7 @@ Version 0.13.1 is the **local workbench slice**: file status, history, search an
 
 ## Status
 
-| Area | 0.13.1 |
+| Area | 0.14.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | keyboard shortcut (`⇧⌘V`) | done |
