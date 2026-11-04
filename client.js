@@ -134,7 +134,6 @@ var EN = {
   deleteRemoteBranch: "Delete remote branch\u2026",
   forceDeleteBranchConfirm: "Delete this local branch even if it has unmerged commits? Those commits may become unreachable. The remote branch is kept.",
   deleteRemoteBranchConfirm: "Delete this branch from the remote server? This affects collaborators. Local branches are kept. If the remote branch has changed since the snapshot, fetch and confirm again.",
-  confirmBranchName: "Type the full branch name to confirm",
   remoteBranchDeleted: "Remote branch deleted",
   branchName: "Branch name",
   createBranchAction: "Create",
@@ -382,7 +381,6 @@ var ZH = {
   deleteRemoteBranch: "\u5220\u9664\u8FDC\u7A0B\u5206\u652F\u2026",
   forceDeleteBranchConfirm: "\u5373\u4F7F\u6709\u672A\u5408\u5E76\u63D0\u4EA4\uFF0C\u4E5F\u5220\u9664\u8FD9\u6761\u672C\u5730\u5206\u652F\uFF1F\u8FD9\u4E9B\u63D0\u4EA4\u53EF\u80FD\u5931\u53BB\u5F15\u7528\u3002\u8FDC\u7A0B\u5206\u652F\u4F1A\u4FDD\u7559\u3002",
   deleteRemoteBranchConfirm: "\u4ECE\u8FDC\u7A0B\u670D\u52A1\u5668\u5220\u9664\u8FD9\u6761\u5206\u652F\uFF1F\u8FD9\u4F1A\u5F71\u54CD\u534F\u4F5C\u8005\uFF0C\u672C\u5730\u5206\u652F\u4F1A\u4FDD\u7559\u3002\u5982\u679C\u8FDC\u7A0B\u5206\u652F\u5DF2\u4ECE\u5FEB\u7167\u7248\u672C\u7EE7\u7EED\u66F4\u65B0\uFF0C\u8BF7\u5148\u83B7\u53D6\u5E76\u91CD\u65B0\u786E\u8BA4\u3002",
-  confirmBranchName: "\u8F93\u5165\u5B8C\u6574\u5206\u652F\u540D\u79F0\u4EE5\u786E\u8BA4",
   remoteBranchDeleted: "\u8FDC\u7A0B\u5206\u652F\u5DF2\u5220\u9664",
   branchName: "\u5206\u652F\u540D",
   createBranchAction: "\u521B\u5EFA",
@@ -3302,9 +3300,6 @@ function PromptDialog(props) {
   );
 }
 function ConfirmDialog(props) {
-  const [typed, setTyped] = React.useState("");
-  React.useEffect(() => setTyped(""), [props.confirmText]);
-  const canConfirm = !props.busy && (props.confirmText === void 0 || typed === props.confirmText);
   return h(
     "div",
     { className: "dgt-overlay", role: "presentation", onClick: props.busy ? void 0 : props.onCancel },
@@ -3313,20 +3308,6 @@ function ConfirmDialog(props) {
       { className: "dgt-dialog", role: "dialog", "aria-modal": "true", onClick: (event) => event.stopPropagation() },
       h("div", { className: "dgt-dialog-title" }, props.title),
       h("div", { className: "dgt-dialog-body" }, props.body),
-      props.confirmText !== void 0 ? h(
-        "label",
-        { className: "dgt-dialog-label" },
-        props.t("confirmBranchName"),
-        h("input", {
-          className: "dgt-dialog-input",
-          value: typed,
-          placeholder: props.confirmText,
-          autoFocus: true,
-          spellCheck: false,
-          disabled: props.busy,
-          onChange: (event) => setTyped(event.target.value)
-        })
-      ) : null,
       props.error !== "" ? h("div", { className: "dgt-dialog-error" }, props.error) : null,
       h(
         "div",
@@ -3337,9 +3318,9 @@ function ConfirmDialog(props) {
           {
             type: "button",
             className: (props.tone ?? "danger") === "primary" ? "dgt-primary" : "dgt-primary dgt-danger",
-            disabled: !canConfirm,
+            disabled: props.busy,
             onClick: () => {
-              if (canConfirm) props.onConfirm();
+              if (!props.busy) props.onConfirm();
             }
           },
           props.submitLabel
@@ -5234,7 +5215,6 @@ function Workspace(props) {
       key: dialog.kind + ":" + dialog.branch + ":" + dialog.force,
       title: t(dialog.kind === "delete-remote" ? "deleteRemoteBranch" : dialog.force ? "forceDeleteBranch" : "deleteBranch"),
       body: (dialog.branch ?? "") + " \u2014 " + t(dialog.kind === "delete-remote" ? "deleteRemoteBranchConfirm" : dialog.force ? "forceDeleteBranchConfirm" : "deleteBranchConfirm"),
-      confirmText: dialog.kind === "delete-remote" || dialog.force ? dialog.branch : void 0,
       submitLabel: t("delete"),
       busy: dialogBusy,
       error: dialogError,

@@ -12,7 +12,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.16.0 provides a Git workspace with file status, history, search, local branches, grouped remote branch browsing, fetch/pull/push, and an AI-assisted commit message. Unstaged files can be selected in bulk to stage them, copy their paths, or delete the untracked ones; the change list keeps its layout compact and stops redrawing when a poll finds nothing new.
+Version 0.16.1 provides a Git workspace with file status, history, search, local branches, grouped remote branch browsing, fetch/pull/push, and an AI-assisted commit message. Unstaged files can be selected in bulk to stage them, copy their paths, or delete the untracked ones; the change list keeps its layout compact and stops redrawing when a poll finds nothing new.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Keyboard shortcut**: `⇧⌘V` (`Ctrl+Shift+V` on Windows) opens the panel from anywhere and closes it again when it is already open. The command is registered through DSH's own shortcut service, so it is listed and rebindable in Settings → Keyboard shortcuts (`⌘/`); the keycap badge in the toolbar and the hint in the empty diff pane always show the binding you actually have. Panel-owned dialogs and the AI conflict preview hold it still, and the commit draft is kept per repository, so a stray press never drops work; when the command has no binding the empty pane points at Settings instead of showing keys.
@@ -25,7 +25,7 @@ Version 0.16.0 provides a Git workspace with file status, history, search, local
 - **History view**: commits newest-first with a lane graph, description / short SHA / author / date columns, an "all branches / current branch only" switch and paged loading (200 per page).
 - **Commit detail**: select a commit to see its message, author, date, parents, refs and changed files; pick a file for its in-commit diff; follow a parent link to jump.
 - **Search view**: find commits by message, author or file path; results reuse the history list and detail.
-- **Branches**: click a local branch to browse its history, double-click to check out; create, rename and delete local branches from the rail. Checkout refuses a dirty working copy. Remote tracking branches have collapsible groups per remote, with history, copy-name and confirmed server-side deletion actions. Symbolic aliases such as `origin/HEAD` are excluded. Remote deletion requires typing the full name and uses the previewed commit as a lease; a newer server tip or server protection rejects the operation. Local force-delete is a separate confirmed action for unmerged branches, and the current branch cannot be deleted. All-branches history includes remote-only commits and remote reference chips. The remote rail shows a locally fetched snapshot, with separate loading, failure, unconfigured and not-yet-fetched states.
+- **Branches**: click a local branch to browse its history, double-click to check out; create, rename and delete local branches from the rail. Checkout refuses a dirty working copy. Remote tracking branches have collapsible groups per remote, with history, copy-name and confirmed server-side deletion actions. Symbolic aliases such as `origin/HEAD` are excluded. Remote deletion uses a simple confirmation dialog and the previewed commit as a lease; a newer server tip or server protection rejects the operation. Local force-delete is a separate confirmed action for unmerged branches, and the current branch cannot be deleted. All-branches history includes remote-only commits and remote reference chips. The remote rail shows a locally fetched snapshot, with separate loading, failure, unconfigured and not-yet-fetched states.
 - **Right-click actions**: file rows offer commit (stage + focus the message), stage/unstage, discard changes, delete file / delete untracked file and copy path; branch rows offer checkout, rename, delete and copy name; commit rows offer copy SHA, new branch from this commit and copy message. Destructive items confirm first and only live items are red.
 - **Fetch and pull**: Fetch reads the remote's refs (pruned) so ahead/behind is current; Pull fast-forwards the current branch to its upstream, or to `origin/<same branch>` when the branch tracks nothing. Fetch and pull run as two separate actions, the panel fetches once when it opens, and a diverged branch asks before the plugin merges the remote in — conflicts land in the conflict view.
 - **Push**: push the current branch to its upstream (setting the upstream on first push). Never forces; authentication and non-fast-forward failures are translated into readable next steps.
@@ -40,7 +40,7 @@ Version 0.16.0 provides a Git workspace with file status, history, search, local
 
 ## Status
 
-| Area | 0.16.0 |
+| Area | 0.16.1 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | keyboard shortcut (`⇧⌘V`) | done |

@@ -62,7 +62,6 @@ export function PromptDialog(props: {
 }
 
 export function ConfirmDialog(props: {
-  confirmText?: string
   title: string
   body: string
   submitLabel: string
@@ -74,9 +73,6 @@ export function ConfirmDialog(props: {
   onCancel: () => void
   onConfirm: () => void
 }): any {
-  const [typed, setTyped] = React.useState('')
-  React.useEffect(() => setTyped(''), [props.confirmText])
-  const canConfirm = !props.busy && (props.confirmText === undefined || typed === props.confirmText)
   return h(
     'div',
     { className: 'dgt-overlay', role: 'presentation', onClick: props.busy ? undefined : props.onCancel },
@@ -85,18 +81,6 @@ export function ConfirmDialog(props: {
       { className: 'dgt-dialog', role: 'dialog', 'aria-modal': 'true', onClick: (event: any) => event.stopPropagation() },
       h('div', { className: 'dgt-dialog-title' }, props.title),
       h('div', { className: 'dgt-dialog-body' }, props.body),
-      props.confirmText !== undefined
-        ? h('label', { className: 'dgt-dialog-label' }, props.t('confirmBranchName'),
-            h('input', {
-              className: 'dgt-dialog-input',
-              value: typed,
-              placeholder: props.confirmText,
-              autoFocus: true,
-              spellCheck: false,
-              disabled: props.busy,
-              onChange: (event: any) => setTyped(event.target.value),
-            }))
-        : null,
       props.error !== '' ? h('div', { className: 'dgt-dialog-error' }, props.error) : null,
       h(
         'div',
@@ -107,8 +91,8 @@ export function ConfirmDialog(props: {
           {
             type: 'button',
             className: (props.tone ?? 'danger') === 'primary' ? 'dgt-primary' : 'dgt-primary dgt-danger',
-            disabled: !canConfirm,
-            onClick: () => { if (canConfirm) props.onConfirm() },
+            disabled: props.busy,
+            onClick: () => { if (!props.busy) props.onConfirm() },
           },
           props.submitLabel,
         ),

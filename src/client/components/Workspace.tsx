@@ -1891,7 +1891,6 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
           key: dialog.kind + ':' + dialog.branch + ':' + dialog.force,
           title: t(dialog.kind === 'delete-remote' ? 'deleteRemoteBranch' : dialog.force ? 'forceDeleteBranch' : 'deleteBranch'),
           body: (dialog.branch ?? '') + ' — ' + t(dialog.kind === 'delete-remote' ? 'deleteRemoteBranchConfirm' : dialog.force ? 'forceDeleteBranchConfirm' : 'deleteBranchConfirm'),
-          confirmText: dialog.kind === 'delete-remote' || dialog.force ? dialog.branch : undefined,
           submitLabel: t('delete'),
           busy: dialogBusy,
           error: dialogError,

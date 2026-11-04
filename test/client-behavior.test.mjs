@@ -634,41 +634,30 @@ test('an AI response from the previous repository cannot overwrite the new draft
 function confirmDeletion(app) {
   const props = app.props('ConfirmDialog')
   const dialog = app.mount(app.module.ConfirmDialog, props)
-  if (props.confirmText) {
-    nodes(dialog.tree, (node) => node.type === 'input')[0].props.onChange({ target: { value: props.confirmText } })
-    dialog.render()
-  }
   const submit = nodes(dialog.tree, (node) => node.type === 'button' && text(node) === props.submitLabel)[0]
   assert.equal(Boolean(submit.props.disabled), false)
   submit.props.onClick(event())
 }
 
-test('strong confirmation requires the exact full name and blocks Enter until it matches', (tc) => {
+test('deletion uses a simple second confirmation without typing and blocks duplicate submission while busy', (tc) => {
   const app = client(tc)
   const name = '上游/团队/修复/界面'
   let submitted = 0
-  const props = { title: 'delete', body: name, submitLabel: 'confirm-delete', confirmText: name,
+  const props = { title: 'delete', body: name, submitLabel: 'confirm-delete',
     busy: false, error: '', t, onCancel: noop, onConfirm: () => submitted++ }
   const dialog = app.mount(app.module.ConfirmDialog, props)
-  const submit = () => nodes(dialog.tree, (node) => node.type === 'button' && text(node) === props.submitLabel)[0]
-  const input = () => nodes(dialog.tree, (node) => node.type === 'input')[0]
-  assert.equal(submit().props.disabled, true)
-  for (const value of ['修复/界面', name + ' ', ' ' + name]) {
-    input().props.onChange({ target: { value } })
-    dialog.render()
-    assert.equal(submit().props.disabled, true, JSON.stringify(value))
-    input().props.onKeyDown?.(event())
-  }
+  const submit = nodes(dialog.tree, (node) => node.type === 'button' && text(node) === props.submitLabel)[0]
+  assert.equal(nodes(dialog.tree, (node) => node.type === 'input').length, 0)
+  assert.ok(text(dialog.tree).includes(name))
   assert.equal(submitted, 0)
-  input().props.onChange({ target: { value: name } })
-  dialog.render()
-  assert.equal(submit().props.disabled, false)
-  submit().props.onClick(event())
+  assert.equal(submit.props.disabled, false)
+  submit.props.onClick(event())
   assert.equal(submitted, 1)
   const busy = app.mount(app.module.ConfirmDialog, { ...props, busy: true })
-  nodes(busy.tree, (node) => node.type === 'input')[0].props.onChange({ target: { value: name } })
-  busy.render()
-  assert.equal(nodes(busy.tree, (node) => node.type === 'button' && text(node) === props.submitLabel)[0].props.disabled, true)
+  const blocked = nodes(busy.tree, (node) => node.type === 'button' && text(node) === props.submitLabel)[0]
+  assert.equal(blocked.props.disabled, true)
+  blocked.props.onClick(event())
+  assert.equal(submitted, 1)
 })
 
 test('local branch menus expose force delete and disable both deletion choices for the current branch', async (tc) => {
@@ -706,7 +695,9 @@ for (const kind of ['normal', 'force', 'remote']) {
     else if (kind === 'force') rail.onForceDelete(record.name)
     else rail.onDelete(record.name)
     const dialog = app.props('ConfirmDialog')
-    assert.equal(dialog.confirmText, kind === 'normal' ? undefined : record.name)
+    assert.ok(dialog.body.includes(record.name))
+    const rendered = app.mount(app.module.ConfirmDialog, dialog)
+    assert.equal(nodes(rendered.tree, (node) => node.type === 'input').length, 0)
     assert.equal(app.requests.some((request) => request.route.startsWith('branch/delete')), false)
     dialog.onCancel()
     await app.flush()
@@ -740,7 +731,7 @@ for (const kind of ['force', 'remote']) {
     await app.flush()
     assert.equal(app.props('ConfirmDialog').error, 'delete rejected')
     assert.equal(app.props('ConfirmDialog').busy, false)
-    assert.equal(app.props('ConfirmDialog').confirmText, record.name)
+    assert.ok(app.props('ConfirmDialog').body.includes(record.name))
   })
 }
 
