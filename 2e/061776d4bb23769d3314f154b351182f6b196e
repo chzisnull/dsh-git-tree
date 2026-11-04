@@ -1,0 +1,28 @@
+README.md
+  h_6c8eb9d3df9b52 15,28,43
+README.zh.md
+  h_6c8eb9d3df9b52 13,28,43
+client.js
+  h_6c8eb9d3df9b52 3321,3323
+docs/adr/0009-branch-deletion.md
+  h_6c8eb9d3df9b52 9,23
+docs/releases/0.16.1.md
+  h_6c8eb9d3df9b52 1-5
+package.json
+  h_6c8eb9d3df9b52 3
+src/client/components/Dialogs.tsx
+  h_6c8eb9d3df9b52 94-95
+test/client-behavior.test.mjs
+  h_6c8eb9d3df9b52 642,646,649-651,653-654,657-660,698-700,734
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2e061776d4bb23769d3314f154b351182f6b196e",
+  "prompts": {},
+  "humans": {
+    "h_6c8eb9d3df9b52": {
+      "author": "caohanzhou123@163.com <caohanzhou123@163.com>"
+    }
+  }
+}
