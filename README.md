@@ -12,7 +12,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.15.0 provides a Git workspace with file status, history, search, local branches, fetch and pull, and an AI-assisted commit message. Unstaged files can be selected in bulk to stage them, copy their paths, or delete the untracked ones; the change list keeps its layout compact and stops redrawing when a poll finds nothing new.
+Version 0.16.0 provides a Git workspace with file status, history, search, local branches, grouped remote branch browsing, fetch/pull/push, and an AI-assisted commit message. Unstaged files can be selected in bulk to stage them, copy their paths, or delete the untracked ones; the change list keeps its layout compact and stops redrawing when a poll finds nothing new.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Keyboard shortcut**: `⇧⌘V` (`Ctrl+Shift+V` on Windows) opens the panel from anywhere and closes it again when it is already open. The command is registered through DSH's own shortcut service, so it is listed and rebindable in Settings → Keyboard shortcuts (`⌘/`); the keycap badge in the toolbar and the hint in the empty diff pane always show the binding you actually have. Panel-owned dialogs and the AI conflict preview hold it still, and the commit draft is kept per repository, so a stray press never drops work; when the command has no binding the empty pane points at Settings instead of showing keys.
@@ -25,7 +25,7 @@ Version 0.15.0 provides a Git workspace with file status, history, search, local
 - **History view**: commits newest-first with a lane graph, description / short SHA / author / date columns, an "all branches / current branch only" switch and paged loading (200 per page).
 - **Commit detail**: select a commit to see its message, author, date, parents, refs and changed files; pick a file for its in-commit diff; follow a parent link to jump.
 - **Search view**: find commits by message, author or file path; results reuse the history list and detail.
-- **Branches**: click a branch to browse its history, double-click to check out; create, rename and delete local branches from the rail. Checkout refuses a dirty working copy instead of stashing your changes.
+- **Branches**: click a local branch to browse its history, double-click to check out; create, rename and delete local branches from the rail. Checkout refuses a dirty working copy. Remote tracking branches have collapsible groups per remote, with history, copy-name and confirmed server-side deletion actions. Symbolic aliases such as `origin/HEAD` are excluded. Remote deletion requires typing the full name and uses the previewed commit as a lease; a newer server tip or server protection rejects the operation. Local force-delete is a separate confirmed action for unmerged branches, and the current branch cannot be deleted. All-branches history includes remote-only commits and remote reference chips. The remote rail shows a locally fetched snapshot, with separate loading, failure, unconfigured and not-yet-fetched states.
 - **Right-click actions**: file rows offer commit (stage + focus the message), stage/unstage, discard changes, delete file / delete untracked file and copy path; branch rows offer checkout, rename, delete and copy name; commit rows offer copy SHA, new branch from this commit and copy message. Destructive items confirm first and only live items are red.
 - **Fetch and pull**: Fetch reads the remote's refs (pruned) so ahead/behind is current; Pull fast-forwards the current branch to its upstream, or to `origin/<same branch>` when the branch tracks nothing. Fetch and pull run as two separate actions, the panel fetches once when it opens, and a diverged branch asks before the plugin merges the remote in — conflicts land in the conflict view.
 - **Push**: push the current branch to its upstream (setting the upstream on first push). Never forces; authentication and non-fast-forward failures are translated into readable next steps.
@@ -35,12 +35,12 @@ Version 0.15.0 provides a Git workspace with file status, history, search, local
 - **Hand the conflict to a DSH session**: the header action `✦ Hand to AI` opens a session in the repository's own workspace and writes a ready prompt into the composer — repository, file, branch, the conflict-block count when the panel has counted it, and the boundary (edit this file only, no `git add`/`commit`/`checkout`, the human marks it resolved). Nothing is sent and nothing is written by the panel. If the repository is not a registered DSH workspace, the same prompt is copied to the clipboard and a dialog explains why. The older in-panel model merge (`git checkout`-safe preview + Apply) stays available from the conflicted file's right-click menu as `Merge with the model (preview)`; "Mark resolved" (`git add`) and "Restore conflict" (`git checkout --merge`) remain separate, deliberate actions.
 - **AI commit message**: the ✨ button in the commit card writes the message from the diff of the files that commit would include — the staged rows when there are any, otherwise every working-tree row — and the model chip picks which DSH model does it. The picker is the live DSH model catalog (every registered provider, grouped), the choice is remembered per DSH home, and the call itself goes through DSH's own `llm` service; there is no second provider configuration in this plugin. It only fills the text box: you still review and press Commit. The diff of the selected files is sent to the model you chose.
 - **Local actions**: reveal the repository in Finder or open it in Terminal (macOS).
-- **Live, at a cost that matches what you are doing**: the panel polls only while the window is focused and the panel is on screen — 3s while the working copy is moving, backing off to 10s once three polls in a row saw nothing change, and stopping entirely when the window loses focus. An idle poll is one `git status` (the repository root, identity and remote names are cached for a minute; the refs rail is read on its own 10s clock), and every write still refreshes immediately. Measured on a mid-size repository: 9 git processes per 40 idle seconds instead of 123, ~0.25% of one core instead of ~0.75%.
+- **Live, at a cost that matches what you are doing**: the panel polls only while the window is focused and the panel is on screen — 3s while the working copy is moving, backing off to 10s once three polls in a row saw nothing change, and stopping entirely when the window loses focus. A status poll is one `git status` (repository root, identity and remote names are cached for a minute; the refs rail is read on its own 10s clock). In the file status view, the selected diff is also re-read so edits from a terminal or Agent appear even when the file stays modified; with no selection, this extra read is skipped. Every write still refreshes immediately.
 - **Small write surface by construction**: stage/unstage/commit, discard, delete, branch create-rename-delete, checkout, merge into the current branch, and a push of the current branch that never forces. No `reset --hard`, no force-push, no amend, no rebase, no stash route exists.
 
 ## Status
 
-| Area | 0.15.0 |
+| Area | 0.16.0 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | keyboard shortcut (`⇧⌘V`) | done |
@@ -62,7 +62,9 @@ Version 0.15.0 provides a Git workspace with file status, history, search, local
 | right-sidebar tab (compact mode) | not yet |
 | push current branch | done |
 | fetch / pull | done |
-| remote branches / remote management | not yet |
+| remote branch groups / history / copy name / server deletion | done |
+| local branch normal / force delete | done |
+| remote management / tracking checkout | not yet |
 | merge into current branch | done |
 | conflict view | done |
 | hand the conflict to a DSH session | done |
@@ -71,7 +73,7 @@ Version 0.15.0 provides a Git workspace with file status, history, search, local
 | large-repo virtualisation | not planned |
 | agent-shared operations | not yet |
 
-The full plan, including the measured UI spec the layout is built from, is in [`docs/PLAN.md`](docs/PLAN.md).
+The full plan, including the measured UI spec the layout is built from, is in [`docs/PLAN.md`](docs/PLAN.md). [ADR 0008](docs/adr/0008-remote-branch-browsing.md) records remote browsing, the review fixes and follow-up priorities: untracked file preview, hunk staging, then branch comparison. [ADR 0009](docs/adr/0009-branch-deletion.md) adds explicit local force deletion and leased server branch deletion.
 
 ## Design notes
 
@@ -106,7 +108,7 @@ POST /api/git-tree/repositories/pin        → { path, pinned } → pin / unpin 
 POST /api/git-tree/repositories/open       → { path } → count one deliberate switch
 GET  /api/git-tree/status?cwd=…            → branch, upstream, ahead/behind, entries[], counts
 GET  /api/git-tree/diff?path=…&side=…      → files → hunks → lines, stats (or commit=<sha>)
-GET  /api/git-tree/refs?cwd=…&branch=…    → local branches, tags (branch saves a git call)
+GET  /api/git-tree/refs?cwd=…&branch=…    → branches, remote tracking refs, remoteNames, tags
 GET  /api/git-tree/history?scope=…         → commits with lanes, paging, filters
 GET  /api/git-tree/commit-info?sha=…       → metadata, parents, refs, changed files
 GET  /api/git-tree/ai/models               → DSH model catalog + saved/default route
@@ -114,13 +116,15 @@ POST /api/git-tree/stage                   → { paths[] }
 POST /api/git-tree/unstage                 → { paths[] }
 POST /api/git-tree/commit                  → { message } → { sha, shortSha, subject }
 POST /api/git-tree/commit-message          → { side, files[] } → { message } (one model call)
-POST /api/git-tree/conflict/resolve        → { path } → { content, diff } (preview only, no write)
-POST /api/git-tree/conflict/apply          → { path, content } → writes the working-tree file
+POST /api/git-tree/conflict/resolve        → { path } → { content, diff, sourceHash } (preview only, no write)
+POST /api/git-tree/conflict/apply          → { path, content, sourceHash } → writes only if the source still matches
 POST /api/git-tree/conflict/revert         → { path } → git checkout --merge
 POST /api/git-tree/conflict/mark-resolved  → { path } → git add (refused while markers remain)
 POST /api/git-tree/ai/model                → { provider, model } → remembered choice
 POST /api/git-tree/checkout                → { branch } → refuses a dirty work tree
-POST /api/git-tree/branch/create|rename|delete
+POST /api/git-tree/branch/create|rename
+POST /api/git-tree/branch/delete           → { name, force?: boolean } → local normal/force deletion
+POST /api/git-tree/branch/delete-remote    → { name, expectedOid } → leased server branch deletion
 POST /api/git-tree/open                    → { target: 'finder' | 'terminal' }
 POST /api/git-tree/push                    → current branch → its upstream (no force)
 POST /api/git-tree/fetch                   → git fetch <remote> --prune (working tree untouched)
@@ -129,7 +133,7 @@ POST /api/git-tree/discard                 → { paths[], side } → git restore
 POST /api/git-tree/remove                  → { paths[], untracked } → git rm / git clean
 ```
 
-Git runs without a shell, with `GIT_TERMINAL_PROMPT=0` (never blocks on credentials), `GIT_OPTIONAL_LOCKS=0` (never takes optional locks in your repo), `GIT_CONFIG_COUNT=0` and bounded output and time. Absolute paths and paths containing `..` are refused before they reach `argv`; untracked-file removal uses literal paths and permits filenames beginning with `-`. A `cwd` outside the workspace is refused with 403.
+Git runs without a shell, with `GIT_TERMINAL_PROMPT=0` (never blocks on credentials), `GIT_OPTIONAL_LOCKS=0` (never takes optional locks in your repo), `GIT_CONFIG_COUNT=0` and bounded output and time. Absolute paths and paths containing `..` segments are refused before they reach `argv`; file operations use literal paths and permit valid filenames beginning with `-`. A `cwd` outside the workspace is refused with 403.
 
 The host mechanism is documented against the installed build in [`docs/dsh-plugin-api.md`](docs/dsh-plugin-api.md) — slot ids, the Fetch-route channel, subprocess safety and theme tokens, all with `file:line` citations into `app.asar`.
 
@@ -160,7 +164,7 @@ Restart DSH after installing: the host half is mounted at app startup. Nothing i
 ```sh
 node build.mjs     # src/client/index.tsx → client.js (committed artifact)
 npm run check      # node --check on both halves
-npm test           # 78 assertions: manifest, host routes, parsers, client boot, import guard
+npm test           # manifest, host routes, parsers, client behavior and real isolated Git regressions
 ```
 
 `build.mjs` resolves esbuild from this package's `node_modules`, then from an installed `dsh-workbench`; if neither is present it stops with the exact command to fix that (`npm i -D esbuild`).

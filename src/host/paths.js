@@ -4,12 +4,13 @@
  * A request may name a repository-relative path and (optionally) a cwd. Both
  * are confined before they can reach argv: the cwd must stay inside the
  * workspace DSH registered for this session, and a path must be a plain
- * relative path with no traversal, no leading dash and no NUL.
+ * relative path with no traversal or NUL. Git callers use literal pathspecs.
  */
 
 import { existsSync, realpathSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
-import { RequestError } from './errors.js'
+import { GitError, RequestError } from './errors.js'
+import { git } from './git.js'
 
 /** Workspace root from the host services, with the same fallback ladder workbench uses. */
 export function workspaceRootOf(ctx) {
@@ -109,17 +110,20 @@ export function resolveCwd(ctx, requested) {
   return absolute
 }
 
-/**
- * Validate a repository-relative path before it reaches argv.
- * Rejects NUL, absolute paths, `..` segments, option-looking paths and empty input.
- */
+/** Resolve and authorize the repository root before using root-relative paths. */
+export async function resolveRepoRoot(ctx, subprocess, cwd) {
+  const output = await git(subprocess, ['rev-parse', '--show-toplevel'], cwd, { maxBytes: 64 * 1024 })
+  const root = output.replace(/\n$/, '')
+  if (!isAbsolute(root)) throw new GitError('无法确定仓库根目录')
+  return resolveCwd(ctx, root)
+}
+
+/** Validate an exact repository-relative filename; callers use literal pathspecs. */
 export function safeRepoPath(value) {
-  if (typeof value !== 'string' || value.length === 0) throw new RequestError('缺少 path 参数')
-  if (value.length > 4096) throw new RequestError('path 参数过长')
-  if (value.includes('\0')) throw new RequestError('path 不能包含 NUL')
-  if (isAbsolute(value) || value.startsWith('~')) throw new RequestError('path 必须是仓库内相对路径')
-  if (value.startsWith('-')) throw new RequestError('path 不能以 - 开头')
-  const segments = value.split(/[\\/]+/)
-  if (segments.some((segment) => segment === '..')) throw new RequestError('path 不能包含 ..')
-  return segments.filter(Boolean).join('/')
+  if (typeof value !== 'string' || !value || value.length > 4096 || value.includes('\0') || isAbsolute(value) ||
+      (process.platform === 'win32' && value.includes('\\')) ||
+      value.split('/').some((part) => !part || part === '.' || part === '..')) {
+    throw new RequestError('path 必须是规范的文件路径')
+  }
+  return value
 }

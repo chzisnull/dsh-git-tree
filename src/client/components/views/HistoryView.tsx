@@ -184,7 +184,7 @@ export function HistoryView(props: {
   onContextMenu: (commit: HistoryCommit, event: any) => void
 }): any {
   const { commits, t } = props
-  const scoped = props.scope.startsWith('branch:') || props.scope.startsWith('tag:')
+  const scoped = /^(branch|tag|remote):/.test(props.scope)
 
   return h(
     'div',
@@ -224,7 +224,7 @@ export function HistoryView(props: {
           ? h(
               'span',
               { className: 'dgt-scope' },
-              props.scope.replace(/^(branch|tag):/, ''),
+              props.scope.replace(/^(branch|tag|remote):/, ''),
               h(
                 'button',
                 {

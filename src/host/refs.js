@@ -11,6 +11,7 @@ const REF_FORMAT = [
   '%(upstream:short)',
   '%(committerdate:unix)',
   '%(contents:subject)',
+  '%(symref)',
 ].join('%00')
 
 export const REF_ARGS = [
@@ -44,9 +45,9 @@ export function parseRefs(text, currentBranch) {
 
   for (const line of text.split('\n')) {
     if (!line.trim()) continue
-    const [refname, oid, upstream, committedAt, subject = ''] = line.split('\0')
+    const [refname, oid, upstream, committedAt, subject = '', symref = ''] = line.split('\0')
     const kind = refKind(refname || '')
-    if (!kind) continue
+    if (!kind || (kind === 'remote' && symref)) continue
     const name = shortName(refname)
     const record = {
       name,

@@ -33,22 +33,23 @@ export function parseCommitShow(text) {
   }
 }
 
-/** Parse `git show --name-status` lines: `M\tpath`, `R100\told\tnew`, … */
+/** Parse `git show --name-status -z` without quoting or splitting filenames. */
 export function parseNameStatus(text) {
   const files = []
-  for (const line of String(text).split('\n')) {
-    if (!line.trim()) continue
-    const parts = line.split('\t')
-    if (parts.length < 2) continue
-    const code = parts[0].trim()
+  const fields = String(text).split('\0')
+  for (let index = 0; index < fields.length - 1;) {
+    const code = fields[index++].replace(/^\n+/, '')
+    if (!/^[ACDMRTUXB][0-9]*$/.test(code)) continue
     const letter = code[0]
     const status =
       letter === 'A' ? 'added' : letter === 'D' ? 'deleted' : letter === 'R' ? 'renamed' : letter === 'C' ? 'copied' : 'modified'
+    const path = fields[index++]
+    if (!path) continue
     if (letter === 'R' || letter === 'C') {
-      if (parts.length < 3) continue
-      files.push({ status, path: parts[2], origPath: parts[1] })
+      const destination = fields[index++]
+      if (destination) files.push({ status, path: destination, origPath: path })
     } else {
-      files.push({ status, path: parts[1] })
+      files.push({ status, path })
     }
   }
   return files

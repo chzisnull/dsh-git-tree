@@ -73,6 +73,64 @@ export function mapRemoteFailure(stage, detail) {
   return null
 }
 
+/** Configured names may contain slashes, so use the longest matching prefix. */
+export function remoteForRef(name, remotes) {
+  return remotes.filter((remote) => name.startsWith(remote + '/'))
+    .sort((left, right) => right.length - left.length)[0] ?? null
+}
+
+function refspecMatch(pattern, ref) {
+  const parts = pattern.split('*')
+  if (parts.length === 1) return pattern === ref ? '' : null
+  if (parts.length !== 2 || !ref.startsWith(parts[0]) || !ref.endsWith(parts[1]) || ref.length < parts[0].length + parts[1].length) return null
+  return ref.slice(parts[0].length, parts[1] ? -parts[1].length : undefined)
+}
+
+/** Reverse only an unambiguous fetch mapping to a server branch. */
+export function remoteDeleteRef(trackingRef, refspecs) {
+  const candidates = new Set()
+  const excluded = []
+  for (const raw of refspecs) {
+    if (raw.startsWith('^')) {
+      excluded.push(raw.slice(1))
+      continue
+    }
+    const parts = raw.replace(/^\+/, '').split(':')
+    if (parts.length !== 2) continue
+    const [source, destination] = parts
+    const match = refspecMatch(destination, trackingRef)
+    if (match === null) continue
+    if ((source.match(/\*/g) || []).length !== (destination.match(/\*/g) || []).length) {
+      return { ok: false, code: 'remote-mapping-unsupported', reason: '远端 fetch 映射无法唯一对应服务器分支' }
+    }
+    candidates.add(source.replace('*', match))
+  }
+  const [ref] = candidates
+  if (candidates.size !== 1 || !ref.startsWith('refs/heads/') || excluded.some((pattern) => refspecMatch(pattern, ref) !== null)) {
+    return { ok: false, code: 'remote-mapping-unsupported', reason: '远端 fetch 映射无法唯一对应服务器分支' }
+  }
+  return { ok: true, ref }
+}
+
+/** Explain a server-side delete refusal without weakening its protection. */
+export function mapRemoteDeleteFailure(detail) {
+  const common = mapRemoteFailure('fetch', detail)
+  if (common) return common
+  if (/stale info|fetch first|cannot lock ref.*expected|is at .*expected/i.test(detail)) {
+    return { code: 'remote-stale', reason: '远程分支已变化，请获取最新引用后重新确认删除' }
+  }
+  if (/remote ref does not exist|unable to delete.*not found/i.test(detail)) {
+    return { code: 'remote-branch-missing', reason: '远程服务器上已没有这个分支' }
+  }
+  if (/protected branch|hook declined|deletion.*(?:prohibited|denied)|deny deleting|remote rejected/i.test(detail)) {
+    return { code: 'remote-delete-protected', reason: '服务器拒绝删除这个分支，请检查分支保护或服务器钩子' }
+  }
+  if (/repository.*not found|does not appear to be a git repository/i.test(detail)) {
+    return { code: 'remote-not-found', reason: '找不到远程仓库，请检查远端地址与访问权限' }
+  }
+  return null
+}
+
 /** How many commits one branch is ahead/behind another, parsed from rev-list. */
 export function parseAheadBehind(text) {
   const [ahead, behind] = String(text)

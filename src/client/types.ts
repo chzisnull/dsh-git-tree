@@ -19,9 +19,11 @@ export interface ClientCtx {
   inject?(deps: string[], callback: (ctx: ClientCtx) => void): unknown
 }
 
+export type RefKind = 'branch' | 'tag' | 'remote'
+
 export interface HistoryRef {
   name: string
-  kind: 'branch' | 'tag'
+  kind: RefKind
 }
 
 export interface HistoryCommit {
@@ -46,7 +48,7 @@ export interface HistoryPayload {
   code?: string
 }
 
-/** `all`, `current`, `branch:<name>` or `tag:<name>`. */
+/** `all`, `current`, or a `branch:`, `tag:` or `remote:` reference name. */
 export type HistoryScope = string
 
 export interface CommitFile {
@@ -180,6 +182,7 @@ export interface ConflictResolvePayload {
   ok: boolean
   path?: string
   content?: string
+  sourceHash?: string
   provider?: string
   model?: string
   diff?: { files?: DiffFile[]; stats?: { additions: number; deletions: number }; text?: string }
@@ -200,6 +203,7 @@ export interface RefsPayload {
   ok: boolean
   branches?: RefRecord[]
   remotes?: RefRecord[]
+  remoteNames?: string[]
   tags?: RefRecord[]
   error?: string
   code?: string
@@ -236,6 +240,7 @@ export interface OpenPayload {
 
 export interface MutationPayload {
   ok: boolean
+  warning?: string
   error?: string
   code?: string
   remote?: string

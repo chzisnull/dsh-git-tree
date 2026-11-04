@@ -85,6 +85,11 @@ export async function runProcess(subprocess, command, argv, cwd, options = {}) {
       options.missingCode ?? command + '-not-found',
     )
   }
+  const controller = new AbortController()
+  const abort = () => controller.abort(options.signal.reason)
+  if (options.signal?.aborted) abort()
+  else options.signal?.addEventListener('abort', abort, { once: true })
+  let timer
   let handle
   try {
     handle = subprocess.spawn({
@@ -96,21 +101,33 @@ export async function runProcess(subprocess, command, argv, cwd, options = {}) {
         stdout: { maxBytes },
         stderr: { maxBytes: 256 * 1024 },
       },
-      graceMs: options.timeoutMs ?? GIT_TIMEOUT_MS,
-      ...(options.signal ? { signal: options.signal } : {}),
+      graceMs: 1000,
+      signal: controller.signal,
     })
   } catch (error) {
+    options.signal?.removeEventListener('abort', abort)
     const detail = error instanceof Error ? error.message : String(error)
     throw new GitError(
       (options.spawnMessage ?? '无法启动 ' + label + '：') + detail,
       options.spawnCode ?? command + '-spawn-failed',
     )
   }
-  const outcome = await handle.done
-  const stdout = handle.collected?.stdout?.readFrom(0)
-  const stderr = handle.collected?.stderr?.readFrom(0)
-  if (stdout?.lossy) throw new GitError('输出超出上限，请缩小查询范围', 'output-too-large')
-  return { code: outcome.exitCode, out: stdout?.text ?? '', err: (stderr?.text ?? '').trim() }
+  try {
+    const deadline = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new GitError(label + ' 执行超时', command + '-timeout'))
+        controller.abort()
+      }, options.timeoutMs ?? GIT_TIMEOUT_MS)
+    })
+    const outcome = await Promise.race([handle.done, deadline])
+    const stdout = handle.collected?.stdout?.readFrom(0)
+    const stderr = handle.collected?.stderr?.readFrom(0)
+    if (stdout?.lossy) throw new GitError('输出超出上限，请缩小查询范围', 'output-too-large')
+    return { code: outcome.exitCode, out: stdout?.text ?? '', err: (stderr?.text ?? '').trim() }
+  } finally {
+    clearTimeout(timer)
+    options.signal?.removeEventListener('abort', abort)
+  }
 }
 
 /** The checked-out branch, or '' when HEAD is detached. */
@@ -125,6 +142,9 @@ export async function currentBranchOf(subprocess, cwd) {
 /** Run git and throw on a non-zero exit, carrying git's own message. */
 export async function git(subprocess, argv, cwd, options) {
   const result = await execGit(subprocess, argv, cwd, options)
-  if (result.code !== 0) throw new GitError(result.err || 'git 退出码 ' + String(result.code), 'git-failed')
+  if (result.code !== 0) {
+    const detail = [result.err, result.out.trim()].filter(Boolean).join('\n')
+    throw new GitError(detail || 'git 退出码 ' + String(result.code), 'git-failed')
+  }
   return result.out
 }

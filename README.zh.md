@@ -10,9 +10,9 @@
 
 `35 秒介绍片（mp4，3.6 MB）` · [`海报`](docs/media/poster.png)
 
-## 0.15.0 能做什么
+## 0.16.0 能做什么
 
-这一版是**本地 Git 工作台**：文件状态、历史、搜索、本地分支——读改动、暂存、提交、切分支、看任意一次提交，全在面板里完成，支持推送当前分支，也可以让 DSH 里的模型来写提交信息。fetch / pull、远程分支和远端管理还没有做。
+这一版是 **Git 工作台**：文件状态、历史、搜索、本地分支、远程分支浏览与 fetch / pull / push——读改动、暂存、提交、切本地分支、浏览远程历史，全在面板里完成，也可以让 DSH 里的模型来写提交信息。远程分支按远端分组，可浏览、复制和在确认后删除服务器分支；本地分支支持普通删除与强制删除。远端配置管理和创建并检出跟踪分支尚未提供。
 
 - **一个 `main` 面板**，入口是左侧图标栏里的 `Git` 一行——和「插件」页面用的是同一类座位，所以它自动拿到整个中栏、窗口顶部安全区和 DSH 的深浅色。
 - **快捷键开合**：任意位置按 `⇧⌘V`（Windows 是 `Ctrl+Shift+V`）打开面板，面板已经打开时再按一下就回到对话。命令走 DSH 自带的快捷键服务注册，所以它会出现在「设置 → 键盘快捷键」（`⌘/`）里，可以搜索、改键、恢复默认；工具栏右侧的键帽徽标和 diff 空态的提示显示的就是你当前的绑定。面板自己的确认框和 AI 冲突预览打开时不响应；提交框里的草稿按仓库记住，所以误触开关也不会把刚打的字丢掉。命令没有绑定时空态那行会指向「设置 → 键盘快捷键」。
@@ -25,7 +25,7 @@
 - **历史视图**：提交泳道图 + 描述 / 短 SHA / 作者 / 日期，「所有分支 / 仅当前分支」过滤，每页 200 条分页加载。
 - **提交详情**：选中提交看信息、作者、日期、父级、refs 与变更文件；点文件看该提交内 diff；父级链接可跳转。
 - **搜索视图**：按提交信息 / 作者 / 文件路径搜提交，结果复用历史列表与详情。
-- **分支**：单击看该分支历史、双击检出；可新建 / 重命名 / 删除本地分支；脏工作区检出会被拒绝，不会自动 stash。
+- **分支**：本地分支单击看历史、双击检出；可新建 / 重命名 / 删除，脏工作区检出会被拒绝。远程跟踪分支按远端分组并可展开收起，单击或键盘打开该分支历史，菜单支持历史、复制完整名称和删除远程分支；远程删除需要输入完整名称确认，按预览的提交版本删除，远端已更新或受服务器保护时会拒绝。本地分支另提供“强制删除”，可删除尚未合并的本地分支，也需要输入名称确认；当前分支始终不能删除。`origin/HEAD` 等符号别名不重复列为分支。“所有分支”历史包含远程独有提交，并显示远程标记。远程树是本地获取快照；加载失败、未配置远端和尚无已获取分支各有提示。
 - **右键操作**：改动行可提交（暂存并聚焦提交框）、暂存/取消暂存、放弃更改、删除文件 / 删除未跟踪文件、复制路径；分支行可检出、重命名、删除、复制名称；提交行可复制 SHA、从此提交新建分支、复制提交信息。危险操作先确认，只有可执行的破坏项是红色。
 - **获取 / 拉取**：获取只更新远端跟踪引用（带 `--prune`），让 ahead/behind 是新鲜的；拉取把当前分支快进到 upstream，没有 upstream 时走 `origin/<同名分支>`。两个动作分开，面板打开时静默获取一次；本地与远端分叉时先确认，同意后才把远端合并进来，冲突落到冲突视图。
 - **推送**：把当前分支推到它的 upstream（首次推送自动建立跟踪）。永不 force；认证失败和非快进会被翻译成可读的下一步提示。
@@ -35,12 +35,12 @@
 - **把冲突交给 DSH 会话**：头部 `✦ 交给 AI 助手` 会在该仓库所在的 workspace 打开会话，并把写好的提示词填进输入框——仓库、文件、分支、已数到的冲突块数，以及边界（只改这个文件、改完说明、不要 `git add`/`commit`/`checkout`，由你手动标记为已解决）。不自动发送，面板也不写任何文件。仓库不在已注册 workspace 里时，自动复制提示词并弹框说明原因。原来的「面板内模型合并（预览 → 应用）」保留在冲突文件右键菜单的「用模型合并（预览）」；「标记为已解决」（`git add`）和「还原冲突」（`git checkout --merge`）仍是两个需要你点的独立动作。
 - **AI 生成提交信息**：提交卡片里的 ✨ 按钮，按这次提交会包含的文件（有暂存就用暂存，没有就用全部改动）的 diff 生成提交信息；旁边的模型按钮从 DSH 的实时模型列表（所有已注册提供方，分组展示）里挑模型。选择按 DSH home 记住，调用本身走 DSH 自己的 `llm` 服务，插件里不另配一套 provider。它只把文字填进输入框——仍然由你检查、点提交。所选文件的 diff 会发给你选中的模型。
 - **本地动作**：在 Finder 中显示、在终端打开（macOS）。
-- **实时，但按你在做什么花代价**：只在窗口聚焦且面板在前台时轮询——改动活跃时 3 秒一次，连续三次没有变化后退避到 10 秒，窗口失焦就完全停。空闲的一次轮询只跑一条 `git status`（仓库根、身份、remotes 缓存一分钟；引用树走自己的 10 秒节拍），写操作后仍然立即刷新。中等仓库实测：空闲 40 秒从 123 个 git 进程降到 9 个，CPU 从约 0.75% 降到约 0.25%。
+- **实时，但按你在做什么花代价**：只在窗口聚焦且面板在前台时轮询——改动活跃时 3 秒一次，连续三次没有变化后退避到 10 秒，窗口失焦就完全停。状态轮询只跑一条 `git status`（仓库根、身份、remotes 缓存一分钟；引用树走自己的 10 秒节拍），文件状态视图中选中的 diff 也会重新读取，以反映终端或 Agent 对同一文件的继续编辑。没有选中文件时省去 diff 读取；写操作后仍然立即刷新。
 - **写操作面很小**：stage / unstage / commit、放弃更改、删除、分支新建-重命名-删除、检出、合并到当前分支，以及一个永不 force 的当前分支推送。没有 `reset --hard`、没有 force push、没有 amend、没有 rebase、没有 stash 路由。
 
 ## 状态
 
-| 能力 | 0.15.0 |
+| 能力 | 0.16.0 |
 | --- | --- |
 | `main` 面板 + 侧栏入口 | 已完成 |
 | 快捷键（`⇧⌘V`） | 已完成 |
@@ -64,12 +64,14 @@
 | 自动刷新（聚焦感知 + 空闲退避） | 已完成 |
 | 推送当前分支 | 已完成 |
 | 获取 / 拉取 | 已完成 |
-| 远程分支 / 远端管理 | 未做 |
+| 远程分支分组 / 浏览历史 / 复制名称 / 删除服务器分支 | 已完成 |
+| 本地分支普通删除 / 强制删除 | 已完成 |
+| 远端管理 / 创建并检出跟踪分支 | 未做 |
 | 变基 / 贮藏 / 手工三栏合并编辑器 | 不做 |
 | 大仓库虚拟滚动 | 不做（按决定取消） |
 | 与 Agent 共用操作 | 未做 |
 
-完整计划（包括布局依据的实测 UI 规格）在 [`docs/PLAN.md`](docs/PLAN.md)。
+完整计划（包括布局依据的实测 UI 规格）在 [`docs/PLAN.md`](docs/PLAN.md)。本轮远程浏览决策、审查修复约束及后续功能优先级见 [ADR 0008](docs/adr/0008-remote-branch-browsing.md)：先做未跟踪文件预览，再做按区块暂存、分支比较。发布前追加的本地强制删除与远程服务器删除见 [ADR 0009](docs/adr/0009-branch-deletion.md)。
 
 ## 设计取舍
 
@@ -104,7 +106,7 @@ POST /api/git-tree/repositories/pin    → { path, pinned } → 置顶 / 取消�
 POST /api/git-tree/repositories/open   → { path } → 记录一次主动切换
 GET  /api/git-tree/status?cwd=…        → 分支、upstream、ahead/behind、entries、counts
 GET  /api/git-tree/diff?path=…&side=…  → files → hunks → lines、统计（或 commit=<sha>）
-GET  /api/git-tree/refs?cwd=…          → 本地分支、标签
+GET  /api/git-tree/refs?cwd=…          → 本地分支、远程跟踪引用、远端名、标签
 GET  /api/git-tree/history?scope=…     → 带泳道的提交、分页、过滤
 GET  /api/git-tree/commit-info?sha=…   → 元信息、父级、refs、变更文件
 GET  /api/git-tree/ai/models           → DSH 模型目录 + 已保存/默认路由
@@ -112,13 +114,15 @@ POST /api/git-tree/stage               → { paths[] }
 POST /api/git-tree/unstage             → { paths[] }
 POST /api/git-tree/commit              → { message } → { sha, shortSha, subject }
 POST /api/git-tree/commit-message      → { side, files[] } → { message }（一次模型调用）
-POST /api/git-tree/conflict/resolve    → { path } → { content, diff }（只预览，不写盘）
-POST /api/git-tree/conflict/apply      → { path, content } → 写入工作区文件
+POST /api/git-tree/conflict/resolve    → { path } → { content, diff, sourceHash }（只预览，不写盘）
+POST /api/git-tree/conflict/apply      → { path, content, sourceHash } → 来源未变化时写入工作区文件
 POST /api/git-tree/conflict/revert     → { path } → git checkout --merge
 POST /api/git-tree/conflict/mark-resolved → { path } → git add（有标记时拒绝）
 POST /api/git-tree/ai/model            → { provider, model } → 记住选择
 POST /api/git-tree/checkout            → { branch } → 脏工作区拒绝
-POST /api/git-tree/branch/create|rename|delete
+POST /api/git-tree/branch/create|rename
+POST /api/git-tree/branch/delete        → { name, force?: boolean } → 普通或强制删除本地分支
+POST /api/git-tree/branch/delete-remote → { name, expectedOid } → 按确认快照删除服务器分支
 POST /api/git-tree/open                → { target: 'finder' | 'terminal' }
 POST /api/git-tree/push                → 当前分支 → 它的 upstream（永不 force）
 POST /api/git-tree/fetch               → git fetch <remote> --prune（不动工作区）
@@ -127,7 +131,7 @@ POST /api/git-tree/discard             → { paths[], side } → git restore
 POST /api/git-tree/remove              → { paths[], untracked } → git rm / git clean
 ```
 
-git 不走 shell；子进程环境带 `GIT_TERMINAL_PROMPT=0`（永不卡在认证）、`GIT_OPTIONAL_LOCKS=0`（不在你的仓库里拿可选锁）、`GIT_CONFIG_COUNT=0`，输出与耗时都有上限。绝对路径和含 `..` 的路径在进入 `argv` 之前被拒绝；未跟踪文件删除使用字面路径，允许以 `-` 开头的文件名。工作区之外的 `cwd` 一律 403。
+git 不走 shell；子进程环境带 `GIT_TERMINAL_PROMPT=0`（永不卡在认证）、`GIT_OPTIONAL_LOCKS=0`（不在你的仓库里拿可选锁）、`GIT_CONFIG_COUNT=0`，输出与耗时都有上限。绝对路径和含 `..` 段的路径在进入 `argv` 之前被拒绝；文件操作使用字面路径，允许以 `-` 开头的合法文件名。工作区之外的 `cwd` 一律 403。
 
 宿主机制的取证（slot id、Fetch 路由通道、subprocess 安全、主题 token）都在 [`docs/dsh-plugin-api.md`](docs/dsh-plugin-api.md)，每条都带 `app.asar` 内的 `file:line` 引用。
 
@@ -158,7 +162,7 @@ dsh plugin --profile <profile> add /Library/aiProject/dsh-git-tree
 ```sh
 node build.mjs     # src/client/index.tsx → client.js（产物入库）
 npm run check      # 两个半边 node --check
-npm test           # 78 条断言：清单、宿主路由、解析器、客户端启动、导入守卫
+npm test           # 清单、宿主路由、解析器、客户端行为及真实隔离 Git 回归
 ```
 
 `build.mjs` 先找本包的 `node_modules` 里的 esbuild，再找已安装的 `dsh-workbench`；都没有就停下并打印修复命令（`npm i -D esbuild`）。

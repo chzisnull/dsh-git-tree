@@ -61,8 +61,9 @@ function fakeContext({ llm, root, defaultModel } = {}) {
       },
       spawn({ argv, cwd }) {
         spawns.push({ argv, cwd })
-        const command = argv[1]
+        const command = argv[1] === '--literal-pathspecs' ? argv[2] : argv[1]
         let stdout = ''
+        if (command === 'rev-parse' && argv.includes('--show-toplevel')) stdout = root + '\n'
         if (command === 'symbolic-ref') stdout = 'feat/ai\n'
         if (command === 'diff') stdout = DIFF_FIXTURE
         return {
@@ -266,7 +267,7 @@ test('generation streams the saved route and returns a clean message', async () 
     assert.equal(call1.messages[0].role, 'user')
     assert.match(call1.messages[0].content[0].text, /- M src\/app\.js/)
     // The diff came from `git diff --cached`, not from the working tree.
-    const diffSpawn = ctx.spawns.find((spawn) => spawn.argv[1] === 'diff')
+    const diffSpawn = ctx.spawns.find((spawn) => spawn.argv.includes('diff'))
     assert.ok(diffSpawn.argv.includes('--cached'))
     assert.ok(diffSpawn.argv.includes('--'))
     rmSync(root, { recursive: true, force: true })

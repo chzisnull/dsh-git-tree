@@ -127,6 +127,13 @@ export const CSS = `
 .dgt-rail-dot{width:6px;height:6px;border-radius:50%;background:var(--dgt-accent);flex:0 0 auto;}
 .dgt-rail-name{overflow:hidden;text-overflow:ellipsis;}
 .dgt-rail-empty{padding:3px 9px 5px;color:var(--dsw-alias-label-tertiary);font-size:11px;}
+.dgt-rail-note{padding:0 9px 5px;color:var(--dsw-alias-label-tertiary);font-size:10px;}
+.dgt-rail-empty.dgt-error{color:var(--dgt-err);white-space:normal;overflow-wrap:anywhere;}
+.dgt-remote-title{display:list-item;cursor:pointer;padding:4px 9px;color:var(--dsw-alias-label-secondary);font-size:12px;}
+.dgt-remote-title .dgt-rail-name{display:inline-block;max-width:calc(100% - 36px);vertical-align:middle;}
+.dgt-remote-count{float:right;color:var(--dsw-alias-label-tertiary);font-size:10px;}
+.dgt-remote-group .dgt-rail-ref{margin-left:10px;}
+.dgt-rail-ref:focus-visible,.dgt-remote-title:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:-2px;}
 .dgt-rail-btn{appearance:none;border:0;width:100%;background:transparent;text-align:left;
   font:inherit;font-size:12.5px;cursor:pointer;}
 .dgt-rail-ref{position:relative;cursor:pointer;}
@@ -333,6 +340,7 @@ export const CSS = `
 .dgt-detail-meta{flex:0 0 auto;display:flex;flex-direction:column;gap:3px;padding:12px 14px;
   border-bottom:1px solid var(--dgt-line-soft);}
 .dgt-detail-subject{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-refchip[data-kind='remote']{color:var(--dgt-warn);}
 .dgt-detail-sha{font-family:var(--ds-font-family-code);font-size:10.5px;color:var(--dsw-alias-label-tertiary);}
 .dgt-detail-line{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11px;color:var(--dsw-alias-label-secondary);}
 .dgt-detail-label{color:var(--dsw-alias-label-tertiary);}
@@ -534,6 +542,7 @@ export const CSS = `
 .dgt-menu button{display:block;width:100%;padding:5px 9px;border:0;border-radius:7px;background:transparent;
   color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;text-align:left;cursor:pointer;}
 .dgt-menu button:hover{background:var(--dgt-line-soft);}
+.dgt-menu button[data-danger]:not(:disabled){color:var(--dgt-err);}
 .dgt-menu button:disabled{color:var(--dsw-alias-label-caption);cursor:default;}
 .dgt-ctxmenu{position:fixed;z-index:80;min-width:200px;max-width:280px;padding:6px;
   border:1px solid var(--dgt-line);border-radius:12px;background:var(--dgt-card);

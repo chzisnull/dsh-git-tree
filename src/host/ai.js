@@ -25,10 +25,11 @@ import {
   parseConflictText,
   readConflictFile,
   requireUnmerged,
+  requireConflictSource,
   validateResolvedText,
 } from './conflict.js'
 import { RequestError } from './errors.js'
-import { resolveCwd, safeRepoPath } from './paths.js'
+import { resolveCwd, resolveRepoRoot, safeRepoPath } from './paths.js'
 import { json, readJsonBody } from './http.js'
 
 /** Diff characters handed to the model; the tail is dropped, never a file's head only. */
@@ -345,7 +346,7 @@ function deadlineSignal(signal, timeoutMs) {
 /** Collect the diff for the selected files and the scope that produced it. */
 async function readSelectionDiff(subprocess, cwd, side, files) {
   const paths = files.map((file) => file.path)
-  const argv = ['diff', '--no-color', '--no-ext-diff', '--no-textconv', '--unified=3']
+  const argv = ['--literal-pathspecs', 'diff', '--no-color', '--no-ext-diff', '--no-textconv', '--unified=3']
   if (side === 'staged') argv.push('--cached')
   argv.push('--', ...paths)
   try {
@@ -438,9 +439,10 @@ export async function handleGenerateCommitMessage(ctx, request) {
   const locale = typeof body.locale === 'string' ? body.locale : ''
 
   const subprocess = subprocessOf(ctx)
-  const branch = await currentBranchOf(subprocess, cwd)
-  const diff = await readSelectionDiff(subprocess, cwd, side, files)
-  const prompt = buildCommitPrompt({ repoName: repoNameOf(cwd), branch, side, files, diff, locale })
+  const repoRoot = await resolveRepoRoot(ctx, subprocess, cwd)
+  const branch = await currentBranchOf(subprocess, repoRoot)
+  const diff = await readSelectionDiff(subprocess, repoRoot, side, files)
+  const prompt = buildCommitPrompt({ repoName: repoNameOf(repoRoot), branch, side, files, diff, locale })
 
   const { text, provider, model } = await generateWithRoute(ctx, {
     system: systemPrompt(locale),
@@ -505,8 +507,9 @@ export async function handleConflictResolve(ctx, request) {
   const path = safeRepoPath(body.path)
 
   const subprocess = subprocessOf(ctx)
-  await requireUnmerged(subprocess, cwd, path)
-  const file = readConflictFile(cwd, path)
+  const repoRoot = await resolveRepoRoot(ctx, subprocess, cwd)
+  await requireUnmerged(subprocess, repoRoot, path)
+  const file = readConflictFile(repoRoot, path)
   if (Buffer.byteLength(file.text, 'utf8') > MAX_CONFLICT_PROMPT_BYTES) {
     throw new RequestError(
       '冲突文件超过 ' + String(Math.round(MAX_CONFLICT_PROMPT_BYTES / 1024)) + ' KB，先手动缩小再交给模型',
@@ -516,7 +519,7 @@ export async function handleConflictResolve(ctx, request) {
   }
 
   const parsed = parseConflictText(file.text)
-  const branch = await currentBranchOf(subprocess, cwd)
+  const branch = await currentBranchOf(subprocess, repoRoot)
   const { text, provider, model } = await generateWithRoute(ctx, {
     system: conflictSystemPrompt(),
     prompt: buildConflictPrompt({ path, branch, text: file.text, labels: parsed.labels }),
@@ -527,12 +530,15 @@ export async function handleConflictResolve(ctx, request) {
   const checked = validateResolvedText(normaliseResolvedFile(text))
   if (!checked.ok) throw new RequestError(checked.reason, 409, checked.code)
 
-  const diffText = await diffAgainstProposal(subprocess, cwd, path, checked.text)
+  requireConflictSource(repoRoot, path, file.sourceHash)
+  const diffText = await diffAgainstProposal(subprocess, repoRoot, path, checked.text)
+  requireConflictSource(repoRoot, path, file.sourceHash)
   const diff = parseUnifiedDiff(diffText)
   return json({
     ok: true,
     path,
     content: checked.text,
+    sourceHash: file.sourceHash,
     provider,
     model,
     diff: { files: diff.files, stats: diff.stats, text: diffText },

@@ -43,6 +43,11 @@ export function statusSignature(status: GitStatusPayload | null): string {
     counts.staged,
     counts.unstaged,
     counts.conflicted,
+    status.identity?.name ?? '',
+    status.identity?.email ?? '',
+    JSON.stringify(status.remotes ?? []),
+    status.repoRoot ?? '',
+    status.truncated === true,
     entries,
   ].join('\u0001')
 }

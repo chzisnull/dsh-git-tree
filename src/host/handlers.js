@@ -35,18 +35,19 @@ import {
 import { COMMIT_FORMAT, isSafeCommitSha, parseCommitShow, parseNameStatus } from './commit.js'
 import { REF_ARGS, parseRefs } from './refs.js'
 import { lstatSync, realpathSync } from 'node:fs'
-import { isAbsolute, join } from 'node:path'
+import { join } from 'node:path'
 import { openArgv } from './open.js'
-import { resolveCwd, safeRepoPath, workspaceRootOf } from './paths.js'
+import { resolveCwd, resolveRepoRoot, safeRepoPath, workspaceRootOf } from './paths.js'
 import { GitError, RequestError } from './errors.js'
 import { orderWorkspaces, readRepositoryPrefs, recordOpened, togglePinned, writeRepositoryPrefs } from './repositories.js'
-import { mapRemoteFailure, resolvePullTarget, splitUpstream } from './remote.js'
+import { mapRemoteDeleteFailure, mapRemoteFailure, remoteDeleteRef, remoteForRef, resolvePullTarget, splitUpstream } from './remote.js'
 import {
   hasConflictMarkers,
   isUnmerged,
   parseConflictText,
   readConflictFile,
   requireUnmerged,
+  requireConflictSource,
   revertConflict,
   stageResolved,
   validateResolvedText,
@@ -228,10 +229,11 @@ export async function handleDiff(ctx, request) {
   if (commit && !isSafeCommitSha(commit)) throw new RequestError('无效的提交哈希', 400, 'invalid-sha')
   const subprocess = subprocessOf(ctx)
 
+  const repoRoot = await resolveRepoRoot(ctx, subprocess, cwd)
   // An unmerged path has no ordinary unified diff (git prints a combined one),
   // so answer with the working-tree file and its conflict blocks instead.
-  if (!commit && (await isUnmerged(subprocess, cwd, path))) {
-    const file = readConflictFile(cwd, path)
+  if (!commit && (await isUnmerged(subprocess, repoRoot, path))) {
+    const file = readConflictFile(repoRoot, path)
     const parsed = parseConflictText(file.text)
     return json({
       ok: true,
@@ -256,7 +258,7 @@ export async function handleDiff(ctx, request) {
   }
   argv.push('--', path)
 
-  const text = await git(subprocess, argv, cwd, { maxBytes: MAX_DIFF_BYTES, signal: request.signal })
+  const text = await git(subprocess, ['--literal-pathspecs', ...argv], repoRoot, { maxBytes: MAX_DIFF_BYTES, signal: request.signal })
   const parsed = parseUnifiedDiff(text)
 
   return json({
@@ -294,17 +296,38 @@ export async function handleHistory(ctx, request) {
     const tag = scope.slice('tag:'.length)
     if (!isSafeBranchName(tag)) throw new RequestError('无效的标签名', 400, 'invalid-branch-name')
     argv.push('refs/tags/' + tag)
+  } else if (scope.startsWith('remote:')) {
+    const remote = scope.slice('remote:'.length)
+    if (!isSafeBranchName(remote)) throw new RequestError('无效的远程引用名', 400, 'invalid-branch-name')
+    const remoteRef = 'refs/remotes/' + remote
+    try {
+      await git(subprocess, ['show-ref', '--verify', '--quiet', remoteRef], cwd, { maxBytes: 8 * 1024 })
+    } catch (error) {
+      if (error.code !== 'git-failed') throw error
+      throw new RequestError('远程分支已不存在，请清除范围后重试', 404, 'unknown-remote-ref')
+    }
+    argv.push(remoteRef)
+  } else if (scope === 'all') {
+    argv.push('--branches', '--tags', '--remotes')
+    try {
+      await git(subprocess, ['rev-parse', '--verify', 'HEAD'], cwd, { maxBytes: 8 * 1024 })
+      argv.push('HEAD')
+    } catch (error) {
+      if (error.code !== 'git-failed') throw error
+      /* an unborn local branch can still have remote-tracking history */
+    }
   } else {
-    argv.push('--branches', '--tags', 'HEAD')
+    throw new RequestError('无效的历史范围', 400, 'invalid-scope')
   }
   if (query) argv.push('--grep=' + query, '--fixed-strings', '--regexp-ignore-case')
   if (author) argv.push('--author=' + author, '--fixed-strings', '--regexp-ignore-case')
   argv.push('--max-count=' + String(limit + 1), '--skip=' + String(skip))
   if (path) argv.push('--', safeRepoPath(path))
+  const repoRoot = path ? await resolveRepoRoot(ctx, subprocess, cwd) : cwd
 
   let text = ''
   try {
-    text = await git(subprocess, argv, cwd, { maxBytes: MAX_DIFF_BYTES, signal: request.signal })
+    text = await git(subprocess, ['--literal-pathspecs', ...argv], repoRoot, { maxBytes: MAX_DIFF_BYTES, signal: request.signal })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     // An unborn branch has no history yet; that is an empty list, not a failure.
@@ -338,7 +361,7 @@ export async function handleCommitInfo(ctx, request) {
 
   const nameStatus = await git(
     subprocess,
-    ['show', '--name-status', '--find-renames', '--format=', sha],
+    ['show', '--name-status', '-z', '--find-renames', '--format=', sha],
     cwd,
     { maxBytes: MAX_DIFF_BYTES, signal: request.signal },
   )
@@ -448,6 +471,10 @@ export async function handleBranchDelete(ctx, request) {
   const body = await readJsonBody(request)
   const name = body.name
   if (!isSafeBranchName(name)) throw new RequestError('无效的分支名', 400, 'invalid-branch-name')
+  if (body.force !== undefined && typeof body.force !== 'boolean') {
+    throw new RequestError('force 必须是布尔值', 400, 'invalid-force')
+  }
+  const force = body.force === true
   const subprocess = subprocessOf(ctx)
 
   const current = await currentBranchOf(subprocess, cwd)
@@ -461,15 +488,91 @@ export async function handleBranchDelete(ctx, request) {
   }
 
   try {
-    await git(subprocess, ['branch', '-d', name], cwd, { maxBytes: 256 * 1024 })
+    await git(subprocess, ['branch', force ? '-D' : '-d', name], cwd, { maxBytes: 256 * 1024 })
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     if (/not fully merged/i.test(detail)) {
       throw new RequestError('分支尚未合并，先合并再删除', 409, 'branch-not-merged')
     }
+    if (/checked out at|used by worktree/i.test(detail)) {
+      throw new RequestError('分支正在其他工作区使用，无法删除', 409, 'branch-in-use')
+    }
     throw error
   }
-  return json({ ok: true, name })
+  return json({ ok: true, name, force })
+}
+
+/** Delete one reviewed server branch using an explicit expected object lease. */
+export async function handleBranchDeleteRemote(ctx, request) {
+  const { cwd } = handleCwd(ctx, request)
+  const body = await readJsonBody(request)
+  const { name, expectedOid } = body
+  if (!isSafeBranchName(name)) throw new RequestError('无效的远程引用名', 400, 'invalid-branch-name')
+  if (typeof expectedOid !== 'string' || !/^[0-9a-f]{4,64}$/i.test(expectedOid)) {
+    throw new RequestError('缺少有效的 expectedOid，请刷新引用后重试', 400, 'invalid-expected-oid')
+  }
+  const subprocess = subprocessOf(ctx)
+  const { remotes, ok } = await readRemotes(subprocess, cwd)
+  if (!ok) throw new GitError('无法读取远端配置')
+  const remote = remoteForRef(name, remotes)
+  if (!remote) throw new RequestError('该引用不属于已配置的远端', 400, 'unknown-remote')
+  const trackingRef = 'refs/remotes/' + name
+  const records = await git(subprocess, ['for-each-ref', '--format=%(refname)%00%(objectname)%00%(symref)', trackingRef], cwd, { maxBytes: MAX_REFS_BYTES })
+  const record = records.split('\n').map((line) => line.split('\0')).find(([ref]) => ref === trackingRef)
+  if (!record) throw new RequestError('远程跟踪引用已不存在，请刷新后重试', 404, 'unknown-remote-ref')
+  if (record[2]) throw new RequestError('不能通过符号引用删除服务器分支', 400, 'symbolic-remote-ref')
+  let expected
+  try {
+    expected = (await git(subprocess, ['rev-parse', '--verify', expectedOid + '^{object}'], cwd, { maxBytes: 8 * 1024 })).trim()
+  } catch (error) {
+    if (error.code !== 'git-failed') throw error
+    throw new RequestError('引用快照已失效，请刷新后重新确认删除', 409, 'remote-stale')
+  }
+  if (record[1] !== expected) throw new RequestError('引用快照已变化，请刷新后重新确认删除', 409, 'remote-stale')
+
+  const specs = await git(subprocess, ['config', '--get-all', 'remote.' + remote + '.fetch'], cwd, { maxBytes: 64 * 1024 })
+    .catch((error) => { if (error.code !== 'git-failed') throw error; return '' })
+  const mapped = remoteDeleteRef(trackingRef, specs.split('\n').filter(Boolean))
+  if (!mapped.ok) throw new RequestError(mapped.reason, 409, mapped.code)
+  try {
+    await git(subprocess, ['check-ref-format', mapped.ref], cwd, { maxBytes: 8 * 1024 })
+  } catch (error) {
+    if (error.code !== 'git-failed') throw error
+    throw new RequestError('fetch 映射中的服务器分支无效', 409, 'remote-mapping-unsupported')
+  }
+  const urls = (await git(subprocess, ['remote', 'get-url', '--push', '--all', remote], cwd, { maxBytes: 64 * 1024 }))
+    .split('\n').filter(Boolean)
+  if (urls.length !== 1) throw new RequestError('远端必须只配置一个推送地址，避免同时删除多个服务器上的分支', 409, 'multiple-push-urls')
+  const pushUrl = urls[0]
+  try {
+    const advertised = await git(subprocess, ['ls-remote', '--refs', '--', pushUrl, mapped.ref], cwd, {
+      maxBytes: MAX_REFS_BYTES, timeoutMs: GIT_PUSH_TIMEOUT_MS,
+    })
+    const advertisedOid = advertised.split('\n').map((line) => line.split('\t')).find(([, ref]) => ref === mapped.ref)?.[0]
+    if (!advertisedOid) throw new RequestError('远程服务器上已没有这个分支', 404, 'remote-branch-missing')
+    if (advertisedOid !== expected) throw new RequestError('远程分支已变化，请获取最新引用后重新确认删除', 409, 'remote-stale')
+    // A fixed URL avoids multi-push and mirror config; the lease still guards
+    // updates between ls-remote and this deletion.
+    await git(subprocess, ['push', '--porcelain', '--no-mirror', '--force-with-lease=' + mapped.ref + ':' + expected, '--', pushUrl, ':' + mapped.ref], cwd, {
+      maxBytes: MAX_PUSH_BYTES, timeoutMs: GIT_PUSH_TIMEOUT_MS,
+    })
+  } catch (error) {
+    if (error instanceof RequestError) throw error
+    const mappedError = mapRemoteDeleteFailure(error instanceof Error ? error.message : String(error))
+    if (mappedError) throw new RequestError(mappedError.reason, mappedError.code === 'remote-branch-missing' || mappedError.code === 'remote-not-found' ? 404 : 409, mappedError.code)
+    throw error
+  }
+
+  let trackingRemoved = true
+  try {
+    await git(subprocess, ['update-ref', '--no-deref', '-d', trackingRef, expected], cwd, { maxBytes: 8 * 1024 })
+  } catch {
+    trackingRemoved = false
+  }
+  return json({
+    ok: true, name, remote, branch: mapped.ref.slice('refs/heads/'.length), trackingRemoved,
+    ...(!trackingRemoved ? { warning: '服务器分支已删除，本地跟踪引用未清理，请获取最新引用' } : {}),
+  })
 }
 
 export async function handleMerge(ctx, request) {
@@ -713,19 +816,11 @@ export async function handleRefs(ctx, request) {
     signal: request.signal,
   })
   const parsed = parseRefs(text, current)
-  return json({ ok: true, ...parsed })
+  const { remotes: remoteNames } = await readRemotes(subprocess, cwd)
+  return json({ ok: true, ...parsed, remoteNames })
 }
 
 // ── write routes ───────────────────────────────────────────────────────────
-
-/** Validate a list of repository-relative paths before any of them reaches argv. */
-function safePathList(value) {
-  if (!Array.isArray(value) || value.length === 0) throw new RequestError('缺少 paths 参数')
-  if (value.length > MAX_WRITE_PATHS) {
-    throw new RequestError('一次最多操作 ' + String(MAX_WRITE_PATHS) + ' 个路径', 400, 'too-many-paths')
-  }
-  return value.map(safeRepoPath)
-}
 
 function assertWriteFiles(cwd, paths) {
   for (const path of paths) {
@@ -736,13 +831,6 @@ function assertWriteFiles(cwd, paths) {
       if (error?.code !== 'ENOENT' && error?.code !== 'ENOTDIR') throw error
     }
   }
-}
-
-async function writeRepoRoot(ctx, subprocess, cwd) {
-  const output = await git(subprocess, ['rev-parse', '--show-toplevel'], cwd, { maxBytes: 64 * 1024 })
-  const root = output.replace(/\n$/, '')
-  if (!isAbsolute(root)) throw new GitError('无法确定仓库根目录')
-  return resolveCwd(ctx, root)
 }
 
 async function assertExactWritePaths(subprocess, cwd, paths) {
@@ -763,7 +851,7 @@ export async function handleStage(ctx, request) {
     throw new RequestError('暂存路径总字节数不能超过 ' + String(MAX_STAGE_PATH_BYTES), 400, 'paths-too-large')
   }
   const subprocess = subprocessOf(ctx)
-  const repoRoot = await writeRepoRoot(ctx, subprocess, cwd)
+  const repoRoot = await resolveRepoRoot(ctx, subprocess, cwd)
   await assertExactWritePaths(subprocess, repoRoot, paths)
   const unmerged = await git(subprocess, ['--literal-pathspecs', 'ls-files', '--unmerged', '-z', '--', ...paths], repoRoot, { maxBytes: MAX_STATUS_BYTES })
   if (unmerged) throw new RequestError('存在未合并文件，请先解决冲突', 409, 'conflicts-present')
@@ -777,7 +865,7 @@ export async function handleUnstage(ctx, request) {
   const body = await readJsonBody(request)
   const paths = literalPaths(body.paths)
   const subprocess = subprocessOf(ctx)
-  const repoRoot = await writeRepoRoot(ctx, subprocess, cwd)
+  const repoRoot = await resolveRepoRoot(ctx, subprocess, cwd)
   await assertExactWritePaths(subprocess, repoRoot, paths)
   assertWriteFiles(repoRoot, paths)
   await git(subprocess, ['--literal-pathspecs', 'reset', '--quiet', 'HEAD', '--', ...paths], repoRoot, { maxBytes: 256 * 1024 })
@@ -792,14 +880,16 @@ export async function handleUnstage(ctx, request) {
 export async function handleDiscard(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
   const body = await readJsonBody(request)
-  const paths = safePathList(body.paths)
+  const paths = literalPaths(body.paths)
   const staged = body.side === 'staged'
   const subprocess = subprocessOf(ctx)
+  const repoRoot = await resolveRepoRoot(ctx, subprocess, cwd)
+  await assertExactWritePaths(subprocess, repoRoot, paths)
 
-  const argv = ['restore']
+  const argv = ['--literal-pathspecs', 'restore']
   if (staged) argv.push('--staged')
   argv.push('--worktree', '--', ...paths)
-  await git(subprocess, argv, cwd, { maxBytes: 256 * 1024 })
+  await git(subprocess, argv, repoRoot, { maxBytes: 256 * 1024 })
   return json({ ok: true, discarded: paths, side: staged ? 'staged' : 'unstaged' })
 }
 
@@ -808,14 +898,7 @@ function literalPaths(value) {
   if (value.length > MAX_WRITE_PATHS) {
     throw new RequestError('一次最多操作 ' + String(MAX_WRITE_PATHS) + ' 个路径', 400, 'too-many-paths')
   }
-  for (const path of value) {
-    if (typeof path !== 'string' || !path || path.length > 4096 || path.includes('\0') || isAbsolute(path) ||
-        (process.platform === 'win32' && path.includes('\\')) ||
-        path.split('/').some((part) => !part || part === '.' || part === '..')) {
-      throw new RequestError('path 必须是规范的文件路径')
-    }
-  }
-  return value
+  return value.map(safeRepoPath)
 }
 
 /** Delete only exact, currently untracked files; never interpret names as pathspecs. */
@@ -874,14 +957,13 @@ export async function handleRemove(ctx, request) {
   const { cwd } = handleCwd(ctx, request)
   const body = await readJsonBody(request)
   const untracked = body.untracked === true
-  const paths = untracked ? literalPaths(body.paths) : safePathList(body.paths)
+  const paths = literalPaths(body.paths)
   const subprocess = subprocessOf(ctx)
+  const repoRoot = await resolveRepoRoot(ctx, subprocess, cwd)
 
-  if (untracked) {
-    const repoRoot = await writeRepoRoot(ctx, subprocess, cwd)
-    return removeUntracked(subprocess, repoRoot, paths, request.signal)
-  }
-  await git(subprocess, ['rm', '-f', '--quiet', '--', ...paths], cwd, { maxBytes: 256 * 1024 })
+  if (untracked) return removeUntracked(subprocess, repoRoot, paths, request.signal)
+  await assertExactWritePaths(subprocess, repoRoot, paths)
+  await git(subprocess, ['--literal-pathspecs', 'rm', '-f', '--quiet', '--', ...paths], repoRoot, { maxBytes: 256 * 1024 })
   return json({ ok: true, removed: paths, untracked })
 }
 
@@ -965,8 +1047,13 @@ export async function handleConflictApply(ctx, request) {
   if (!checked.ok) throw new RequestError(checked.reason, 409, checked.code)
   const subprocess = subprocessOf(ctx)
 
-  await requireUnmerged(subprocess, cwd, path)
-  writeRepoFile(cwd, path, checked.text)
+  if (typeof body.sourceHash !== 'string' || !/^[0-9a-f]{64}$/.test(body.sourceHash)) {
+    throw new RequestError('缺少有效的 sourceHash，请重新生成解决预览', 400, 'invalid-source-hash')
+  }
+  const repoRoot = await resolveRepoRoot(ctx, subprocess, cwd)
+  await requireUnmerged(subprocess, repoRoot, path)
+  requireConflictSource(repoRoot, path, body.sourceHash)
+  writeRepoFile(repoRoot, path, checked.text)
   return json({ ok: true, path, bytes: Buffer.byteLength(checked.text, 'utf8') })
 }
 
@@ -977,8 +1064,9 @@ export async function handleConflictRevert(ctx, request) {
   const path = safeRepoPath(body.path)
   const subprocess = subprocessOf(ctx)
 
-  await requireUnmerged(subprocess, cwd, path)
-  await revertConflict(subprocess, cwd, path)
+  const repoRoot = await resolveRepoRoot(ctx, subprocess, cwd)
+  await requireUnmerged(subprocess, repoRoot, path)
+  await revertConflict(subprocess, repoRoot, path)
   return json({ ok: true, path })
 }
 
@@ -989,11 +1077,12 @@ export async function handleConflictMarkResolved(ctx, request) {
   const path = safeRepoPath(body.path)
   const subprocess = subprocessOf(ctx)
 
-  await requireUnmerged(subprocess, cwd, path)
-  const file = readConflictFile(cwd, path)
+  const repoRoot = await resolveRepoRoot(ctx, subprocess, cwd)
+  await requireUnmerged(subprocess, repoRoot, path)
+  const file = readConflictFile(repoRoot, path)
   if (hasConflictMarkers(file.text)) {
     throw new RequestError('文件里仍有冲突标记，先解决再标记', 409, 'markers-present')
   }
-  await stageResolved(subprocess, cwd, path)
+  await stageResolved(subprocess, repoRoot, path)
   return json({ ok: true, path })
 }

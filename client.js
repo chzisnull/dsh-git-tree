@@ -130,6 +130,12 @@ var EN = {
   newBranch: "New branch",
   renameBranch: "Rename branch",
   deleteBranch: "Delete branch",
+  forceDeleteBranch: "Force delete branch\u2026",
+  deleteRemoteBranch: "Delete remote branch\u2026",
+  forceDeleteBranchConfirm: "Delete this local branch even if it has unmerged commits? Those commits may become unreachable. The remote branch is kept.",
+  deleteRemoteBranchConfirm: "Delete this branch from the remote server? This affects collaborators. Local branches are kept. If the remote branch has changed since the snapshot, fetch and confirm again.",
+  confirmBranchName: "Type the full branch name to confirm",
+  remoteBranchDeleted: "Remote branch deleted",
   branchName: "Branch name",
   createBranchAction: "Create",
   renameBranchAction: "Rename",
@@ -172,6 +178,11 @@ var EN = {
   searchEmptyPrompt: "Type a message, author or path to search commits.",
   branches: "Branches",
   remotes: "Remotes",
+  remoteSnapshot: "Local snapshot \xB7 update with Fetch",
+  noRemotes: "No remotes configured.",
+  noRemoteBranches: "No fetched branches yet.",
+  refsFailed: "Could not read references.",
+  remoteBranchGone: "This remote branch is no longer in the local snapshot. Clear the filter or fetch again.",
   tags: "Tags",
   stagedFiles: "Staged files",
   unstagedFiles: "Unstaged files",
@@ -367,6 +378,12 @@ var ZH = {
   newBranch: "\u65B0\u5EFA\u5206\u652F",
   renameBranch: "\u91CD\u547D\u540D\u5206\u652F",
   deleteBranch: "\u5220\u9664\u5206\u652F",
+  forceDeleteBranch: "\u5F3A\u5236\u5220\u9664\u5206\u652F\u2026",
+  deleteRemoteBranch: "\u5220\u9664\u8FDC\u7A0B\u5206\u652F\u2026",
+  forceDeleteBranchConfirm: "\u5373\u4F7F\u6709\u672A\u5408\u5E76\u63D0\u4EA4\uFF0C\u4E5F\u5220\u9664\u8FD9\u6761\u672C\u5730\u5206\u652F\uFF1F\u8FD9\u4E9B\u63D0\u4EA4\u53EF\u80FD\u5931\u53BB\u5F15\u7528\u3002\u8FDC\u7A0B\u5206\u652F\u4F1A\u4FDD\u7559\u3002",
+  deleteRemoteBranchConfirm: "\u4ECE\u8FDC\u7A0B\u670D\u52A1\u5668\u5220\u9664\u8FD9\u6761\u5206\u652F\uFF1F\u8FD9\u4F1A\u5F71\u54CD\u534F\u4F5C\u8005\uFF0C\u672C\u5730\u5206\u652F\u4F1A\u4FDD\u7559\u3002\u5982\u679C\u8FDC\u7A0B\u5206\u652F\u5DF2\u4ECE\u5FEB\u7167\u7248\u672C\u7EE7\u7EED\u66F4\u65B0\uFF0C\u8BF7\u5148\u83B7\u53D6\u5E76\u91CD\u65B0\u786E\u8BA4\u3002",
+  confirmBranchName: "\u8F93\u5165\u5B8C\u6574\u5206\u652F\u540D\u79F0\u4EE5\u786E\u8BA4",
+  remoteBranchDeleted: "\u8FDC\u7A0B\u5206\u652F\u5DF2\u5220\u9664",
   branchName: "\u5206\u652F\u540D",
   createBranchAction: "\u521B\u5EFA",
   renameBranchAction: "\u91CD\u547D\u540D",
@@ -409,6 +426,11 @@ var ZH = {
   searchEmptyPrompt: "\u8F93\u5165\u63D0\u4EA4\u4FE1\u606F\u3001\u4F5C\u8005\u6216\u6587\u4EF6\u8DEF\u5F84\u6765\u641C\u7D22\u63D0\u4EA4\u3002",
   branches: "\u5206\u652F",
   remotes: "\u8FDC\u7A0B",
+  remoteSnapshot: "\u672C\u5730\u83B7\u53D6\u5FEB\u7167 \xB7 \u83B7\u53D6\u540E\u66F4\u65B0",
+  noRemotes: "\u5C1A\u672A\u914D\u7F6E\u8FDC\u7AEF\u3002",
+  noRemoteBranches: "\u5C1A\u65E0\u5DF2\u83B7\u53D6\u7684\u5206\u652F\u3002",
+  refsFailed: "\u8BFB\u53D6\u5F15\u7528\u5931\u8D25\u3002",
+  remoteBranchGone: "\u8BE5\u8FDC\u7A0B\u5206\u652F\u5DF2\u4E0D\u5728\u672C\u5730\u5FEB\u7167\u4E2D\uFF0C\u8BF7\u6E05\u9664\u7B5B\u9009\u6216\u91CD\u65B0\u83B7\u53D6\u3002",
   tags: "\u6807\u7B7E",
   stagedFiles: "\u5DF2\u6682\u5B58\u6587\u4EF6",
   unstagedFiles: "\u672A\u6682\u5B58\u6587\u4EF6",
@@ -650,6 +672,13 @@ var CSS = `
 .dgt-rail-dot{width:6px;height:6px;border-radius:50%;background:var(--dgt-accent);flex:0 0 auto;}
 .dgt-rail-name{overflow:hidden;text-overflow:ellipsis;}
 .dgt-rail-empty{padding:3px 9px 5px;color:var(--dsw-alias-label-tertiary);font-size:11px;}
+.dgt-rail-note{padding:0 9px 5px;color:var(--dsw-alias-label-tertiary);font-size:10px;}
+.dgt-rail-empty.dgt-error{color:var(--dgt-err);white-space:normal;overflow-wrap:anywhere;}
+.dgt-remote-title{display:list-item;cursor:pointer;padding:4px 9px;color:var(--dsw-alias-label-secondary);font-size:12px;}
+.dgt-remote-title .dgt-rail-name{display:inline-block;max-width:calc(100% - 36px);vertical-align:middle;}
+.dgt-remote-count{float:right;color:var(--dsw-alias-label-tertiary);font-size:10px;}
+.dgt-remote-group .dgt-rail-ref{margin-left:10px;}
+.dgt-rail-ref:focus-visible,.dgt-remote-title:focus-visible{outline:2px solid var(--dgt-accent);outline-offset:-2px;}
 .dgt-rail-btn{appearance:none;border:0;width:100%;background:transparent;text-align:left;
   font:inherit;font-size:12.5px;cursor:pointer;}
 .dgt-rail-ref{position:relative;cursor:pointer;}
@@ -856,6 +885,7 @@ var CSS = `
 .dgt-detail-meta{flex:0 0 auto;display:flex;flex-direction:column;gap:3px;padding:12px 14px;
   border-bottom:1px solid var(--dgt-line-soft);}
 .dgt-detail-subject{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dgt-refchip[data-kind='remote']{color:var(--dgt-warn);}
 .dgt-detail-sha{font-family:var(--ds-font-family-code);font-size:10.5px;color:var(--dsw-alias-label-tertiary);}
 .dgt-detail-line{display:flex;align-items:center;gap:5px;flex-wrap:wrap;font-size:11px;color:var(--dsw-alias-label-secondary);}
 .dgt-detail-label{color:var(--dsw-alias-label-tertiary);}
@@ -1057,6 +1087,7 @@ var CSS = `
 .dgt-menu button{display:block;width:100%;padding:5px 9px;border:0;border-radius:7px;background:transparent;
   color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;text-align:left;cursor:pointer;}
 .dgt-menu button:hover{background:var(--dgt-line-soft);}
+.dgt-menu button[data-danger]:not(:disabled){color:var(--dgt-err);}
 .dgt-menu button:disabled{color:var(--dsw-alias-label-caption);cursor:default;}
 .dgt-ctxmenu{position:fixed;z-index:80;min-width:200px;max-width:280px;padding:6px;
   border:1px solid var(--dgt-line);border-radius:12px;background:var(--dgt-card);
@@ -1109,6 +1140,7 @@ var PULL_ROUTE = "api/git-tree/pull";
 var BRANCH_CREATE_ROUTE = "api/git-tree/branch/create";
 var BRANCH_RENAME_ROUTE = "api/git-tree/branch/rename";
 var BRANCH_DELETE_ROUTE = "api/git-tree/branch/delete";
+var REMOTE_BRANCH_DELETE_ROUTE = "api/git-tree/branch/delete-remote";
 var STAGE_ROUTE = "api/git-tree/stage";
 var UNSTAGE_ROUTE = "api/git-tree/unstage";
 var COMMIT_ROUTE = "api/git-tree/commit";
@@ -1188,8 +1220,11 @@ function createBranch(name, cwd, start) {
 function renameBranch(from, to, cwd) {
   return postJson(BRANCH_RENAME_ROUTE + query({ cwd }), { from, to });
 }
-function deleteBranch(name, cwd) {
-  return postJson(BRANCH_DELETE_ROUTE + query({ cwd }), { name });
+function deleteBranch(name, cwd, force = false) {
+  return postJson(BRANCH_DELETE_ROUTE + query({ cwd }), { name, force });
+}
+function deleteRemoteBranch(name, expectedOid, cwd) {
+  return postJson(REMOTE_BRANCH_DELETE_ROUTE + query({ cwd }), { name, expectedOid });
 }
 function stagePaths(paths, cwd) {
   return postJson(STAGE_ROUTE + query({ cwd }), { paths });
@@ -1215,8 +1250,8 @@ function generateCommitMessage(input, cwd) {
 function resolveConflict(path, cwd) {
   return postJson(CONFLICT_RESOLVE_ROUTE + query({ cwd }), { path });
 }
-function applyConflict(path, content, cwd) {
-  return postJson(CONFLICT_APPLY_ROUTE + query({ cwd }), { path, content });
+function applyConflict(path, content, sourceHash, cwd) {
+  return postJson(CONFLICT_APPLY_ROUTE + query({ cwd }), { path, content, sourceHash });
 }
 function revertConflict(path, cwd) {
   return postJson(CONFLICT_REVERT_ROUTE + query({ cwd }), { path });
@@ -1845,7 +1880,7 @@ function RefRow(props) {
   const anchor = menuOpen && popover.triggerRef.current ? popover.triggerRef.current.getBoundingClientRect() : null;
   const menuStyle = anchor ? { position: "fixed", left: anchor.right + 4, top: anchor.top, right: "auto" } : void 0;
   const ref = props.record;
-  const Icon = props.kind === "branch" ? BranchIcon : TagIcon;
+  const Icon = props.kind === "tag" ? TagIcon : BranchIcon;
   return h(
     "div",
     {
@@ -1864,7 +1899,8 @@ function RefRow(props) {
         if (props.kind === "branch") props.onCheckout(ref.name);
       },
       onKeyDown: (event) => {
-        if (event.key === "Enter") {
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
           props.onOpen(ref, props.kind);
         }
@@ -1872,7 +1908,7 @@ function RefRow(props) {
     },
     h("span", { className: "dgt-rail-icon" }, h(Icon)),
     ref.current ? h("span", { className: "dgt-rail-dot" }) : null,
-    h("span", { className: "dgt-rail-name" }, ref.name),
+    h("span", { className: "dgt-rail-name" }, props.label ?? ref.name),
     h(
       "button",
       {
@@ -1947,6 +1983,33 @@ function RefRow(props) {
         },
         props.t("deleteBranch")
       ) : null,
+      props.kind === "branch" ? h("button", {
+        type: "button",
+        "data-danger": true,
+        disabled: ref.current,
+        title: ref.current ? props.t("currentBranchCannotDelete") : void 0,
+        onClick: () => {
+          if (!ref.current) {
+            popover.close();
+            props.onForceDelete(ref.name);
+          }
+        }
+      }, props.t("forceDeleteBranch")) : null,
+      props.kind === "remote" ? h("button", {
+        type: "button",
+        "data-danger": true,
+        onClick: () => {
+          popover.close();
+          props.onDeleteRemote(ref);
+        }
+      }, props.t("deleteRemoteBranch")) : null,
+      props.kind !== "branch" ? h("button", {
+        type: "button",
+        onClick: () => {
+          popover.close();
+          props.onOpen(ref, props.kind);
+        }
+      }, props.t("history")) : null,
       h(
         "button",
         {
@@ -1977,6 +2040,14 @@ function RefRail(props) {
   const { refs, t } = props;
   const branches = refs?.branches ?? [];
   const tags = refs?.tags ?? [];
+  const remotes = refs?.remotes ?? [];
+  const remoteNames = [...refs?.remoteNames ?? props.status?.remotes ?? []].sort((a, b) => b.length - a.length);
+  const groups = new Map(remoteNames.map((name) => [name, []]));
+  for (const record of remotes) {
+    const remote = remoteNames.find((name) => record.name.startsWith(name + "/")) ?? record.name.split("/")[0];
+    if (!groups.has(remote)) groups.set(remote, []);
+    groups.get(remote).push(record);
+  }
   return h(
     "aside",
     { className: "dgt-rail", "aria-label": t("refs") },
@@ -2016,9 +2087,45 @@ function RefRail(props) {
           onCopy: props.onCopyRef,
           onRename: props.onRename,
           onDelete: props.onDelete,
+          onForceDelete: props.onForceDelete,
+          onDeleteRemote: props.onDeleteRemote,
           onContextMenu: props.onContextMenu
         })
       ) : h("div", { className: "dgt-rail-empty" }, "\u2014")
+    ),
+    h(
+      Section,
+      { title: t("remotes"), count: remotes.length },
+      h("div", { className: "dgt-rail-note" }, t("remoteSnapshot")),
+      refs === null ? h("div", { className: "dgt-rail-empty", role: "status" }, t("loading")) : null,
+      refs?.ok === false ? h("div", { className: "dgt-rail-empty dgt-error", role: "alert" }, refs.error || t("refsFailed")) : null,
+      [...groups].sort(([a], [b]) => a.localeCompare(b)).map(([name, records]) => h(
+        "details",
+        { key: name, className: "dgt-remote-group", open: true },
+        h(
+          "summary",
+          { className: "dgt-remote-title" },
+          h("span", { className: "dgt-rail-name" }, name),
+          h("span", { className: "dgt-remote-count" }, String(records.length))
+        ),
+        records.length === 0 ? h("div", { className: "dgt-rail-empty" }, t("noRemoteBranches")) : records.map((record) => h(RefRow, {
+          key: "r:" + record.name,
+          record,
+          kind: "remote",
+          label: record.name.startsWith(name + "/") ? record.name.slice(name.length + 1) : record.name,
+          t,
+          onOpen: props.onOpenRef,
+          onCheckout: props.onCheckout,
+          onMerge: props.onMerge,
+          onCopy: props.onCopyRef,
+          onRename: props.onRename,
+          onDelete: props.onDelete,
+          onForceDelete: props.onForceDelete,
+          onDeleteRemote: props.onDeleteRemote,
+          onContextMenu: props.onContextMenu
+        }))
+      )),
+      refs?.ok && groups.size === 0 ? h("div", { className: "dgt-rail-empty" }, t("noRemotes")) : null
     ),
     h(
       Section,
@@ -2032,7 +2139,12 @@ function RefRail(props) {
           onOpen: props.onOpenRef,
           onCheckout: props.onCheckout,
           onMerge: props.onMerge,
-          onCopy: props.onCopyRef
+          onCopy: props.onCopyRef,
+          onRename: props.onRename,
+          onDelete: props.onDelete,
+          onForceDelete: props.onForceDelete,
+          onDeleteRemote: props.onDeleteRemote,
+          onContextMenu: props.onContextMenu
         })
       ) : h("div", { className: "dgt-rail-empty" }, "\u2014")
     )
@@ -2958,7 +3070,7 @@ function Detail(props) {
 }
 function HistoryView(props) {
   const { commits, t } = props;
-  const scoped = props.scope.startsWith("branch:") || props.scope.startsWith("tag:");
+  const scoped = /^(branch|tag|remote):/.test(props.scope);
   return h(
     "div",
     { className: "dgt-main" },
@@ -2996,7 +3108,7 @@ function HistoryView(props) {
         scoped ? h(
           "span",
           { className: "dgt-scope" },
-          props.scope.replace(/^(branch|tag):/, ""),
+          props.scope.replace(/^(branch|tag|remote):/, ""),
           h(
             "button",
             {
@@ -3179,7 +3291,7 @@ function PromptDialog(props) {
       h(
         "div",
         { className: "dgt-dialog-actions" },
-        h("button", { type: "button", className: "dgt-button", onClick: props.onCancel }, props.t("cancel")),
+        h("button", { type: "button", className: "dgt-button", disabled: props.busy, onClick: props.onCancel }, props.t("cancel")),
         h(
           "button",
           { type: "button", className: "dgt-primary", disabled: props.busy || value.trim() === "", onClick: submit },
@@ -3190,26 +3302,45 @@ function PromptDialog(props) {
   );
 }
 function ConfirmDialog(props) {
+  const [typed, setTyped] = React.useState("");
+  React.useEffect(() => setTyped(""), [props.confirmText]);
+  const canConfirm = !props.busy && (props.confirmText === void 0 || typed === props.confirmText);
   return h(
     "div",
-    { className: "dgt-overlay", role: "presentation", onClick: props.onCancel },
+    { className: "dgt-overlay", role: "presentation", onClick: props.busy ? void 0 : props.onCancel },
     h(
       "div",
       { className: "dgt-dialog", role: "dialog", "aria-modal": "true", onClick: (event) => event.stopPropagation() },
       h("div", { className: "dgt-dialog-title" }, props.title),
       h("div", { className: "dgt-dialog-body" }, props.body),
+      props.confirmText !== void 0 ? h(
+        "label",
+        { className: "dgt-dialog-label" },
+        props.t("confirmBranchName"),
+        h("input", {
+          className: "dgt-dialog-input",
+          value: typed,
+          placeholder: props.confirmText,
+          autoFocus: true,
+          spellCheck: false,
+          disabled: props.busy,
+          onChange: (event) => setTyped(event.target.value)
+        })
+      ) : null,
       props.error !== "" ? h("div", { className: "dgt-dialog-error" }, props.error) : null,
       h(
         "div",
         { className: "dgt-dialog-actions" },
-        h("button", { type: "button", className: "dgt-button", onClick: props.onCancel }, props.t("cancel")),
+        h("button", { type: "button", className: "dgt-button", disabled: props.busy, onClick: props.onCancel }, props.t("cancel")),
         h(
           "button",
           {
             type: "button",
             className: (props.tone ?? "danger") === "primary" ? "dgt-primary" : "dgt-primary dgt-danger",
-            disabled: props.busy,
-            onClick: props.onConfirm
+            disabled: !canConfirm,
+            onClick: () => {
+              if (canConfirm) props.onConfirm();
+            }
           },
           props.submitLabel
         )
@@ -3391,6 +3522,11 @@ function statusSignature(status) {
     counts.staged,
     counts.unstaged,
     counts.conflicted,
+    status.identity?.name ?? "",
+    status.identity?.email ?? "",
+    JSON.stringify(status.remotes ?? []),
+    status.repoRoot ?? "",
+    status.truncated === true,
     entries
   ].join("");
 }
@@ -3590,6 +3726,13 @@ function Workspace(props) {
   const busyRef = React.useRef(false);
   const repoGeneration = React.useRef(0);
   const statusRequest = React.useRef(0);
+  const refsRequest = React.useRef(0);
+  const diffRequest = React.useRef(0);
+  const historyRequest = React.useRef(0);
+  const detailRequest = React.useRef(0);
+  const commitFileRequest = React.useRef(0);
+  const selectedRef = React.useRef(selected);
+  selectedRef.current = selected;
   const statusWritten = React.useRef({
     generation: -1,
     signature: ""
@@ -3674,12 +3817,18 @@ function Workspace(props) {
     [repoPath, statusGeneration, t]
   );
   const loadRefs = React.useCallback(async (branch) => {
+    const generation = statusGeneration;
+    if (generation !== repoGeneration.current) return;
+    const request = ++refsRequest.current;
+    const current = () => generation === repoGeneration.current && request === refsRequest.current;
     try {
       const next = await fetchRefs(repoPath || void 0, branch);
-      if (next.ok) setRefs(next);
-    } catch {
+      if (!current()) return;
+      setRefs((previous) => next.ok ? next : { ...previous, ok: false, error: next.error || t("refsFailed") });
+    } catch (error) {
+      if (current()) setRefs((previous) => ({ ...previous, ok: false, error: error instanceof Error ? error.message : String(error) }));
     }
-  }, [repoPath]);
+  }, [repoPath, statusGeneration, t]);
   const loadAiModels = React.useCallback(async () => {
     setAiLoading(true);
     try {
@@ -3695,7 +3844,8 @@ function Workspace(props) {
     void loadAiModels();
   }, [loadAiModels]);
   const generateMessage = React.useCallback(async () => {
-    if (busyRef.current || aiBusy) return;
+    const generation = statusGeneration;
+    if (busyRef.current || aiBusy || generation !== repoGeneration.current) return;
     const all = status?.entries ?? [];
     const staged = all.filter((entry) => entry.staged && !entry.conflicted);
     const side = staged.length > 0 ? "staged" : "unstaged";
@@ -3713,6 +3863,7 @@ function Workspace(props) {
     try {
       const locale = typeof props.locale === "function" ? props.locale() : "en";
       const payload = await generateCommitMessage({ side, files, locale }, repoPath || void 0);
+      if (generation !== repoGeneration.current) return;
       if (!payload.ok || typeof payload.message !== "string" || payload.message === "") {
         throw new Error(payload.error || t("aiFailed"));
       }
@@ -3722,13 +3873,14 @@ function Workspace(props) {
         if (commitInput.current && commitInput.current.focus) commitInput.current.focus();
       }, 0);
     } catch (error) {
+      if (generation !== repoGeneration.current) return;
       const text = error instanceof Error ? error.message : String(error);
       setActionError(text);
       showToast(text);
     } finally {
-      setAiBusy(false);
+      if (generation === repoGeneration.current) setAiBusy(false);
     }
-  }, [aiBusy, props.locale, repoPath, showToast, status, t]);
+  }, [aiBusy, props.locale, repoPath, showToast, status, statusGeneration, t]);
   const selectAiModel = React.useCallback(
     async (provider, model) => {
       try {
@@ -3752,22 +3904,51 @@ function Workspace(props) {
     onGenerate: generateMessage,
     onSelect: selectAiModel
   };
-  const openDiff = React.useCallback(async (entry, side) => {
-    setSelected({ path: entry.path, side });
-    setDiff(null);
-    if (entry.kind === "ignored") return;
-    setDiffLoading(true);
+  const openDiff = React.useCallback(async (entry, side, silent = false) => {
+    const generation = statusGeneration;
+    if (generation !== repoGeneration.current) return;
+    const request = ++diffRequest.current;
+    const current = () => generation === repoGeneration.current && request === diffRequest.current;
+    if (!silent) {
+      const selection = { path: entry.path, side };
+      selectedRef.current = selection;
+      setSelected(selection);
+      setDiff(null);
+      setDiffLoading(true);
+    }
+    if (entry.kind === "ignored") {
+      setDiffLoading(false);
+      return;
+    }
     try {
       const next = await fetchDiff({ path: entry.path, side: sideFor(entry, side), cwd: repoPath || void 0 });
-      setDiff(next);
+      if (current()) setDiff((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
     } catch (error) {
-      setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
+      if (current()) setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
     } finally {
+      if (current()) setDiffLoading(false);
+    }
+  }, [repoPath, statusGeneration]);
+  const refreshDiff = React.useCallback(async (next) => {
+    const selection = selectedRef.current;
+    if (view !== "status" || !next?.ok || !selection || statusGeneration !== repoGeneration.current) return;
+    const entry = findEntry(next, selection.path);
+    if (entry && (selection.side === "conflicted" ? entry.conflicted : entry[selection.side])) {
+      await openDiff(entry, selection.side, true);
+    } else {
+      ++diffRequest.current;
+      selectedRef.current = null;
+      setSelected(null);
+      setDiff(null);
       setDiffLoading(false);
     }
-  }, [repoPath]);
+  }, [openDiff, statusGeneration, view]);
   const loadHistory = React.useCallback(
     async (reset) => {
+      const generation = statusGeneration;
+      if (generation !== repoGeneration.current) return;
+      const request = ++historyRequest.current;
+      const current = () => generation === repoGeneration.current && request === historyRequest.current;
       setHistoryLoading(true);
       setHistoryError("");
       const skip = reset ? 0 : historyCommits.length;
@@ -3782,6 +3963,7 @@ function Workspace(props) {
           ...filtering && appliedAuthor !== "" ? { author: appliedAuthor } : {},
           ...filtering && appliedPath !== "" ? { path: appliedPath } : {}
         });
+        if (!current()) return;
         if (!next.ok) {
           setHistoryError(next.error || t("historyFailed"));
           if (reset) setHistoryCommits([]);
@@ -3792,25 +3974,35 @@ function Workspace(props) {
           setHistoryHasMore(next.hasMore === true);
         }
       } catch (error) {
-        setHistoryError(error instanceof Error ? error.message : String(error));
+        if (current()) setHistoryError(error instanceof Error ? error.message : String(error));
       } finally {
-        setHistoryLoading(false);
+        if (current()) setHistoryLoading(false);
       }
     },
-    [appliedAuthor, appliedPath, appliedQuery, historyCommits, historyScope, repoPath, t, view]
+    [appliedAuthor, appliedPath, appliedQuery, historyCommits, historyScope, repoPath, statusGeneration, t, view]
   );
   const afterPush = React.useCallback(async () => {
     await loadStatus();
     await loadRefs();
     if (view !== "status") await loadHistory(true);
   }, [loadHistory, loadRefs, loadStatus, view]);
+  const refreshAll = React.useCallback(async () => {
+    const next = await loadStatus();
+    await Promise.all([loadRefs(next?.branch), refreshDiff(next), view !== "status" ? loadHistory(true) : Promise.resolve()]);
+  }, [loadHistory, loadRefs, loadStatus, refreshDiff, view]);
   const loadCommitDetail = React.useCallback(
     async (sha) => {
+      const generation = statusGeneration;
+      if (generation !== repoGeneration.current) return;
+      const request = ++detailRequest.current;
+      ++commitFileRequest.current;
+      const current = () => generation === repoGeneration.current && request === detailRequest.current;
       setCommitDetailLoading(true);
       setCommitDetailError("");
       setCommitDetail(null);
       try {
         const next = await fetchCommitInfo({ cwd: repoPath || void 0, sha });
+        if (!current()) return;
         if (!next.ok) {
           setCommitDetailError(next.error || t("historyFailed"));
         } else {
@@ -3820,13 +4012,15 @@ function Workspace(props) {
             setCommitFile(first.path);
             setCommitFileDiff(null);
             setCommitFileDiffLoading(true);
+            const fileRequest = ++commitFileRequest.current;
+            const fileCurrent = () => current() && fileRequest === commitFileRequest.current;
             try {
               const detail = await fetchDiff({ cwd: repoPath || void 0, path: first.path, commit: sha });
-              setCommitFileDiff(detail);
+              if (fileCurrent()) setCommitFileDiff(detail);
             } catch (error) {
-              setCommitFileDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
+              if (fileCurrent()) setCommitFileDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
             } finally {
-              setCommitFileDiffLoading(false);
+              if (fileCurrent()) setCommitFileDiffLoading(false);
             }
           } else {
             setCommitFile("");
@@ -3834,13 +4028,19 @@ function Workspace(props) {
           }
         }
       } catch (error) {
-        setCommitDetailError(error instanceof Error ? error.message : String(error));
+        if (current()) setCommitDetailError(error instanceof Error ? error.message : String(error));
       } finally {
-        setCommitDetailLoading(false);
+        if (current()) setCommitDetailLoading(false);
       }
     },
-    [repoPath, t]
+    [repoPath, statusGeneration, t]
   );
+  const selectCommit = React.useCallback((sha) => {
+    if (sha === historySha) return;
+    ++detailRequest.current;
+    ++commitFileRequest.current;
+    setHistorySha(sha);
+  }, [historySha]);
   React.useEffect(() => {
     if (view !== "history" && view !== "search" || historySha === "") return;
     setCommitFile("");
@@ -3849,20 +4049,23 @@ function Workspace(props) {
   }, [historySha, view, repoPath]);
   const openCommitFile = React.useCallback(
     async (path) => {
-      if (historySha === "") return;
+      const generation = statusGeneration;
+      if (historySha === "" || generation !== repoGeneration.current) return;
+      const request = ++commitFileRequest.current;
+      const current = () => generation === repoGeneration.current && request === commitFileRequest.current;
       setCommitFile(path);
       setCommitFileDiff(null);
       setCommitFileDiffLoading(true);
       try {
         const next = await fetchDiff({ cwd: repoPath || void 0, path, commit: historySha });
-        setCommitFileDiff(next);
+        if (current()) setCommitFileDiff(next);
       } catch (error) {
-        setCommitFileDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
+        if (current()) setCommitFileDiff({ ok: false, error: error instanceof Error ? error.message : String(error) });
       } finally {
-        setCommitFileDiffLoading(false);
+        if (current()) setCommitFileDiffLoading(false);
       }
     },
-    [historySha, repoPath]
+    [historySha, repoPath, statusGeneration]
   );
   React.useEffect(() => {
     if (view !== "search" || historyLoading || historySha !== "") return;
@@ -3870,10 +4073,14 @@ function Workspace(props) {
     if (first) setHistorySha(first.sha);
   }, [view, historyLoading, historyCommits, historySha]);
   const openRef = React.useCallback((record, kind) => {
-    setHistoryScope((kind === "branch" ? "branch:" : "tag:") + record.name);
+    if (view === "history" && historyScope === kind + ":" + record.name) return;
+    ++historyRequest.current;
+    ++detailRequest.current;
+    ++commitFileRequest.current;
+    setHistoryScope(kind + ":" + record.name);
     setHistorySha("");
     setView("history");
-  }, []);
+  }, [historyScope, view]);
   const checkout = React.useCallback(
     async (name) => {
       setBusy(true);
@@ -3898,9 +4105,13 @@ function Workspace(props) {
     [loadRefs, loadStatus, repoPath, showToast, t]
   );
   const copyRef = React.useCallback(
-    (name) => {
+    async (name) => {
       try {
-        void navigator.clipboard?.writeText(name);
+        if (!navigator.clipboard?.writeText) {
+          showToast(name);
+          return;
+        }
+        await navigator.clipboard.writeText(name);
         showToast(t("copiedPath"));
       } catch {
         showToast(name);
@@ -3956,21 +4167,37 @@ function Workspace(props) {
     },
     [afterBranchChange, dialog, historyScope, repoPath, t]
   );
+  const requestBranchDelete = React.useCallback((name, force = false) => {
+    setDialogError("");
+    setDialog({ kind: "delete", branch: name, force, generation: statusGeneration });
+  }, [statusGeneration]);
+  const requestRemoteDelete = React.useCallback((record) => {
+    setDialogError("");
+    setDialog({ kind: "delete-remote", branch: record.name, oid: record.oid, generation: statusGeneration });
+  }, [statusGeneration]);
   const submitDelete = React.useCallback(async () => {
-    const name = dialog?.branch ?? "";
+    if (!dialog || dialog.generation !== repoGeneration.current || busyRef.current) return;
+    const generation = dialog.generation;
+    const name = dialog.branch ?? "";
+    const remote = dialog.kind === "delete-remote";
+    busyRef.current = true;
     setDialogBusy(true);
     setDialogError("");
     try {
-      const result = await deleteBranch(name, repoPath || void 0);
+      const result = remote ? await deleteRemoteBranch(name, dialog.oid ?? "", repoPath || void 0) : await deleteBranch(name, repoPath || void 0, dialog.force === true);
+      if (generation !== repoGeneration.current) return;
       if (!result.ok) throw new Error(result.error || t("branchActionFailed"));
-      if (historyScope === "branch:" + name) setHistoryScope("all");
-      await afterBranchChange(t("branchDeleted") + " \xB7 " + name);
+      const resetScope = historyScope === (remote ? "remote:" : "branch:") + name;
+      if (resetScope) setHistoryScope("all");
+      await afterBranchChange(t(remote ? "remoteBranchDeleted" : "branchDeleted") + " \xB7 " + name + (result.warning ? " \xB7 " + result.warning : ""));
+      if (!resetScope && view !== "status" && generation === repoGeneration.current) await loadHistory(true);
     } catch (error) {
-      setDialogError(error instanceof Error ? error.message : String(error));
+      if (generation === repoGeneration.current) setDialogError(error instanceof Error ? error.message : String(error));
     } finally {
-      setDialogBusy(false);
+      busyRef.current = false;
+      if (generation === repoGeneration.current) setDialogBusy(false);
     }
-  }, [afterBranchChange, dialog, historyScope, repoPath, t]);
+  }, [afterBranchChange, dialog, historyScope, loadHistory, repoPath, t, view]);
   React.useEffect(() => {
     if (view !== "search") return;
     const id = setTimeout(() => {
@@ -3982,7 +4209,11 @@ function Workspace(props) {
   }, [view, searchQuery, searchAuthor, searchPath]);
   React.useEffect(() => {
     if (view !== "history" && view !== "search") return;
+    ++historyRequest.current;
+    ++detailRequest.current;
+    ++commitFileRequest.current;
     setHistorySha("");
+    setHistoryHasMore(false);
     if (view === "search" && appliedQuery === "" && appliedAuthor === "" && appliedPath === "") {
       setHistoryCommits([]);
       setHistoryError("");
@@ -4009,6 +4240,8 @@ function Workspace(props) {
       const saved = typeof localStorage !== "undefined" ? localStorage.getItem(REPO_KEY) : null;
       if (saved && list.some((workspace) => workspace.path === saved)) {
         repoGeneration.current += 1;
+        selectedRef.current = null;
+        setRefs(null);
         setStatus(null);
         setBatchSelected(/* @__PURE__ */ new Set());
         setDialog(null);
@@ -4036,7 +4269,11 @@ function Workspace(props) {
     const focusedNow = () => typeof document === "undefined" || typeof document.hasFocus !== "function" ? true : document.hasFocus();
     let focused = focusedNow();
     const loop = startPollLoop({
-      readStatus: () => loadStatus({ silent: true }),
+      readStatus: async () => {
+        const next = await loadStatus({ silent: true });
+        await refreshDiff(next);
+        return next;
+      },
       readRefs: (branch) => void loadRefs(branch),
       stopped: () => typeof document !== "undefined" && document.visibilityState === "hidden" || !focused,
       busy: () => busyRef.current,
@@ -4072,7 +4309,7 @@ function Workspace(props) {
       document.removeEventListener("visibilitychange", onVisible);
       loop.stop();
     };
-  }, [loadStatus, loadRefs]);
+  }, [loadStatus, loadRefs, refreshDiff]);
   const toggle = React.useCallback(
     async (entry, side) => {
       if (busyRef.current) return;
@@ -4325,9 +4562,14 @@ function Workspace(props) {
     }
   }, [closeDialog, dialog?.branch, loadHistory, loadRefs, loadStatus, repoPath, showToast, t, view]);
   const refMenu = (record, kind, event) => {
-    const items = kind === "tag" ? [
+    const items = kind !== "branch" ? [
+      { label: t("history"), onSelect: () => openRef(record, kind) },
       { label: t("copyRefName"), onSelect: () => copyText(record.name, t("copiedPath")) },
-      { label: t("history"), onSelect: () => openRef(record, "tag") }
+      ...kind === "remote" ? [{
+        label: t("deleteRemoteBranch"),
+        danger: true,
+        onSelect: () => requestRemoteDelete(record)
+      }] : []
     ] : [
       {
         label: t("checkout"),
@@ -4353,10 +4595,14 @@ function Workspace(props) {
         danger: true,
         disabled: record.current,
         hint: record.current ? t("currentBranchCannotDelete") : void 0,
-        onSelect: () => {
-          setDialogError("");
-          setDialog({ kind: "delete", branch: record.name });
-        }
+        onSelect: () => requestBranchDelete(record.name)
+      },
+      {
+        label: t("forceDeleteBranch"),
+        danger: true,
+        disabled: record.current,
+        hint: record.current ? t("currentBranchCannotDelete") : void 0,
+        onSelect: () => requestBranchDelete(record.name, true)
       },
       { divider: true },
       { label: t("copyRefName"), onSelect: () => copyText(record.name, t("copiedPath")) }
@@ -4397,30 +4643,36 @@ function Workspace(props) {
   );
   const resolveConflictWithAi = React.useCallback(
     async (path) => {
+      const generation = statusGeneration;
+      if (generation !== repoGeneration.current) return;
       setConflictBusy("resolve");
       setActionError("");
       setConflictError("");
       try {
         const result = await resolveConflict(path, repoPath || void 0);
-        if (!result.ok || typeof result.content !== "string") {
+        if (generation !== repoGeneration.current) return;
+        if (!result.ok || typeof result.content !== "string" || !result.sourceHash) {
           throw new Error(result.error || t("mergeModelFailed"));
         }
         setConflictResolve({
           path,
           content: result.content,
+          sourceHash: result.sourceHash,
+          generation,
           diff: { ok: true, files: result.diff?.files, stats: result.diff?.stats },
           provider: result.provider || "",
           model: result.model || ""
         });
       } catch (error) {
+        if (generation !== repoGeneration.current) return;
         const text = error instanceof Error ? error.message : String(error);
         setActionError(text);
         showToast(text);
       } finally {
-        setConflictBusy("");
+        if (generation === repoGeneration.current) setConflictBusy("");
       }
     },
-    [repoPath, showToast, t]
+    [repoPath, showToast, statusGeneration, t]
   );
   const conflictBlocksOf = React.useCallback(
     async (path) => {
@@ -4472,20 +4724,21 @@ function Workspace(props) {
   );
   const applyConflictResolution = React.useCallback(async () => {
     const pending = conflictResolve;
-    if (!pending) return;
+    if (!pending || pending.generation !== repoGeneration.current) return;
     setConflictBusy("apply");
     setConflictError("");
     try {
-      const result = await applyConflict(pending.path, pending.content, repoPath || void 0);
+      const result = await applyConflict(pending.path, pending.content, pending.sourceHash, repoPath || void 0);
+      if (pending.generation !== repoGeneration.current) return;
       if (!result.ok) throw new Error(result.error || t("conflictApplyFailed"));
       setConflictResolve(null);
       showToast(t("resolutionApplied") + " \xB7 " + pending.path);
       await refreshAfterConflict(pending.path);
       await loadRefs();
     } catch (error) {
-      setConflictError(error instanceof Error ? error.message : String(error));
+      if (pending.generation === repoGeneration.current) setConflictError(error instanceof Error ? error.message : String(error));
     } finally {
-      setConflictBusy("");
+      if (pending.generation === repoGeneration.current) setConflictBusy("");
     }
   }, [conflictResolve, loadRefs, refreshAfterConflict, repoPath, showToast, t]);
   const submitConflictRevert = React.useCallback(async () => {
@@ -4593,24 +4846,29 @@ function Workspace(props) {
   );
   const fetchNow = React.useCallback(
     async (options) => {
+      const generation = statusGeneration;
+      if (generation !== repoGeneration.current) return;
       setFetching(true);
       try {
         const result = await fetchRemote(repoPath || void 0);
+        if (generation !== repoGeneration.current) return;
         if (!result.ok) throw new Error(result.error || t("fetchFailed"));
         await loadStatus({ silent: true });
         await loadRefs();
+        if (view !== "status") await loadHistory(true);
         if (!options?.silent) showToast(t("fetched") + (result.remote ? " \xB7 " + result.remote : ""));
       } catch (error) {
+        if (generation !== repoGeneration.current) return;
         if (!options?.silent) {
           const text = error instanceof Error ? error.message : String(error);
           setActionError(text);
           showToast(text);
         }
       } finally {
-        setFetching(false);
+        if (generation === repoGeneration.current) setFetching(false);
       }
     },
-    [loadRefs, loadStatus, repoPath, showToast, t]
+    [loadHistory, loadRefs, loadStatus, repoPath, showToast, statusGeneration, t, view]
   );
   const pullNow = React.useCallback(
     async (mode) => {
@@ -4681,9 +4939,21 @@ function Workspace(props) {
     (path) => {
       if (path === repoPath) return;
       repoGeneration.current += 1;
+      selectedRef.current = null;
+      setRefs(null);
+      setConflictResolve(null);
+      setConflictBusy("");
+      setAiBusy(false);
+      setFetching(false);
+      setPulling(false);
+      setHistoryLoading(false);
+      setCommitDetailLoading(false);
+      setCommitFileDiffLoading(false);
+      setDiffLoading(false);
       setStatus(null);
       setStatusError("");
       setDialog(null);
+      setDialogBusy(false);
       setRepoPath(path);
       setBatchSelected(/* @__PURE__ */ new Set());
       try {
@@ -4695,6 +4965,7 @@ function Workspace(props) {
       setActionError("");
       setMessage("");
       setView("status");
+      setHistoryScope("all");
       setHistoryCommits([]);
       setHistorySha("");
       setPushAfter(false);
@@ -4800,7 +5071,7 @@ function Workspace(props) {
           laneCount: historyLaneCount,
           hasMore: historyHasMore,
           loading: historyLoading,
-          error: historyError,
+          error: historyScope.startsWith("remote:") && refs?.ok && !(refs.remotes ?? []).some((record) => "remote:" + record.name === historyScope) ? t("remoteBranchGone") : historyError,
           scope: historyScope,
           selectedSha: historySha,
           detail: historySha === "" ? null : commitDetail,
@@ -4818,9 +5089,9 @@ function Workspace(props) {
             setHistoryScope("all");
             setHistorySha("");
           },
-          onSelect: (commit2) => setHistorySha(commit2.sha),
+          onSelect: (commit2) => selectCommit(commit2.sha),
           onSelectFile: (path) => void openCommitFile(path),
-          onParent: (sha) => setHistorySha(sha),
+          onParent: selectCommit,
           onContextMenu: (commit2, event) => commitMenu(commit2, event),
           onLoadMore: () => void loadHistory(false)
         });
@@ -4886,7 +5157,7 @@ function Workspace(props) {
       busy: refreshing || busy,
       opening,
       t,
-      onRefresh: () => void loadStatus(),
+      onRefresh: () => void refreshAll(),
       onOpen: (target) => void openLocalAction(target),
       onSelectWorkspace: switchWorkspace,
       onTogglePin: (path, pinned) => void toggleRepositoryPin(path, pinned),
@@ -4933,10 +5204,9 @@ function Workspace(props) {
         setDialogError("");
         setDialog({ kind: "rename", branch: name });
       },
-      onDelete: (name) => {
-        setDialogError("");
-        setDialog({ kind: "delete", branch: name });
-      }
+      onDelete: (name) => requestBranchDelete(name),
+      onForceDelete: (name) => requestBranchDelete(name, true),
+      onDeleteRemote: requestRemoteDelete
     }), renderView()),
     dialog?.kind === "create" ? h(PromptDialog, {
       title: t("newBranch"),
@@ -4960,14 +5230,18 @@ function Workspace(props) {
       onCancel: closeDialog,
       onSubmit: (value) => void submitRename(value)
     }) : null,
-    dialog?.kind === "delete" ? h(ConfirmDialog, {
-      title: t("deleteBranch"),
-      body: (dialog.branch ?? "") + " \u2014 " + t("deleteBranchConfirm"),
+    dialog?.kind === "delete" || dialog?.kind === "delete-remote" ? h(ConfirmDialog, {
+      key: dialog.kind + ":" + dialog.branch + ":" + dialog.force,
+      title: t(dialog.kind === "delete-remote" ? "deleteRemoteBranch" : dialog.force ? "forceDeleteBranch" : "deleteBranch"),
+      body: (dialog.branch ?? "") + " \u2014 " + t(dialog.kind === "delete-remote" ? "deleteRemoteBranchConfirm" : dialog.force ? "forceDeleteBranchConfirm" : "deleteBranchConfirm"),
+      confirmText: dialog.kind === "delete-remote" || dialog.force ? dialog.branch : void 0,
       submitLabel: t("delete"),
       busy: dialogBusy,
       error: dialogError,
       t,
-      onCancel: closeDialog,
+      onCancel: () => {
+        if (!dialogBusy) closeDialog();
+      },
       onConfirm: () => void submitDelete()
     }) : null,
     handoffDialog ? h(HandoffDialog, {

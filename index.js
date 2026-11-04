@@ -21,8 +21,9 @@
  *     user's repository), GIT_CONFIG_COUNT=0 (ignore ambient indexed config);
  *   - bounded output, bounded run time, `--` before user-supplied paths, and a
  *     cwd that must stay inside the workspace root;
- *   - the write surface is file-level stage / unstage / commit only. No
- *     reset --hard, no push, no amend, no discard route exists on purpose.
+ *   - file operations use literal repository-relative paths; remote deletion
+ *     targets one server branch with an explicit object lease. Normal push
+ *     never forces; reset --hard is not exposed.
  *
  * Config: a host plugin may export a schemastery `Config` and the Loader
  * validates the row's `config` against it (workbench does this). This skeleton
@@ -33,6 +34,7 @@
 import {
   handleBranchCreate,
   handleBranchDelete,
+  handleBranchDeleteRemote,
   handleBranchRename,
   handleCheckout,
   handleCommit,
@@ -93,6 +95,7 @@ const ROUTES = [
   { path: '/api/git-tree/branch/create', methods: ['POST'], handler: handleBranchCreate },
   { path: '/api/git-tree/branch/rename', methods: ['POST'], handler: handleBranchRename },
   { path: '/api/git-tree/branch/delete', methods: ['POST'], handler: handleBranchDelete },
+  { path: '/api/git-tree/branch/delete-remote', methods: ['POST'], handler: handleBranchDeleteRemote },
   { path: '/api/git-tree/stage', methods: ['POST'], handler: handleStage },
   { path: '/api/git-tree/unstage', methods: ['POST'], handler: handleUnstage },
   { path: '/api/git-tree/commit', methods: ['POST'], handler: handleCommit },

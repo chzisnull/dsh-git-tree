@@ -185,7 +185,7 @@ test('history parser reads fields, decorations and merges', () => {
   const commits = parseHistoryLog(text)
   assert.equal(commits.length, 3)
   assert.deepEqual(commits[0].parents, ['c2', 'c1'])
-  assert.deepEqual(commits[0].refs, [{ name: 'main', kind: 'branch' }])
+  assert.deepEqual(commits[0].refs, [{ name: 'main', kind: 'branch' }, { name: 'origin/main', kind: 'remote' }])
   assert.deepEqual(commits[2].refs, [{ name: 'v1', kind: 'tag' }])
 })
 
@@ -230,7 +230,8 @@ test('git runner spawns argv directly, with the scrubbed git environment', async
   assert.equal(spawn.env.GIT_CONFIG_COUNT, '0')
   assert.equal(spawn.stdio.stdin, 'ignore')
   assert.deepEqual(spawn.stdio.stdout, { maxBytes: 1234 })
-  assert.equal(spawn.signal, signal)
+  assert.equal(spawn.signal.aborted, false)
+  assert.equal(spawn.graceMs, 1000)
 })
 
 test('git helper rejects a failed command with git stderr as the message', async () => {

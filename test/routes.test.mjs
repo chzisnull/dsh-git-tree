@@ -64,10 +64,10 @@ const REFS_FIXTURE = [
 const SHOW_FIXTURE =
   ['c3c3c3c', 'Ann', 'ann@example.com', '2026-10-20T10:00:00+08:00', 'fix: parser', 'body line', 'c2c2c2c', 'HEAD -> refs/heads/main, tag: refs/tags/v1']
     .join('\u0000') + '\u001e'
-const NAME_STATUS_FIXTURE = ['M\tsrc/app.js', 'A\tdocs/new.md', 'R100\told.md\tnew.md', ''].join('\n')
+const NAME_STATUS_FIXTURE = ['M', 'src/app.js', 'A', 'docs/new.md', 'R100', 'old.md', 'new.md', ''].join('\0')
 
 function defaultResult(argv) {
-  const command = argv[1]
+  const command = argv[1] === '--literal-pathspecs' ? argv[2] : argv[1]
   if (command === 'status') return { exitCode: 0, stdout: STATUS_FIXTURE, stderr: '' }
   if (command === 'rev-parse') {
     if (argv.includes('@{u}')) return { exitCode: 128, stdout: '', stderr: 'no upstream configured' }
@@ -164,7 +164,7 @@ test('host plugin declares its name and hard service dependencies', () => {
   assert.deepEqual(inject, ['connection', 'subprocess'])
 })
 
-test('apply registers the twenty-nine authenticated exact Fetch routes', () => {
+test('apply registers the thirty authenticated exact Fetch routes', () => {
   const ctx = fakeContext()
   apply(ctx)
 
@@ -175,6 +175,7 @@ test('apply registers the twenty-nine authenticated exact Fetch routes', () => {
       '/api/git-tree/ai/models',
       '/api/git-tree/branch/create',
       '/api/git-tree/branch/delete',
+      '/api/git-tree/branch/delete-remote',
       '/api/git-tree/branch/rename',
       '/api/git-tree/checkout',
       '/api/git-tree/commit',
@@ -228,6 +229,7 @@ test('apply registers the twenty-nine authenticated exact Fetch routes', () => {
       '/api/git-tree/branch/create',
       '/api/git-tree/branch/rename',
       '/api/git-tree/branch/delete',
+      '/api/git-tree/branch/delete-remote',
     ].includes(route.path)
       ? ['POST']
       : ['GET']
@@ -352,7 +354,7 @@ test('diff route returns a structured diff and guards the path', async () => {
   )
   assert.equal(hunk.lines[5].text, '\\ No newline at end of file')
 
-  const diffCall = ctx.spawns.find((call) => call.argv[1] === 'diff')
+  const diffCall = ctx.spawns.find((call) => call.argv[2] === 'diff')
   const dashDash = diffCall.argv.indexOf('--')
   assert.ok(dashDash > 0, 'diff argv must contain --')
   assert.equal(diffCall.argv[dashDash + 1], 'src/app.js')
@@ -363,14 +365,14 @@ test('diff route asks for the index side when side=staged', async () => {
   const ctx = fakeContext()
   apply(ctx)
   await call(ctx, '/api/git-tree/diff?path=src/staged.js&side=staged')
-  const diffCall = ctx.spawns.find((call) => call.argv[1] === 'diff')
+  const diffCall = ctx.spawns.find((call) => call.argv[2] === 'diff')
   assert.ok(diffCall.argv.includes('--cached'))
 })
 
-test('diff route rejects traversal, absolute and option-shaped paths', async () => {
+test('diff route rejects traversal, absolute and noncanonical paths', async () => {
   const ctx = fakeContext()
   apply(ctx)
-  const cases = ['../etc/passwd', '/etc/passwd', '-rf', 'src/../../secret']
+  const cases = ['../etc/passwd', '/etc/passwd', 'src/./file', 'src/../../secret']
   for (const bad of cases) {
     const { body } = await call(ctx, '/api/git-tree/diff?path=' + encodeURIComponent(bad))
     assert.equal(body.ok, false, 'must refuse ' + bad)
@@ -397,7 +399,7 @@ test('missing subprocess degrades instead of throwing', async () => {
   assert.equal(body.code, 'subprocess-unavailable')
 })
 
-test('history route parses commits, drops remote refs and assigns lanes', async () => {
+test('history route parses commits, includes remote refs and assigns lanes', async () => {
   const ctx = fakeContext()
   apply(ctx)
   const { body } = await call(ctx, '/api/git-tree/history')
@@ -412,12 +414,13 @@ test('history route parses commits, drops remote refs and assigns lanes', async 
   assert.deepEqual(merge.parents, ['c3', 'c2'])
   assert.deepEqual(merge.refs, [
     { name: 'main', kind: 'branch' },
+    { name: 'origin/main', kind: 'remote' },
     { name: 'v1', kind: 'tag' },
-  ], 'remote refs and HEAD are dropped')
+  ], 'remote refs are included and HEAD is dropped')
   assert.equal(typeof merge.lane, 'number')
   assert.equal(merge.parentLanes.length, 2)
 
-  const logCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'log')
+  const logCall = ctx.spawns.find((spawn) => spawn.argv[2] === 'log')
   assert.ok(logCall, 'history must come from git log')
   assert.ok(logCall.argv.includes('--branches'))
   assert.ok(logCall.argv.includes('--decorate=full'))
@@ -429,7 +432,7 @@ test('history route paginates and reports hasMore', async () => {
   const { body } = await call(ctx, '/api/git-tree/history?limit=2&skip=1')
   assert.equal(body.commits.length, 2)
   assert.equal(body.hasMore, true)
-  const logCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'log')
+  const logCall = ctx.spawns.find((spawn) => spawn.argv[2] === 'log')
   assert.ok(logCall.argv.includes('--max-count=3'), 'one extra record detects hasMore')
   assert.ok(logCall.argv.includes('--skip=1'))
 })
@@ -442,7 +445,7 @@ test('history route maps search filters to fixed-string args and guards paths', 
     '/api/git-tree/history?query=fix&author=Ann&path=' + encodeURIComponent('src/app.js'),
   )
   assert.equal(body.ok, true)
-  const logCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'log')
+  const logCall = ctx.spawns.find((spawn) => spawn.argv[2] === 'log')
   assert.ok(logCall.argv.includes('--grep=fix'))
   assert.ok(logCall.argv.includes('--author=Ann'))
   assert.ok(logCall.argv.includes('--fixed-strings'))
@@ -455,7 +458,7 @@ test('history route scopes to a validated local branch', async () => {
   apply(ctx)
   const { body } = await call(ctx, '/api/git-tree/history?scope=branch:topic')
   assert.equal(body.ok, true)
-  const logCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'log')
+  const logCall = ctx.spawns.find((spawn) => spawn.argv[2] === 'log')
   assert.ok(logCall.argv.includes('refs/heads/topic'))
 
   const bad = await call(ctx, '/api/git-tree/history?scope=branch:' + encodeURIComponent('../escape'))
@@ -501,7 +504,7 @@ test('diff route reads one file out of a commit when commit is given', async () 
   apply(ctx)
   const { body } = await call(ctx, '/api/git-tree/diff?commit=c3c3c3c&path=src/app.js')
   assert.equal(body.ok, true)
-  const callRecord = ctx.spawns.find((spawn) => spawn.argv[1] === 'show')
+  const callRecord = ctx.spawns.find((spawn) => spawn.argv[2] === 'show')
   assert.ok(callRecord, 'a commit diff must come from git show')
   assert.ok(callRecord.argv.includes('c3c3c3c'))
   assert.ok(callRecord.argv.includes('--format='))
@@ -566,7 +569,7 @@ test('history can be scoped to a tag', async () => {
   apply(ctx)
   const { body } = await call(ctx, '/api/git-tree/history?scope=tag:v0.2-demo')
   assert.equal(body.ok, true)
-  const logCall = ctx.spawns.find((spawn) => spawn.argv[1] === 'log')
+  const logCall = ctx.spawns.find((spawn) => spawn.argv[2] === 'log')
   assert.ok(logCall.argv.includes('refs/tags/v0.2-demo'))
 })
 
@@ -664,22 +667,22 @@ test('discard restores the work tree or both sides with a fixed argv', async () 
     body: { paths: ['src/app.js'], side: 'unstaged' },
   })
   assert.equal(unstaged.body.ok, true)
-  const restore = ctx.spawns.find((spawn) => spawn.argv[1] === 'restore')
-  assert.deepEqual(restore.argv.slice(1), ['restore', '--worktree', '--', 'src/app.js'])
+  const restore = ctx.spawns.find((spawn) => spawn.argv[2] === 'restore')
+  assert.deepEqual(restore.argv.slice(1), ['--literal-pathspecs', 'restore', '--worktree', '--', 'src/app.js'])
 
   const staged = fakeContext()
   apply(staged)
   await call(staged, '/api/git-tree/discard', { method: 'POST', body: { paths: ['src/app.js'], side: 'staged' } })
-  const restore2 = staged.spawns.find((spawn) => spawn.argv[1] === 'restore')
-  assert.deepEqual(restore2.argv.slice(1), ['restore', '--staged', '--worktree', '--', 'src/app.js'])
+  const restore2 = staged.spawns.find((spawn) => spawn.argv[2] === 'restore')
+  assert.deepEqual(restore2.argv.slice(1), ['--literal-pathspecs', 'restore', '--staged', '--worktree', '--', 'src/app.js'])
 })
 
 test('remove deletes tracked files with git rm', async () => {
   const ctx = fakeContext()
   apply(ctx)
   await call(ctx, '/api/git-tree/remove', { method: 'POST', body: { paths: ['old.md'] } })
-  const rm = ctx.spawns.find((spawn) => spawn.argv[1] === 'rm')
-  assert.deepEqual(rm.argv.slice(1), ['rm', '-f', '--quiet', '--', 'old.md'])
+  const rm = ctx.spawns.find((spawn) => spawn.argv[2] === 'rm')
+  assert.deepEqual(rm.argv.slice(1), ['--literal-pathspecs', 'rm', '-f', '--quiet', '--', 'old.md'])
 })
 
 test('untracked removal uses exact literal paths and reports partial failures in a real repository', async (t) => {
@@ -1035,7 +1038,7 @@ test('refs reuse the branch the poll already read instead of asking git again', 
   const before = ctx.spawns.length
   const { body } = await call(ctx, '/api/git-tree/refs?branch=main')
   const commands = ctx.spawns.slice(before).map((spawn) => spawn.argv[1])
-  assert.deepEqual(commands, ['for-each-ref'], 'no symbolic-ref when the caller knows the branch')
+  assert.deepEqual(commands, ['for-each-ref', 'remote'], 'no symbolic-ref when the caller knows the branch')
   assert.equal(body.branches.find((branch) => branch.name === 'main').current, true)
 })
 

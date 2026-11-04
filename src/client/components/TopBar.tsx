@@ -25,6 +25,8 @@ export function TopBar(props: {
   onCommitFocus: () => void
   onSelectWorkspace: (path: string) => void
   onTogglePin: (path: string, pinned: boolean) => void
+  canPush: boolean
+  onPush: () => void
   canFetch: boolean
   hasUpstream: boolean
   fetching: boolean

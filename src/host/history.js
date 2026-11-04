@@ -31,7 +31,7 @@ export function isSafeBranchName(value) {
   return true
 }
 
-/** Turn `%D` into local branch and tag chips; remote refs are dropped. */
+/** Turn full `%D` decorations into branch, remote and tag chips. */
 export function parseDecoration(decoration) {
   const out = []
   for (const raw of String(decoration || '').split(',')) {
@@ -48,8 +48,10 @@ export function parseDecoration(decoration) {
       out.push({ name: token.slice('refs/heads/'.length), kind: 'branch' })
       continue
     }
-    // --decorate=full still prints bare remote refs; they are out of scope.
-    if (token.startsWith('refs/remotes/')) continue
+    if (token.startsWith('refs/remotes/')) {
+      const name = token.slice('refs/remotes/'.length)
+      if (name) out.push({ name, kind: 'remote' })
+    }
   }
   return out
 }

@@ -17,6 +17,7 @@ import type {
   OpenTarget,
   RefsPayload,
   RefRecord,
+  RefKind,
   Translate,
   WorkspaceRecord,
 } from '../types'
@@ -33,6 +34,7 @@ import {
   pushBranch,
   createBranch,
   deleteBranch,
+  deleteRemoteBranch,
   renameBranch,
   fetchAiModels,
   saveAiModel,
@@ -122,6 +124,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       | 'create'
       | 'rename'
       | 'delete'
+      | 'delete-remote'
       | 'discard'
       | 'remove'
       | 'remove-untracked'
@@ -131,6 +134,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       | 'conflict-revert'
       | 'pull-diverged'
     branch?: string
+    oid?: string
+    force?: boolean
     start?: string
     path?: string
     paths?: string[]
@@ -155,6 +160,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   const [conflictResolve, setConflictResolve] = React.useState<{
     path: string
     content: string
+    sourceHash: string
+    generation: number
     diff: DiffPayload | null
     provider: string
     model: string
@@ -190,6 +197,13 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   const busyRef = React.useRef(false)
   const repoGeneration = React.useRef(0)
   const statusRequest = React.useRef(0)
+  const refsRequest = React.useRef(0)
+  const diffRequest = React.useRef(0)
+  const historyRequest = React.useRef(0)
+  const detailRequest = React.useRef(0)
+  const commitFileRequest = React.useRef(0)
+  const selectedRef = React.useRef(selected)
+  selectedRef.current = selected
   // The status the panel is already showing, per repository generation. A poll
   // that reads the same content again must not write it back: every write
   // re-renders the whole change list for a screen that has not changed (138 ms
@@ -306,13 +320,18 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   )
 
   const loadRefs = React.useCallback(async (branch?: string) => {
+    const generation = statusGeneration
+    if (generation !== repoGeneration.current) return
+    const request = ++refsRequest.current
+    const current = () => generation === repoGeneration.current && request === refsRequest.current
     try {
       const next = await fetchRefs(repoPath || undefined, branch)
-      if (next.ok) setRefs(next)
-    } catch {
-      /* the rail degrades to empty groups */
+      if (!current()) return
+      setRefs((previous) => next.ok ? next : { ...previous, ok: false, error: next.error || t('refsFailed') })
+    } catch (error) {
+      if (current()) setRefs((previous) => ({ ...previous, ok: false, error: error instanceof Error ? error.message : String(error) }))
     }
-  }, [repoPath])
+  }, [repoPath, statusGeneration, t])
 
   /** Refresh the live DSH model catalog and the route the card will call. */
   const loadAiModels = React.useCallback(async () => {
@@ -337,7 +356,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
    * message can be drafted before staging).
    */
   const generateMessage = React.useCallback(async () => {
-    if (busyRef.current || aiBusy) return
+    const generation = statusGeneration
+    if (busyRef.current || aiBusy || generation !== repoGeneration.current) return
     const all = status?.entries ?? []
     const staged = all.filter((entry) => entry.staged && !entry.conflicted)
     const side: 'staged' | 'unstaged' = staged.length > 0 ? 'staged' : 'unstaged'
@@ -355,6 +375,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     try {
       const locale = typeof props.locale === 'function' ? props.locale() : 'en'
       const payload = await generateCommitMessage({ side, files, locale }, repoPath || undefined)
+      if (generation !== repoGeneration.current) return
       if (!payload.ok || typeof payload.message !== 'string' || payload.message === '') {
         throw new Error(payload.error || t('aiFailed'))
       }
@@ -364,13 +385,14 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
         if (commitInput.current && commitInput.current.focus) commitInput.current.focus()
       }, 0)
     } catch (error) {
+      if (generation !== repoGeneration.current) return
       const text = error instanceof Error ? error.message : String(error)
       setActionError(text)
       showToast(text)
     } finally {
-      setAiBusy(false)
+      if (generation === repoGeneration.current) setAiBusy(false)
     }
-  }, [aiBusy, props.locale, repoPath, showToast, status, t])
+  }, [aiBusy, props.locale, repoPath, showToast, status, statusGeneration, t])
 
   const selectAiModel = React.useCallback(
     async (provider: string, model: string) => {
@@ -400,23 +422,50 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     onSelect: selectAiModel,
   }
 
-  const openDiff = React.useCallback(async (entry: GitFileEntry, side: EntrySide) => {
-    setSelected({ path: entry.path, side })
-    setDiff(null)
-    if (entry.kind === 'ignored') return
-    setDiffLoading(true)
+  const openDiff = React.useCallback(async (entry: GitFileEntry, side: EntrySide, silent = false) => {
+    const generation = statusGeneration
+    if (generation !== repoGeneration.current) return
+    const request = ++diffRequest.current
+    const current = () => generation === repoGeneration.current && request === diffRequest.current
+    if (!silent) {
+      const selection = { path: entry.path, side }
+      selectedRef.current = selection
+      setSelected(selection)
+      setDiff(null)
+      setDiffLoading(true)
+    }
+    if (entry.kind === 'ignored') { setDiffLoading(false); return }
     try {
       const next = await fetchDiff({ path: entry.path, side: sideFor(entry, side), cwd: repoPath || undefined })
-      setDiff(next)
+      if (current()) setDiff((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next)
     } catch (error) {
-      setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) })
+      if (current()) setDiff({ ok: false, error: error instanceof Error ? error.message : String(error) })
     } finally {
+      if (current()) setDiffLoading(false)
+    }
+  }, [repoPath, statusGeneration])
+
+  const refreshDiff = React.useCallback(async (next: GitStatusPayload | null) => {
+    const selection = selectedRef.current
+    if (view !== 'status' || !next?.ok || !selection || statusGeneration !== repoGeneration.current) return
+    const entry = findEntry(next, selection.path)
+    if (entry && (selection.side === 'conflicted' ? entry.conflicted : entry[selection.side])) {
+      await openDiff(entry, selection.side, true)
+    } else {
+      ++diffRequest.current
+      selectedRef.current = null
+      setSelected(null)
+      setDiff(null)
       setDiffLoading(false)
     }
-  }, [repoPath])
+  }, [openDiff, statusGeneration, view])
 
   const loadHistory = React.useCallback(
     async (reset: boolean) => {
+      const generation = statusGeneration
+      if (generation !== repoGeneration.current) return
+      const request = ++historyRequest.current
+      const current = () => generation === repoGeneration.current && request === historyRequest.current
       setHistoryLoading(true)
       setHistoryError('')
       const skip = reset ? 0 : historyCommits.length
@@ -431,6 +480,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
           ...(filtering && appliedAuthor !== '' ? { author: appliedAuthor } : {}),
           ...(filtering && appliedPath !== '' ? { path: appliedPath } : {}),
         })
+        if (!current()) return
         if (!next.ok) {
           setHistoryError(next.error || t('historyFailed'))
           if (reset) setHistoryCommits([])
@@ -441,12 +491,12 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
           setHistoryHasMore(next.hasMore === true)
         }
       } catch (error) {
-        setHistoryError(error instanceof Error ? error.message : String(error))
+        if (current()) setHistoryError(error instanceof Error ? error.message : String(error))
       } finally {
-        setHistoryLoading(false)
+        if (current()) setHistoryLoading(false)
       }
     },
-    [appliedAuthor, appliedPath, appliedQuery, historyCommits, historyScope, repoPath, t, view],
+    [appliedAuthor, appliedPath, appliedQuery, historyCommits, historyScope, repoPath, statusGeneration, t, view],
   )
 
   const afterPush = React.useCallback(async () => {
@@ -455,13 +505,24 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     if (view !== 'status') await loadHistory(true)
   }, [loadHistory, loadRefs, loadStatus, view])
 
+  const refreshAll = React.useCallback(async () => {
+    const next = await loadStatus()
+    await Promise.all([loadRefs(next?.branch), refreshDiff(next), view !== 'status' ? loadHistory(true) : Promise.resolve()])
+  }, [loadHistory, loadRefs, loadStatus, refreshDiff, view])
+
   const loadCommitDetail = React.useCallback(
     async (sha: string) => {
+      const generation = statusGeneration
+      if (generation !== repoGeneration.current) return
+      const request = ++detailRequest.current
+      ++commitFileRequest.current
+      const current = () => generation === repoGeneration.current && request === detailRequest.current
       setCommitDetailLoading(true)
       setCommitDetailError('')
       setCommitDetail(null)
       try {
         const next = await fetchCommitInfo({ cwd: repoPath || undefined, sha })
+        if (!current()) return
         if (!next.ok) {
           setCommitDetailError(next.error || t('historyFailed'))
         } else {
@@ -473,13 +534,15 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
             setCommitFile(first.path)
             setCommitFileDiff(null)
             setCommitFileDiffLoading(true)
+            const fileRequest = ++commitFileRequest.current
+            const fileCurrent = () => current() && fileRequest === commitFileRequest.current
             try {
               const detail = await fetchDiff({ cwd: repoPath || undefined, path: first.path, commit: sha })
-              setCommitFileDiff(detail)
+              if (fileCurrent()) setCommitFileDiff(detail)
             } catch (error) {
-              setCommitFileDiff({ ok: false, error: error instanceof Error ? error.message : String(error) })
+              if (fileCurrent()) setCommitFileDiff({ ok: false, error: error instanceof Error ? error.message : String(error) })
             } finally {
-              setCommitFileDiffLoading(false)
+              if (fileCurrent()) setCommitFileDiffLoading(false)
             }
           } else {
             setCommitFile('')
@@ -487,13 +550,20 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
           }
         }
       } catch (error) {
-        setCommitDetailError(error instanceof Error ? error.message : String(error))
+        if (current()) setCommitDetailError(error instanceof Error ? error.message : String(error))
       } finally {
-        setCommitDetailLoading(false)
+        if (current()) setCommitDetailLoading(false)
       }
     },
-    [repoPath, t],
+    [repoPath, statusGeneration, t],
   )
+
+  const selectCommit = React.useCallback((sha: string) => {
+    if (sha === historySha) return
+    ++detailRequest.current
+    ++commitFileRequest.current
+    setHistorySha(sha)
+  }, [historySha])
 
   React.useEffect(() => {
     if ((view !== 'history' && view !== 'search') || historySha === '') return
@@ -505,20 +575,23 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
 
   const openCommitFile = React.useCallback(
     async (path: string) => {
-      if (historySha === '') return
+      const generation = statusGeneration
+      if (historySha === '' || generation !== repoGeneration.current) return
+      const request = ++commitFileRequest.current
+      const current = () => generation === repoGeneration.current && request === commitFileRequest.current
       setCommitFile(path)
       setCommitFileDiff(null)
       setCommitFileDiffLoading(true)
       try {
         const next = await fetchDiff({ cwd: repoPath || undefined, path, commit: historySha })
-        setCommitFileDiff(next)
+        if (current()) setCommitFileDiff(next)
       } catch (error) {
-        setCommitFileDiff({ ok: false, error: error instanceof Error ? error.message : String(error) })
+        if (current()) setCommitFileDiff({ ok: false, error: error instanceof Error ? error.message : String(error) })
       } finally {
-        setCommitFileDiffLoading(false)
+        if (current()) setCommitFileDiffLoading(false)
       }
     },
-    [historySha, repoPath],
+    [historySha, repoPath, statusGeneration],
   )
 
   React.useEffect(() => {
@@ -528,11 +601,15 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, historyLoading, historyCommits, historySha])
 
-  const openRef = React.useCallback((record: RefRecord, kind: 'branch' | 'tag') => {
-    setHistoryScope((kind === 'branch' ? 'branch:' : 'tag:') + record.name)
+  const openRef = React.useCallback((record: RefRecord, kind: RefKind) => {
+    if (view === 'history' && historyScope === kind + ':' + record.name) return
+    ++historyRequest.current
+    ++detailRequest.current
+    ++commitFileRequest.current
+    setHistoryScope(kind + ':' + record.name)
     setHistorySha('')
     setView('history')
-  }, [])
+  }, [historyScope, view])
 
   const checkout = React.useCallback(
     async (name: string) => {
@@ -559,9 +636,10 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   )
 
   const copyRef = React.useCallback(
-    (name: string) => {
+    async (name: string) => {
       try {
-        void navigator.clipboard?.writeText(name)
+        if (!navigator.clipboard?.writeText) { showToast(name); return }
+        await navigator.clipboard.writeText(name)
         showToast(t('copiedPath'))
       } catch {
         showToast(name)
@@ -622,21 +700,41 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     [afterBranchChange, dialog, historyScope, repoPath, t],
   )
 
+  const requestBranchDelete = React.useCallback((name: string, force = false) => {
+    setDialogError('')
+    setDialog({ kind: 'delete', branch: name, force, generation: statusGeneration })
+  }, [statusGeneration])
+
+  const requestRemoteDelete = React.useCallback((record: RefRecord) => {
+    setDialogError('')
+    setDialog({ kind: 'delete-remote', branch: record.name, oid: record.oid, generation: statusGeneration })
+  }, [statusGeneration])
+
   const submitDelete = React.useCallback(async () => {
-    const name = dialog?.branch ?? ''
+    if (!dialog || dialog.generation !== repoGeneration.current || busyRef.current) return
+    const generation = dialog.generation
+    const name = dialog.branch ?? ''
+    const remote = dialog.kind === 'delete-remote'
+    busyRef.current = true
     setDialogBusy(true)
     setDialogError('')
     try {
-      const result = await deleteBranch(name, repoPath || undefined)
+      const result = remote
+        ? await deleteRemoteBranch(name, dialog.oid ?? '', repoPath || undefined)
+        : await deleteBranch(name, repoPath || undefined, dialog.force === true)
+      if (generation !== repoGeneration.current) return
       if (!result.ok) throw new Error(result.error || t('branchActionFailed'))
-      if (historyScope === 'branch:' + name) setHistoryScope('all')
-      await afterBranchChange(t('branchDeleted') + ' · ' + name)
+      const resetScope = historyScope === (remote ? 'remote:' : 'branch:') + name
+      if (resetScope) setHistoryScope('all')
+      await afterBranchChange(t(remote ? 'remoteBranchDeleted' : 'branchDeleted') + ' · ' + name + (result.warning ? ' · ' + result.warning : ''))
+      if (!resetScope && view !== 'status' && generation === repoGeneration.current) await loadHistory(true)
     } catch (error) {
-      setDialogError(error instanceof Error ? error.message : String(error))
+      if (generation === repoGeneration.current) setDialogError(error instanceof Error ? error.message : String(error))
     } finally {
-      setDialogBusy(false)
+      busyRef.current = false
+      if (generation === repoGeneration.current) setDialogBusy(false)
     }
-  }, [afterBranchChange, dialog, historyScope, repoPath, t])
+  }, [afterBranchChange, dialog, historyScope, loadHistory, repoPath, t, view])
 
   // Debounce the search inputs into applied filters.
   React.useEffect(() => {
@@ -652,7 +750,11 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   // Reload whenever the view, repository, scope or applied filters change.
   React.useEffect(() => {
     if (view !== 'history' && view !== 'search') return
+    ++historyRequest.current
+    ++detailRequest.current
+    ++commitFileRequest.current
     setHistorySha('')
+    setHistoryHasMore(false)
     if (view === 'search' && appliedQuery === '' && appliedAuthor === '' && appliedPath === '') {
       setHistoryCommits([])
       setHistoryError('')
@@ -684,6 +786,8 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(REPO_KEY) : null
       if (saved && list.some((workspace) => workspace.path === saved)) {
         repoGeneration.current += 1
+        selectedRef.current = null
+        setRefs(null)
         setStatus(null)
         setBatchSelected(new Set())
         setDialog(null)
@@ -721,7 +825,11 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     let focused = focusedNow()
 
     const loop = startPollLoop({
-      readStatus: () => loadStatus({ silent: true }),
+      readStatus: async () => {
+        const next = await loadStatus({ silent: true })
+        await refreshDiff(next)
+        return next
+      },
       readRefs: (branch) => void loadRefs(branch),
       stopped: () => (typeof document !== 'undefined' && document.visibilityState === 'hidden') || !focused,
       busy: () => busyRef.current,
@@ -761,7 +869,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       document.removeEventListener('visibilitychange', onVisible)
       loop.stop()
     }
-  }, [loadStatus, loadRefs])
+  }, [loadStatus, loadRefs, refreshDiff])
 
   const toggle = React.useCallback(
     async (entry: GitFileEntry, side: EntrySide) => {
@@ -1031,12 +1139,16 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     }
   }, [closeDialog, dialog?.branch, loadHistory, loadRefs, loadStatus, repoPath, showToast, t, view])
 
-  const refMenu = (record: RefRecord, kind: 'branch' | 'tag', event: any) => {
+  const refMenu = (record: RefRecord, kind: RefKind, event: any) => {
     const items: ContextMenuEntry[] =
-      kind === 'tag'
+      kind !== 'branch'
         ? [
+            { label: t('history'), onSelect: () => openRef(record, kind) },
             { label: t('copyRefName'), onSelect: () => copyText(record.name, t('copiedPath')) },
-            { label: t('history'), onSelect: () => openRef(record, 'tag') },
+            ...(kind === 'remote' ? [{
+              label: t('deleteRemoteBranch'), danger: true,
+              onSelect: () => requestRemoteDelete(record),
+            }] : []),
           ]
         : [
             {
@@ -1057,7 +1169,14 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
               danger: true,
               disabled: record.current,
               hint: record.current ? t('currentBranchCannotDelete') : undefined,
-              onSelect: () => { setDialogError(''); setDialog({ kind: 'delete', branch: record.name }) },
+              onSelect: () => requestBranchDelete(record.name),
+            },
+            {
+              label: t('forceDeleteBranch'),
+              danger: true,
+              disabled: record.current,
+              hint: record.current ? t('currentBranchCannotDelete') : undefined,
+              onSelect: () => requestBranchDelete(record.name, true),
             },
             { divider: true },
             { label: t('copyRefName'), onSelect: () => copyText(record.name, t('copiedPath')) },
@@ -1102,30 +1221,36 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   /** Ask the model to merge one conflicted file; nothing is written yet. */
   const resolveConflictWithAi = React.useCallback(
     async (path: string) => {
+      const generation = statusGeneration
+      if (generation !== repoGeneration.current) return
       setConflictBusy('resolve')
       setActionError('')
       setConflictError('')
       try {
         const result = await resolveConflict(path, repoPath || undefined)
-        if (!result.ok || typeof result.content !== 'string') {
+        if (generation !== repoGeneration.current) return
+        if (!result.ok || typeof result.content !== 'string' || !result.sourceHash) {
           throw new Error(result.error || t('mergeModelFailed'))
         }
         setConflictResolve({
           path,
           content: result.content,
+          sourceHash: result.sourceHash,
+          generation,
           diff: { ok: true, files: result.diff?.files, stats: result.diff?.stats },
           provider: result.provider || '',
           model: result.model || '',
         })
       } catch (error) {
+        if (generation !== repoGeneration.current) return
         const text = error instanceof Error ? error.message : String(error)
         setActionError(text)
         showToast(text)
       } finally {
-        setConflictBusy('')
+        if (generation === repoGeneration.current) setConflictBusy('')
       }
     },
-    [repoPath, showToast, t],
+    [repoPath, showToast, statusGeneration, t],
   )
 
   /** The conflict-block count for one path, read from the open diff or fetched. */
@@ -1196,20 +1321,21 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
 
   const applyConflictResolution = React.useCallback(async () => {
     const pending = conflictResolve
-    if (!pending) return
+    if (!pending || pending.generation !== repoGeneration.current) return
     setConflictBusy('apply')
     setConflictError('')
     try {
-      const result = await applyConflict(pending.path, pending.content, repoPath || undefined)
+      const result = await applyConflict(pending.path, pending.content, pending.sourceHash, repoPath || undefined)
+      if (pending.generation !== repoGeneration.current) return
       if (!result.ok) throw new Error(result.error || t('conflictApplyFailed'))
       setConflictResolve(null)
       showToast(t('resolutionApplied') + ' · ' + pending.path)
       await refreshAfterConflict(pending.path)
       await loadRefs()
     } catch (error) {
-      setConflictError(error instanceof Error ? error.message : String(error))
+      if (pending.generation === repoGeneration.current) setConflictError(error instanceof Error ? error.message : String(error))
     } finally {
-      setConflictBusy('')
+      if (pending.generation === repoGeneration.current) setConflictBusy('')
     }
   }, [conflictResolve, loadRefs, refreshAfterConflict, repoPath, showToast, t])
 
@@ -1330,24 +1456,29 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
   /** Fetch only: updates ahead/behind and remote-tracking refs, never the tree. */
   const fetchNow = React.useCallback(
     async (options?: { silent?: boolean }) => {
+      const generation = statusGeneration
+      if (generation !== repoGeneration.current) return
       setFetching(true)
       try {
         const result = await fetchRemote(repoPath || undefined)
+        if (generation !== repoGeneration.current) return
         if (!result.ok) throw new Error(result.error || t('fetchFailed'))
         await loadStatus({ silent: true })
         await loadRefs()
+        if (view !== 'status') await loadHistory(true)
         if (!options?.silent) showToast(t('fetched') + (result.remote ? ' · ' + result.remote : ''))
       } catch (error) {
+        if (generation !== repoGeneration.current) return
         if (!options?.silent) {
           const text = error instanceof Error ? error.message : String(error)
           setActionError(text)
           showToast(text)
         }
       } finally {
-        setFetching(false)
+        if (generation === repoGeneration.current) setFetching(false)
       }
     },
-    [loadRefs, loadStatus, repoPath, showToast, t],
+    [loadHistory, loadRefs, loadStatus, repoPath, showToast, statusGeneration, t, view],
   )
 
   /** Pull the current branch: fast-forward, or merge when the user asks for it. */
@@ -1427,23 +1558,36 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
     (path: string) => {
       if (path === repoPath) return
       repoGeneration.current += 1
+      selectedRef.current = null
+      setRefs(null)
+      setConflictResolve(null)
+      setConflictBusy('')
+      setAiBusy(false)
+      setFetching(false)
+      setPulling(false)
+      setHistoryLoading(false)
+      setCommitDetailLoading(false)
+      setCommitFileDiffLoading(false)
+      setDiffLoading(false)
       setStatus(null)
       setStatusError('')
       setDialog(null)
+      setDialogBusy(false)
       setRepoPath(path)
       setBatchSelected(new Set())
-    try {
-      if (typeof localStorage !== 'undefined') localStorage.setItem(REPO_KEY, path)
-    } catch {
-      /* storage may be unavailable; the selection still holds for this mount */
-    }
-    setSelected(null)
-    setDiff(null)
-    setActionError('')
-    setMessage('')
-    setView('status')
-    setHistoryCommits([])
-    setHistorySha('')
+      try {
+        if (typeof localStorage !== 'undefined') localStorage.setItem(REPO_KEY, path)
+      } catch {
+        /* storage may be unavailable; the selection still holds for this mount */
+      }
+      setSelected(null)
+      setDiff(null)
+      setActionError('')
+      setMessage('')
+      setView('status')
+      setHistoryScope('all')
+      setHistoryCommits([])
+      setHistorySha('')
       setPushAfter(false)
       // Count the switch, then re-read the ordered list (pins and counts moved).
       void recordRepositoryOpen(path)
@@ -1571,7 +1715,9 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
           laneCount: historyLaneCount,
           hasMore: historyHasMore,
           loading: historyLoading,
-          error: historyError,
+          error: historyScope.startsWith('remote:') && refs?.ok &&
+            !(refs.remotes ?? []).some((record) => 'remote:' + record.name === historyScope)
+              ? t('remoteBranchGone') : historyError,
           scope: historyScope,
           selectedSha: historySha,
           detail: historySha === '' ? null : commitDetail,
@@ -1589,9 +1735,9 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
             setHistoryScope('all')
             setHistorySha('')
           },
-          onSelect: (commit: HistoryCommit) => setHistorySha(commit.sha),
+          onSelect: (commit: HistoryCommit) => selectCommit(commit.sha),
           onSelectFile: (path: string) => void openCommitFile(path),
-          onParent: (sha: string) => setHistorySha(sha),
+          onParent: selectCommit,
           onContextMenu: (commit: HistoryCommit, event: any) => commitMenu(commit, event),
           onLoadMore: () => void loadHistory(false),
         })
@@ -1658,7 +1804,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
       busy: refreshing || busy,
       opening,
       t,
-      onRefresh: () => void loadStatus(),
+      onRefresh: () => void refreshAll(),
       onOpen: (target: OpenTarget) => void openLocalAction(target),
       onSelectWorkspace: switchWorkspace,
       onTogglePin: (path: string, pinned: boolean) => void toggleRepositoryPin(path, pinned),
@@ -1700,7 +1846,7 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
             setDialog({ kind: 'merge', branch: name })
           },
           onCopyRef: copyRef,
-          onContextMenu: (record: RefRecord, kind: 'branch' | 'tag', event: any) => refMenu(record, kind, event),
+          onContextMenu: (record: RefRecord, kind: RefKind, event: any) => refMenu(record, kind, event),
           onCreate: () => {
             setDialogError('')
             setDialog({ kind: 'create' })
@@ -1709,10 +1855,9 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
             setDialogError('')
             setDialog({ kind: 'rename', branch: name })
           },
-          onDelete: (name: string) => {
-            setDialogError('')
-            setDialog({ kind: 'delete', branch: name })
-          },
+          onDelete: (name: string) => requestBranchDelete(name),
+          onForceDelete: (name: string) => requestBranchDelete(name, true),
+          onDeleteRemote: requestRemoteDelete,
         }), renderView()),
 
     dialog?.kind === 'create'
@@ -1741,15 +1886,17 @@ export function Workspace(props: { t?: Translate; locale?: () => string; handoff
           onSubmit: (value: string) => void submitRename(value),
         })
       : null,
-    dialog?.kind === 'delete'
+    dialog?.kind === 'delete' || dialog?.kind === 'delete-remote'
       ? h(ConfirmDialog, {
-          title: t('deleteBranch'),
-          body: (dialog.branch ?? '') + ' — ' + t('deleteBranchConfirm'),
+          key: dialog.kind + ':' + dialog.branch + ':' + dialog.force,
+          title: t(dialog.kind === 'delete-remote' ? 'deleteRemoteBranch' : dialog.force ? 'forceDeleteBranch' : 'deleteBranch'),
+          body: (dialog.branch ?? '') + ' — ' + t(dialog.kind === 'delete-remote' ? 'deleteRemoteBranchConfirm' : dialog.force ? 'forceDeleteBranchConfirm' : 'deleteBranchConfirm'),
+          confirmText: dialog.kind === 'delete-remote' || dialog.force ? dialog.branch : undefined,
           submitLabel: t('delete'),
           busy: dialogBusy,
           error: dialogError,
           t,
-          onCancel: closeDialog,
+          onCancel: () => { if (!dialogBusy) closeDialog() },
           onConfirm: () => void submitDelete(),
         })
       : null,

@@ -13,6 +13,7 @@ import {
   countConflictBlocks,
   hasConflictMarkers,
   parseConflictText,
+  readConflictFile,
   validateResolvedText,
 } from '../src/host/conflict.js'
 
@@ -58,7 +59,8 @@ function fakeContext({ root, llm, handler }) {
       },
       spawn({ argv, cwd }) {
         spawns.push({ argv, cwd })
-        const result = handler ? handler(argv) : { exitCode: 0, stdout: '', stderr: '' }
+        const result = argv.includes('--show-toplevel') ? { stdout: root + '\n' } :
+          handler ? handler(argv[1] === '--literal-pathspecs' ? [argv[0], ...argv.slice(2)] : argv) : { exitCode: 0, stdout: '', stderr: '' }
         return {
           done: Promise.resolve({ exitCode: result.exitCode ?? 0, signal: null }),
           collected: {
@@ -149,6 +151,21 @@ test('a file without markers is all context and counts no blocks', () => {
   assert.equal(countConflictBlocks('<<<<<<< a\nx\n=======\ny\n>>>>>>> b\n'), 1)
 })
 
+test('short marker-like source lines need a complete same-width conflict block', () => {
+  for (const text of ['< text\n', '<<< "$x"\n', '<<< HEAD\nours\n==\ntheirs\n>>> topic\n']) {
+    assert.equal(hasConflictMarkers(text), false, text)
+    assert.equal(parseConflictText(text).blocks, 0)
+    assert.equal(validateResolvedText(text).ok, true)
+  }
+  for (const size of [1, 3, 11]) {
+    const text = '<'.repeat(size) + ' HEAD\nours\n' + '='.repeat(size) + '\ntheirs\n' + '>'.repeat(size) + ' topic\n'
+    assert.equal(hasConflictMarkers(text), true)
+    assert.equal(countConflictBlocks(text), 1)
+    assert.equal(parseConflictText(text).blocks, 1)
+    assert.equal(validateResolvedText(text).code, 'markers-present')
+  }
+})
+
 test('resolved text must be non-empty, marker-free and within budget', () => {
   assert.equal(validateResolvedText('').code, 'empty-content')
   assert.equal(validateResolvedText('   \n').code, 'empty-content')
@@ -180,7 +197,7 @@ test('apply writes the reviewed file and refuses markers or a clean path', async
   const ctx = fakeContext({ root, handler: unmergedHandler() })
   apply(ctx)
   const applied = await call(ctx, '/api/git-tree/conflict/apply', {
-    body: { path: 'app.txt', content: 'merged\n' },
+    body: { path: 'app.txt', content: 'merged\n', sourceHash: readConflictFile(root, 'app.txt').sourceHash },
   })
   assert.equal(applied.body.ok, true)
   assert.equal(readFileSync(join(root, 'app.txt'), 'utf8'), 'merged\n')
@@ -197,7 +214,7 @@ test('apply writes the reviewed file and refuses markers or a clean path', async
   })
   apply(notConflicted)
   const refused = await call(notConflicted, '/api/git-tree/conflict/apply', {
-    body: { path: 'app.txt', content: 'merged\n' },
+    body: { path: 'app.txt', content: 'merged\n', sourceHash: readConflictFile(root, 'app.txt').sourceHash },
   })
   assert.equal(refused.body.ok, false)
   assert.equal(refused.body.code, 'not-conflicted')
@@ -211,13 +228,13 @@ test('revert restores the conflicted copy and mark-resolved stages without marke
 
   const reverted = await call(ctx, '/api/git-tree/conflict/revert', { body: { path: 'app.txt' } })
   assert.equal(reverted.body.ok, true)
-  const checkout = ctx.spawns.find((spawn) => spawn.argv[1] === 'checkout')
-  assert.deepEqual(checkout.argv.slice(1), ['checkout', '--merge', '--', 'app.txt'])
+  const checkout = ctx.spawns.find((spawn) => spawn.argv[2] === 'checkout')
+  assert.deepEqual(checkout.argv.slice(1), ['--literal-pathspecs', 'checkout', '--merge', '--', 'app.txt'])
 
   const staged = await call(ctx, '/api/git-tree/conflict/mark-resolved', { body: { path: 'app.txt' } })
   assert.equal(staged.body.ok, true)
-  const add = ctx.spawns.find((spawn) => spawn.argv[1] === 'add')
-  assert.deepEqual(add.argv.slice(1), ['add', '--', 'app.txt'])
+  const add = ctx.spawns.find((spawn) => spawn.argv[2] === 'add')
+  assert.deepEqual(add.argv.slice(1), ['--literal-pathspecs', 'add', '--', 'app.txt'])
 
   writeFileSync(join(root, 'app.txt'), CONFLICTED)
   const stillMarked = await call(ctx, '/api/git-tree/conflict/mark-resolved', { body: { path: 'app.txt' } })

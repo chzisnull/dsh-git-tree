@@ -9,7 +9,7 @@
  * into renderable lines and owns the guards for reading and rewriting it.
  */
 
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { chmodSync, lstatSync, readFileSync, realpathSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { execGit, git } from './git.js'
@@ -22,22 +22,42 @@ export const MAX_CONFLICT_PROMPT_BYTES = 60 * 1024
 /** Largest resolved file a model may hand back. */
 export const MAX_RESOLVED_BYTES = 512 * 1024
 
-const MARKER_START = /^<{7}(?:\s|$)/
-const MARKER_BASE = /^\|{7}(?:\s|$)/
-const MARKER_SEP = /^={7}(?:\s|$)/
-const MARKER_END = /^>{7}(?:\s|$)/
+const MARKER_START = /^(<+)(?:\s|$)/
+const MARKER_BASE = /^(\|+)(?:\s|$)/
+const MARKER_SEP = /^(=+)(?:\s|$)/
+const MARKER_END = /^(>+)(?:\s|$)/
 
-/** True when a text carries at least one conflict block opener. */
+// Short configured markers overlap ordinary source text, so require a complete
+// same-width block; conventional markers still block incomplete resolutions.
+function conflictStarts(lines) {
+  const starts = new Set()
+  const endings = new Set()
+  const separators = new Set()
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index]
+    const end = MARKER_END.exec(line)
+    if (end) endings.add(end[1].length)
+    const separator = MARKER_SEP.exec(line)
+    if (separator && endings.has(separator[1].length)) separators.add(separator[1].length)
+    const start = MARKER_START.exec(line)
+    if (start) {
+      const size = start[1].length
+      if (size >= 7 || separators.has(size)) starts.add(index)
+      endings.delete(size)
+      separators.delete(size)
+    }
+  }
+  return starts
+}
+
+/** True when a text carries conflict markers, including configured short ones. */
 export function hasConflictMarkers(text) {
-  for (const line of String(text).split('\n')) if (MARKER_START.test(line)) return true
-  return false
+  return countConflictBlocks(text) > 0
 }
 
 /** How many conflict blocks a text still carries. */
 export function countConflictBlocks(text) {
-  let count = 0
-  for (const line of String(text).split('\n')) if (MARKER_START.test(line)) count += 1
-  return count
+  return conflictStarts(String(text).split('\n')).size
 }
 
 /**
@@ -50,6 +70,7 @@ export function countConflictBlocks(text) {
 export function parseConflictText(text) {
   const lines = []
   let section = null
+  let markerSize = 0
   let oursLabel = ''
   let theirsLabel = ''
   let blocks = 0
@@ -57,28 +78,31 @@ export function parseConflictText(text) {
   let theirs = 0
   let base = 0
 
-  for (const raw of String(text).split('\n')) {
-    const line = raw.replace(/\r$/, '')
-    if (MARKER_START.test(line)) {
+  const rawLines = String(text).split('\n')
+  const starts = conflictStarts(rawLines)
+  for (let index = 0; index < rawLines.length; index += 1) {
+    const line = rawLines[index].replace(/\r$/, '')
+    if (starts.has(index)) {
       section = 'ours'
+      markerSize = MARKER_START.exec(line)[1].length
       blocks += 1
-      if (!oursLabel) oursLabel = line.replace(/^<{7}\s?/, '').trim()
+      if (!oursLabel) oursLabel = line.slice(markerSize).trim()
       lines.push({ kind: 'marker-start', text: line })
       continue
     }
-    if (MARKER_BASE.test(line) && section !== null) {
+    if (MARKER_BASE.exec(line)?.[1].length === markerSize && section !== null) {
       section = 'base'
       lines.push({ kind: 'marker-base', text: line })
       continue
     }
-    if (MARKER_SEP.test(line) && section !== null) {
+    if (MARKER_SEP.exec(line)?.[1].length === markerSize && section !== null) {
       section = 'theirs'
       lines.push({ kind: 'marker-sep', text: line })
       continue
     }
-    if (MARKER_END.test(line) && section !== null) {
+    if (MARKER_END.exec(line)?.[1].length === markerSize && section !== null) {
       section = null
-      if (!theirsLabel) theirsLabel = line.replace(/^>{7}\s?/, '').trim()
+      if (!theirsLabel) theirsLabel = line.slice(markerSize).trim()
       lines.push({ kind: 'marker-end', text: line })
       continue
     }
@@ -151,7 +175,17 @@ export function readConflictFile(cwd, repoPath) {
   if (stat.size > MAX_CONFLICT_BYTES) {
     throw new RequestError('文件超过 ' + String(MAX_CONFLICT_BYTES / 1024) + ' KB，无法在面板里显示', 409, 'file-too-large')
   }
-  return { ...file, text: readFileSync(file.absolute, 'utf8') }
+  const bytes = readFileSync(file.absolute)
+  const sourceHash = createHash('sha256')
+    .update(realpathOr(cwd)).update('\0').update(repoPath).update('\0').update(bytes).digest('hex')
+  return { ...file, text: bytes.toString('utf8'), sourceHash }
+}
+
+/** Refuse an outdated preview before writing, including one from another repo. */
+export function requireConflictSource(cwd, repoPath, sourceHash) {
+  if (readConflictFile(cwd, repoPath).sourceHash !== sourceHash) {
+    throw new RequestError('文件已变化，请重新生成解决预览', 409, 'stale-source')
+  }
 }
 
 /** Replace a file's contents atomically, keeping its mode. */
@@ -175,7 +209,7 @@ export function writeRepoFile(cwd, repoPath, content) {
 
 /** True when the index still holds unmerged stages for this path. */
 export async function isUnmerged(subprocess, cwd, repoPath) {
-  const out = await git(subprocess, ['ls-files', '-u', '-z', '--', repoPath], cwd, { maxBytes: 64 * 1024 })
+  const out = await git(subprocess, ['--literal-pathspecs', 'ls-files', '-u', '-z', '--', repoPath], cwd, { maxBytes: 64 * 1024 })
   return out.length > 0
 }
 
@@ -188,12 +222,12 @@ export async function requireUnmerged(subprocess, cwd, repoPath) {
 
 /** Restore the conflicted working-tree copy from the index stages. */
 export async function revertConflict(subprocess, cwd, repoPath) {
-  await git(subprocess, ['checkout', '--merge', '--', repoPath], cwd, { maxBytes: 256 * 1024 })
+  await git(subprocess, ['--literal-pathspecs', 'checkout', '--merge', '--', repoPath], cwd, { maxBytes: 256 * 1024 })
 }
 
 /** Stage a resolved file, which removes its unmerged stages. */
 export async function stageResolved(subprocess, cwd, repoPath) {
-  await git(subprocess, ['add', '--', repoPath], cwd, { maxBytes: 256 * 1024 })
+  await git(subprocess, ['--literal-pathspecs', 'add', '--', repoPath], cwd, { maxBytes: 256 * 1024 })
 }
 
 /**

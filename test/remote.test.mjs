@@ -5,7 +5,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { apply } from '../index.js'
-import { mapRemoteFailure, parseAheadBehind, resolvePullTarget, splitUpstream } from '../src/host/remote.js'
+import { mapRemoteDeleteFailure, mapRemoteFailure, parseAheadBehind, remoteDeleteRef, remoteForRef, resolvePullTarget, splitUpstream } from '../src/host/remote.js'
 
 const WORKSPACE = '/tmp/fake-workspace'
 
@@ -69,6 +69,25 @@ function handlerWith({ upstream = 'origin/main', originBranch = true, fetchFail 
     return { exitCode: 0, stdout: '' }
   }
 }
+
+test('remote deletion reverses unique branch refspecs and selects the longest configured name', () => {
+  assert.equal(remoteForRef('team/review/功能/topic', ['team', 'team/review']), 'team/review')
+  assert.equal(remoteForRef('origin/topic', ['upstream']), null)
+  const tracking = 'refs/remotes/team/review/功能/topic'
+  assert.deepEqual(remoteDeleteRef(tracking, ['+refs/heads/release/*:refs/remotes/team/review/*']), { ok: true, ref: 'refs/heads/release/功能/topic' })
+  assert.deepEqual(remoteDeleteRef(tracking, ['refs/heads/server:refs/remotes/team/review/功能/topic']), { ok: true, ref: 'refs/heads/server' })
+  for (const specs of [
+    [], ['+refs/tags/*:refs/remotes/team/review/*'],
+    ['+refs/heads/*:refs/remotes/team/review/*', '+refs/heads/other/*:refs/remotes/team/review/*'],
+    ['+refs/heads/*:refs/remotes/team/review/*', '^refs/heads/功能/*'],
+    ['+refs/heads/static:refs/remotes/team/review/*'],
+    ['+refs/*:refs/*'],
+  ]) assert.equal(remoteDeleteRef(tracking, specs).code, 'remote-mapping-unsupported', specs.join(','))
+  assert.equal(mapRemoteDeleteFailure('! [rejected] topic (stale info)').code, 'remote-stale')
+  assert.equal(mapRemoteDeleteFailure('remote rejected: pre-receive hook declined').code, 'remote-delete-protected')
+  assert.equal(mapRemoteDeleteFailure('remote ref does not exist').code, 'remote-branch-missing')
+  assert.equal(mapRemoteDeleteFailure('fatal: Authentication failed').code, 'auth-failed')
+})
 
 test('upstream splitting keeps branch slashes and refuses garbage', () => {
   assert.deepEqual(splitUpstream('origin/main'), { remote: 'origin', branch: 'main' })

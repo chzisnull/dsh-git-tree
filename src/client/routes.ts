@@ -6,6 +6,7 @@ import type {
   AiMessagePayload,
   AiModelsPayload,
   ConflictResolvePayload,
+  CommitDetailPayload,
   DiffPayload,
   HistoryPayload,
   MutationPayload,
@@ -35,6 +36,7 @@ const PULL_ROUTE = 'api/git-tree/pull'
 const BRANCH_CREATE_ROUTE = 'api/git-tree/branch/create'
 const BRANCH_RENAME_ROUTE = 'api/git-tree/branch/rename'
 const BRANCH_DELETE_ROUTE = 'api/git-tree/branch/delete'
+const REMOTE_BRANCH_DELETE_ROUTE = 'api/git-tree/branch/delete-remote'
 const STAGE_ROUTE = 'api/git-tree/stage'
 const UNSTAGE_ROUTE = 'api/git-tree/unstage'
 const COMMIT_ROUTE = 'api/git-tree/commit'
@@ -149,8 +151,12 @@ export function renameBranch(from: string, to: string, cwd?: string): Promise<Mu
   return postJson<MutationPayload>(BRANCH_RENAME_ROUTE + query({ cwd }), { from, to })
 }
 
-export function deleteBranch(name: string, cwd?: string): Promise<MutationPayload> {
-  return postJson<MutationPayload>(BRANCH_DELETE_ROUTE + query({ cwd }), { name })
+export function deleteBranch(name: string, cwd?: string, force = false): Promise<MutationPayload> {
+  return postJson<MutationPayload>(BRANCH_DELETE_ROUTE + query({ cwd }), { name, force })
+}
+
+export function deleteRemoteBranch(name: string, expectedOid: string, cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(REMOTE_BRANCH_DELETE_ROUTE + query({ cwd }), { name, expectedOid })
 }
 
 export function stagePaths(paths: string[], cwd?: string): Promise<MutationPayload> {
@@ -194,8 +200,8 @@ export function resolveConflict(path: string, cwd?: string): Promise<ConflictRes
   return postJson<ConflictResolvePayload>(CONFLICT_RESOLVE_ROUTE + query({ cwd }), { path })
 }
 
-export function applyConflict(path: string, content: string, cwd?: string): Promise<MutationPayload> {
-  return postJson<MutationPayload>(CONFLICT_APPLY_ROUTE + query({ cwd }), { path, content })
+export function applyConflict(path: string, content: string, sourceHash: string, cwd?: string): Promise<MutationPayload> {
+  return postJson<MutationPayload>(CONFLICT_APPLY_ROUTE + query({ cwd }), { path, content, sourceHash })
 }
 
 export function revertConflict(path: string, cwd?: string): Promise<MutationPayload> {
