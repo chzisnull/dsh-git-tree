@@ -1156,13 +1156,32 @@ function query(params) {
   const text = search.toString();
   return text === "" ? "" : "?" + text;
 }
+async function readResponseJson(response) {
+  const text = await response.text();
+  try {
+    const payload = JSON.parse(text);
+    if (payload && typeof payload === "object" && !Array.isArray(payload) && (response.ok || payload.ok === false)) {
+      return payload;
+    }
+  } catch {
+  }
+  if (response.status === 404) {
+    throw new Error("Git \u63D2\u4EF6\u63A5\u53E3\u4E0D\u53EF\u7528\uFF08HTTP 404\uFF09\uFF0C\u8BF7\u5728\u63D2\u4EF6\u7BA1\u7406\u4E2D\u91CD\u65B0\u542F\u7528 Git \u5DE5\u4F5C\u533A\uFF0C\u6216\u91CD\u542F DSH \u540E\u91CD\u8BD5\u3002");
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new Error("DSH \u62D2\u7EDD\u4E86\u8BF7\u6C42\uFF08HTTP " + response.status + "\uFF09\uFF0C\u8BF7\u68C0\u67E5\u767B\u5F55\u72B6\u6001\u548C\u8BBF\u95EE\u6743\u9650\u3002");
+  }
+  if (response.status >= 500) {
+    throw new Error("Git \u63D2\u4EF6\u670D\u52A1\u6682\u65F6\u4E0D\u53EF\u7528\uFF08HTTP " + response.status + "\uFF09\uFF0C\u8BF7\u7A0D\u540E\u91CD\u8BD5\u3002");
+  }
+  throw new Error("Git \u63D2\u4EF6\u8FD4\u56DE\u4E86\u65E0\u6CD5\u8BC6\u522B\u7684\u54CD\u5E94\uFF08HTTP " + response.status + "\uFF09\uFF0C\u8BF7\u91CD\u542F DSH \u540E\u91CD\u8BD5\u3002");
+}
 async function getJson(route, params, signal) {
   const response = await fetch(route + query(params), {
     signal,
     headers: { accept: "application/json" }
   });
-  const payload = await response.json();
-  return payload;
+  return readResponseJson(response);
 }
 async function postJson(route, body, signal) {
   const response = await fetch(route, {
@@ -1171,7 +1190,7 @@ async function postJson(route, body, signal) {
     headers: { accept: "application/json", "content-type": "application/json" },
     body: JSON.stringify(body)
   });
-  return await response.json();
+  return readResponseJson(response);
 }
 function fetchWorkspaces(signal) {
   return getJson(WORKSPACES_ROUTE, {}, signal);

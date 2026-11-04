@@ -12,7 +12,7 @@ A DeepSeek Harness plugin that gives the Web GUI a Sourcetree-style Git workspac
 
 ## What it does today
 
-Version 0.16.1 provides a Git workspace with file status, history, search, local branches, grouped remote branch browsing, fetch/pull/push, and an AI-assisted commit message. Unstaged files can be selected in bulk to stage them, copy their paths, or delete the untracked ones; the change list keeps its layout compact and stops redrawing when a poll finds nothing new.
+Version 0.16.2 provides a Git workspace with file status, history, search, local branches, grouped remote branch browsing, fetch/pull/push, and an AI-assisted commit message. Unstaged files can be selected in bulk to stage them, copy their paths, or delete the untracked ones; the change list keeps its layout compact and stops redrawing when a poll finds nothing new.
 
 - **A `main` panel**, opened from the `Git` row in DSH's left icon rail — the same kind of seat the Plugins page uses, so it gets the full centre column, the window chrome inset, and DSH's theme for free.
 - **Keyboard shortcut**: `⇧⌘V` (`Ctrl+Shift+V` on Windows) opens the panel from anywhere and closes it again when it is already open. The command is registered through DSH's own shortcut service, so it is listed and rebindable in Settings → Keyboard shortcuts (`⌘/`); the keycap badge in the toolbar and the hint in the empty diff pane always show the binding you actually have. Panel-owned dialogs and the AI conflict preview hold it still, and the commit draft is kept per repository, so a stray press never drops work; when the command has no binding the empty pane points at Settings instead of showing keys.
@@ -40,7 +40,7 @@ Version 0.16.1 provides a Git workspace with file status, history, search, local
 
 ## Status
 
-| Area | 0.16.1 |
+| Area | 0.16.2 |
 | --- | --- |
 | `main` panel + sidebar launcher | done |
 | keyboard shortcut (`⇧⌘V`) | done |
@@ -138,6 +138,8 @@ Git runs without a shell, with `GIT_TERMINAL_PROMPT=0` (never blocks on credenti
 The host mechanism is documented against the installed build in [`docs/dsh-plugin-api.md`](docs/dsh-plugin-api.md) — slot ids, the Fetch-route channel, subprocess safety and theme tokens, all with `file:line` citations into `app.asar`.
 
 ## Install
+
+If remote deletion reports an unavailable host route (HTTP 404) after an update, turn Git Workspace off and on in Plugins to reload the host, or restart DSH. Refreshing the page alone does not guarantee newly added host routes are loaded.
 
 From npm, by name — the package ships both halves and the bundle patch:
 

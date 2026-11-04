@@ -56,6 +56,28 @@ function query(params: Record<string, string | undefined>): string {
   return text === '' ? '' : '?' + text
 }
 
+async function readResponseJson<T>(response: Response): Promise<T> {
+  const text = await response.text()
+  try {
+    const payload = JSON.parse(text)
+    if (payload && typeof payload === 'object' && !Array.isArray(payload) && (response.ok || payload.ok === false)) {
+      return payload as T
+    }
+  } catch {
+    // Missing routes and authentication failures can be plain text or HTML.
+  }
+  if (response.status === 404) {
+    throw new Error('Git 插件接口不可用（HTTP 404），请在插件管理中重新启用 Git 工作区，或重启 DSH 后重试。')
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('DSH 拒绝了请求（HTTP ' + response.status + '），请检查登录状态和访问权限。')
+  }
+  if (response.status >= 500) {
+    throw new Error('Git 插件服务暂时不可用（HTTP ' + response.status + '），请稍后重试。')
+  }
+  throw new Error('Git 插件返回了无法识别的响应（HTTP ' + response.status + '），请重启 DSH 后重试。')
+}
+
 async function getJson<T>(
   route: string,
   params: Record<string, string | undefined>,
@@ -65,8 +87,7 @@ async function getJson<T>(
     signal,
     headers: { accept: 'application/json' },
   })
-  const payload = (await response.json()) as T
-  return payload
+  return readResponseJson<T>(response)
 }
 
 async function postJson<T>(route: string, body: unknown, signal?: AbortSignal): Promise<T> {
@@ -76,7 +97,7 @@ async function postJson<T>(route: string, body: unknown, signal?: AbortSignal): 
     headers: { accept: 'application/json', 'content-type': 'application/json' },
     body: JSON.stringify(body),
   })
-  return (await response.json()) as T
+  return readResponseJson<T>(response)
 }
 
 export function fetchWorkspaces(signal?: AbortSignal): Promise<WorkspacesPayload> {

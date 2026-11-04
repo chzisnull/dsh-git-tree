@@ -96,7 +96,7 @@ function client(testContext, focused = false) {
     const request = { route, params: Object.fromEntries(parsed.searchParams), options, done: false }
     requests.push(request)
     return new Promise((resolve, reject) => {
-      request.respond = (payload) => { request.done = true; resolve({ json: async () => payload }) }
+      request.respond = (payload) => { request.done = true; resolve(payload instanceof Response ? payload : Response.json(payload)) }
       request.reject = (error) => { request.done = true; reject(error) }
       if (route === 'ai/models') request.respond({ ok: true, groups: [], failures: [], active: null })
       if (route === 'workspaces') request.respond({ ok: true, workspaces: [] })
@@ -734,6 +734,57 @@ for (const kind of ['force', 'remote']) {
     assert.ok(app.props('ConfirmDialog').body.includes(record.name))
   })
 }
+
+test('missing remote delete host route shows a restart hint instead of a JSON parse error', async (tc) => {
+  const app = await workspace(tc)
+  app.props('RefRail').onDeleteRemote(ref('origin/topic'))
+  confirmDeletion(app)
+  app.pending('branch/delete-remote').respond(new Response('not found', { status: 404 }))
+  await app.flush()
+  const dialog = app.props('ConfirmDialog')
+  assert.match(dialog.error, /404/)
+  assert.match(dialog.error, /重启.*DSH|restart.*DSH/i)
+  assert.doesNotMatch(dialog.error, /Unexpected token|valid JSON/)
+  assert.equal(dialog.busy, false)
+  assert.equal(app.requests.filter((request) => request.route === 'branch/delete-remote').length, 1)
+})
+
+for (const [statusCode, body, hint] of [
+  [401, 'unauthorized', /登录|权限/],
+  [502, '<html>Bad Gateway</html>', /502.*稍后/],
+  [200, '<html>unexpected page</html>', /无法识别.*200/],
+]) {
+  test(`non-JSON deletion response ${statusCode} shows a useful error without retrying`, async (tc) => {
+    const app = await workspace(tc)
+    app.props('RefRail').onDeleteRemote(ref('origin/topic'))
+    confirmDeletion(app)
+    app.pending('branch/delete-remote').respond(new Response(body, { status: statusCode }))
+    await app.flush()
+    assert.match(app.props('ConfirmDialog').error, hint)
+    assert.doesNotMatch(app.props('ConfirmDialog').error, /Unexpected token|valid JSON/)
+    assert.equal(app.props('ConfirmDialog').busy, false)
+    assert.equal(app.requests.filter((request) => request.route === 'branch/delete-remote').length, 1)
+  })
+}
+
+test('a structured missing-ref response keeps the Git error instead of suggesting a host restart', async (tc) => {
+  const app = await workspace(tc)
+  app.props('RefRail').onDeleteRemote(ref('origin/topic'))
+  confirmDeletion(app)
+  app.pending('branch/delete-remote').respond(Response.json({ ok: false, error: '目标引用已不存在', code: 'unknown-remote-ref' }, { status: 404 }))
+  await app.flush()
+  assert.equal(app.props('ConfirmDialog').error, '目标引用已不存在')
+})
+
+test('non-JSON GET authentication failure shows an access hint in the status banner', async (tc) => {
+  const app = client(tc)
+  const shell = app.mount(app.module.Workspace, { t })
+  app.pending('status').respond(new Response('unauthorized', { status: 401 }))
+  app.pending('refs').respond(refs())
+  await app.flush()
+  assert.match(text(shell.tree), /登录|权限/)
+  assert.doesNotMatch(text(shell.tree), /Unexpected token|valid JSON/)
+})
 
 for (const [kind, scopeKind, expectedScope] of [
   ['remote', 'remote', 'all'], ['remote', 'branch', 'branch:origin/topic'],
